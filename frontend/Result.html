@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>PTU Grade Portal — Puducherry Technological University</title>
+  <meta name="description" content="University Grade Processing, CGPA Computation & Examination Platform — Puducherry Technological University" />
+
+  <!-- Anti-FOUC immediate theme script -->
+  <script>
+    (function() {
+      try {
+        const saved = localStorage.getItem('ptu_theme') || localStorage.getItem('theme');
+        const pref = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const theme = saved || pref || 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = theme;
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="Result.css" />
+</head>
+<body>
+
+  <!-- ╔═══════════════════════════════════════╗ -->
+  <!-- ║  TOAST CONTAINER                      ║ -->
+  <!-- ╚═══════════════════════════════════════╝ -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Particle canvas (homepage hero) -->
+  <canvas id="cyber-network-canvas" aria-hidden="true"></canvas>
+
+  <!-- ═══════════════════════════════════════════
+       PUBLIC NAVIGATION (Homepage / Login / Report Card)
+  ════════════════════════════════════════════ -->
+  <header id="public-navbar" class="public-nav no-print" aria-label="Public portal navigation">
+    <button class="public-nav-brand" onclick="navigateToHome()" title="Back to Homepage">
+      <div class="public-nav-logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 4h14l5 6L14 26 2 10z" fill="url(#publicNavGrad)" />
+          <defs>
+            <linearGradient id="publicNavGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stop-color="#DC2626" />
+              <stop offset="50%"  stop-color="#2563EB" />
+              <stop offset="100%" stop-color="#059669" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="public-nav-title">
+        <span class="public-nav-name">PTU Grade Hub</span>
+        <span class="public-nav-subtitle">Puducherry Technological University</span>
+      </div>
+    </button>
+
+    <div class="public-nav-links">
+      <button class="public-nav-btn" id="nav-btn-home" onclick="navigateToHome()">
+        <span>Home</span>
+      </button>
+      <button class="public-nav-btn" id="nav-btn-student" onclick="openReportCardFromHome()">
+        <span>Student Portal</span>
+      </button>
+      <button class="public-nav-btn" id="nav-btn-staff" onclick="openStaffPortalFromHome()">
+        <span>Staff &amp; Faculty</span>
+      </button>
+
+      <!-- Segmented Theme Switch Pill -->
+      <div class="theme-switch-pill" role="radiogroup" aria-label="Theme switcher">
+        <button type="button" class="theme-switch-option" id="theme-btn-light" onclick="setTheme('light')" role="radio" aria-checked="false" title="Switch to Light Mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+          </svg>
+          <span>Light</span>
+        </button>
+        <button type="button" class="theme-switch-option" id="theme-btn-dark" onclick="setTheme('dark')" role="radio" aria-checked="true" title="Switch to Dark Mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <span>Dark</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 1: HOMEPAGE
+  ════════════════════════════════════════════ -->
+  <section id="home-section" class="auth-wrapper" aria-label="Homepage">
+    <div class="home-hero">
+
+      <!-- Badge -->
+      <div class="home-badge" role="status">
+        <span class="home-badge-dot"></span>
+        Puducherry Technological University
+      </div>
+
+      <!-- Title -->
+      <h1 class="home-title">
+        Academic Grade<br />
+        <span class="accent-red">Portal</span> &amp;
+        <span class="accent-teal">Analytics</span>
+      </h1>
+
+      <!-- Description -->
+      <p class="home-desc">
+        Unified grade processing, CGPA computation, and student self-service — all in one modern, accessible platform.
+      </p>
+
+      <!-- Portal Entry Cards -->
+      <div class="portal-cards" role="navigation" aria-label="Portal entry">
+        <!-- Student Portal -->
+        <button class="portal-card student" onclick="openReportCardFromHome()" aria-label="Open student self-service portal">
+          <div class="portal-card-icon">🎓</div>
+          <div class="portal-card-title">Student Portal</div>
+          <div class="portal-card-desc">View your report card, SGPA &amp; CGPA with instant OTP verification.</div>
+          <div class="portal-card-arrow">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </button>
+
+        <!-- Staff Portal -->
+        <button class="portal-card staff" onclick="openStaffPortalFromHome()" aria-label="Open staff and faculty login">
+          <div class="portal-card-icon">🔐</div>
+          <div class="portal-card-title">Staff &amp; Faculty</div>
+          <div class="portal-card-desc">Manage students, upload results, and administer grades seamlessly.</div>
+          <div class="portal-card-arrow">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </button>
+      </div>
+
+      <!-- Stats Ticker -->
+      <div class="home-stats" aria-label="Platform statistics">
+        <div class="home-stat">
+          <span class="home-stat-num red" id="home-stat-students">0</span>
+          <span class="home-stat-label">Students</span>
+        </div>
+        <div class="home-stat">
+          <span class="home-stat-num teal" id="home-stat-subjects">0</span>
+          <span class="home-stat-label">Subjects</span>
+        </div>
+        <div class="home-stat">
+          <span class="home-stat-num indigo" id="home-stat-results">0</span>
+          <span class="home-stat-label">Results</span>
+        </div>
+        <div class="home-stat">
+          <span class="home-stat-num violet" id="home-stat-depts">0</span>
+          <span class="home-stat-label">Departments</span>
+        </div>
+      </div>
+
+      <p class="home-footer">
+        © 2026 Puducherry Technological University &nbsp;·&nbsp; All Rights Reserved
+      </p>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 2: AUTH — Staff Login
+  ════════════════════════════════════════════ -->
+  <section id="auth-section" class="auth-wrapper hidden" aria-label="Staff authentication">
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <h2 id="auth-title">Staff <span class="accent">Sign In</span></h2>
+        <p id="auth-subtitle">Enter your credentials to access the management portal</p>
+      </div>
+
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)" autocomplete="off" novalidate>
+        <div class="form-group">
+          <label for="auth-username">Username</label>
+          <div style="position:relative;">
+            <span class="input-icon">👤</span>
+            <input type="text" id="auth-username" required placeholder="admin or viewer" autocomplete="username" class="has-icon" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="auth-password" required placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('auth-password', this)" aria-label="Toggle password visibility">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div style="margin-bottom:4px;">
+          <button type="submit" id="auth-submit-btn" class="btn-primary">
+            <span class="btn-spinner"></span>
+            <span class="btn-label" id="auth-submit-label">Sign In</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="auth-footer">
+        <span id="auth-toggle-link" onclick="toggleAuthMode()">Register new account</span>
+      </div>
+      <div class="auth-footer" style="margin-top:8px;">
+        <span onclick="closeStaffPortalFromHome()">← Back to Homepage</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 3: REPORT CARD (Student Self-Service)
+  ════════════════════════════════════════════ -->
+  <section id="report-card-section" class="auth-wrapper hidden" aria-label="Student report card">
+
+    <!-- Step 1: Lookup -->
+    <div class="auth-card report-card-lookup-card" id="rc-step-lookup">
+      <div class="auth-card-header">
+        <h2>🎓 Report Card</h2>
+        <p>Enter your register number and email to receive your one-time passcode</p>
+      </div>
+
+      <!-- Step indicator -->
+      <div class="step-indicator" role="progressbar" aria-valuetext="Step 1 of 3">
+        <div class="step-item active">
+          <div class="step-circle">1</div>
+          <div class="step-label">Lookup</div>
+        </div>
+        <div class="step-item">
+          <div class="step-circle">2</div>
+          <div class="step-label">Verify OTP</div>
+        </div>
+        <div class="step-item">
+          <div class="step-circle">3</div>
+          <div class="step-label">View</div>
+        </div>
+      </div>
+
+      <form id="rc-lookup-form" onsubmit="return false;" autocomplete="off" novalidate>
+        <div class="form-group">
+          <label for="rc-reg-no">Register Number</label>
+          <div style="position:relative;">
+            <span class="input-icon">🆔</span>
+            <input type="text" id="rc-reg-no" class="has-icon" required maxlength="10" placeholder="Enter 10-digit Reg No (e.g. 2401112050)" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label for="rc-email" style="margin-bottom:0;">Email ID (Auto-filled / Editable)</label>
+          </div>
+          <div style="position:relative;">
+            <span class="input-icon">✉️</span>
+            <input type="email" id="rc-email" class="has-icon" required placeholder="e.g. 2401112050@ptuniv.edu.in" autocomplete="email" />
+          </div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <button type="button" id="rc-lookup-btn" class="btn-primary">
+            <span class="btn-spinner"></span>
+            <span class="btn-label">Send OTP</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="auth-footer" style="margin-top:16px;">
+        <span onclick="closeReportCard()">← Back to Homepage</span>
+      </div>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div class="auth-card report-card-lookup-card hidden" id="rc-step-otp">
+      <div class="auth-card-header">
+        <h2>🔐 Verify OTP</h2>
+        <p>We've sent a 6-digit code to <strong id="rc-otp-target-email">your email</strong></p>
+      </div>
+
+      <!-- Step indicator -->
+      <div class="step-indicator" role="progressbar" aria-valuetext="Step 2 of 3">
+        <div class="step-item done">
+          <div class="step-circle">✓</div>
+          <div class="step-label">Lookup</div>
+        </div>
+        <div class="step-item active">
+          <div class="step-circle">2</div>
+          <div class="step-label">Verify OTP</div>
+        </div>
+        <div class="step-item">
+          <div class="step-circle">3</div>
+          <div class="step-label">View</div>
+        </div>
+      </div>
+
+      <form id="rc-otp-form" onsubmit="return false;" autocomplete="off" novalidate>
+        <div class="form-group">
+          <label for="rc-otp-input">One-Time Passcode</label>
+          <div style="position:relative;">
+            <span class="input-icon">🔢</span>
+            <input type="text" id="rc-otp-input" class="otp-input has-icon" required
+                   inputmode="numeric" pattern="\d{6}" maxlength="6"
+                   autocomplete="one-time-code" placeholder="• • • • • •" />
+          </div>
+        </div>
+        <div id="rc-otp-msg" class="rc-otp-msg" aria-live="polite"></div>
+        <div style="margin-top:12px;">
+          <button type="button" id="rc-otp-verify-btn" class="btn-primary">
+            <span class="btn-spinner"></span>
+            <span class="btn-label">Verify &amp; View Report Card</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="auth-footer" style="margin-top:12px;">
+        <span id="rc-otp-resend" onclick="handleResendOtp()">Resend OTP</span>
+      </div>
+      <div class="auth-footer">
+        <span onclick="showRcLookupStep()">← Change Register No / Email</span>
+      </div>
+    </div>
+
+    <!-- Step 3: Output -->
+    <div id="report-card-output" class="report-card-doc hidden">
+      <div class="report-card-actions no-print">
+        <button class="btn-secondary" onclick="closeReportCardOutput()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 12H5M12 5l-7 7 7 7"/></svg>
+          Back
+        </button>
+        <button class="btn-primary" onclick="exportReportCardPDF()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print / Save as PDF
+        </button>
+      </div>
+      <div class="report-card-paper" id="report-card-paper">
+        <!-- populated by renderReportCard() -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 4: DASHBOARD
+  ════════════════════════════════════════════ -->
+  <div id="dashboard-section" class="dashboard-layout hidden" role="application" aria-label="Grade management dashboard">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="main-sidebar" aria-label="Main navigation">
+      <!-- Brand -->
+      <div class="brand">
+        <button class="brand-logo-toggle-btn" onclick="toggleSidebarView()" title="Toggle sidebar" aria-label="Toggle sidebar collapse">
+          <div class="logo-graphic">
+            <!-- Diamond logo -->
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 4h14l5 6L14 26 2 10z" fill="url(#logoGrad)" />
+              <defs>
+                <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%"   stop-color="#DC2626" />
+                  <stop offset="50%"  stop-color="#2563EB" />
+                  <stop offset="100%" stop-color="#059669" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="toggle-graphic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
+            </svg>
+          </div>
+        </button>
+        <div class="brand-text">
+          <span class="brand-name">Grade Hub</span>
+          <span class="brand-sub">PTU · Academic Portal</span>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="nav-menu" aria-label="Dashboard navigation">
+        <button class="nav-item active" onclick="switchView('dashboard')" aria-label="Dashboard">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </span>
+          <span class="label">Dashboard</span>
+        </button>
+        <button class="nav-item" onclick="switchView('upload')" aria-label="Upload Data">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </span>
+          <span class="label">Upload Data</span>
+        </button>
+        <button class="nav-item" onclick="switchView('results')" aria-label="View Results">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </span>
+          <span class="label">View Results</span>
+        </button>
+        <button class="nav-item" onclick="switchView('students')" aria-label="Students">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="label">Students</span>
+        </button>
+        <button class="nav-item" onclick="switchView('subjects')" aria-label="Subjects">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </span>
+          <span class="label">Subjects</span>
+        </button>
+        <button class="nav-item" onclick="switchView('grades')" aria-label="SGPA / CGPA">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
+          <span class="label">SGPA / CGPA</span>
+        </button>
+      </nav>
+
+      <!-- User Profile -->
+      <div class="user-profile">
+        <div class="avatar" id="user-avatar" aria-label="User avatar">U</div>
+        <div class="user-info">
+          <strong class="user-name" id="user-display-name">Loading…</strong>
+          <span class="user-role" id="user-role-badge">VIEWER</span>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()" title="Sign out" aria-label="Sign out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ── MAIN CONTENT ── -->
+    <main class="main-content">
+
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-title-group">
+          <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" onclick="toggleSidebarView()" aria-label="Toggle sidebar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <h1 id="module-title">Dashboard</h1>
+        </div>
+        <div class="header-actions">
+          <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle theme (Alt + T)" onclick="toggleTheme()">
+            <!-- Sun (shown in dark mode to switch to light) -->
+            <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <!-- Moon (shown in light mode to switch to dark) -->
+            <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- ── Content Views ── -->
+      <div class="content-grid">
+
+        <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: DASHBOARD              ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-dashboard" class="panel" role="region" aria-label="System overview">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </span>
+              System Overview
+            </h3>
+          </div>
+
+          <!-- KPI Stats -->
+          <div class="stats-row" id="dashboard-stats">
+            <div class="stat-card red">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Total Students</div>
+                  <div class="stat-value" id="stat-students">0</div>
+                </div>
+                <div class="stat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+              </div>
+              <div class="stat-trend">↑ Registered</div>
+            </div>
+
+            <div class="stat-card teal">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Total Subjects</div>
+                  <div class="stat-value" id="stat-subjects">0</div>
+                </div>
+                <div class="stat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                </div>
+              </div>
+              <div class="stat-trend">↑ Courses</div>
+            </div>
+
+            <div class="stat-card violet">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Total Results</div>
+                  <div class="stat-value" id="stat-results">0</div>
+                </div>
+                <div class="stat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                </div>
+              </div>
+              <div class="stat-trend">↑ Published</div>
+            </div>
+
+            <div class="stat-card amber">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Departments</div>
+                  <div class="stat-value" id="stat-depts">0</div>
+                </div>
+                <div class="stat-icon">🏛️</div>
+              </div>
+              <div class="stat-trend">CE · CSE · ECE…</div>
+            </div>
+          </div>
+
+
+
+          <!-- ============================================================
+               BATCH LIFECYCLE & PURGE GRADUATED BATCH DATA
+               ============================================================ -->
+          <div class="panel-section purge-batch-card admin-only" id="admin-purge-batch-section">
+            <div class="purge-batch-header">
+              <div class="purge-batch-title-wrap">
+                <span class="purge-batch-icon">🗑️</span>
+                <div>
+                  <h4 class="purge-batch-title">Graduated Batch Data Purge</h4>
+                  <p class="purge-batch-desc">Permanently delete all student rosters and exam results for a graduated batch.</p>
+                </div>
+              </div>
+              <span class="badge-danger">Admin Action</span>
+            </div>
+            <form id="admin-purge-batch-form" onsubmit="handlePurgeBatchSubmit(event)" class="purge-batch-form">
+              <div class="purge-batch-input-group">
+                <select id="dashboard-purge-batch-select" required>
+                  <option value="">Select graduated batch to delete…</option>
+                </select>
+              </div>
+              <button type="submit" id="dashboard-purge-batch-btn" class="btn-danger-solid purge-batch-btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-label">Delete Batch Data</span>
+              </button>
+            </form>
+            <div id="dashboard-purge-batch-msg" class="testing-rc-msg" style="display:none;"></div>
+          </div>
+
+          <!-- ============================================================
+               [TESTING ONLY] DIRECT REPORT CARD GENERATOR (START)
+               To remove: delete this block and the modal markup below.
+               ============================================================ -->
+          <div class="panel-section testing-report-card-card" id="admin-direct-rc-section">
+            <div class="testing-rc-header">
+              <div class="testing-rc-title-wrap">
+                <span class="testing-rc-icon">🎓</span>
+                <div>
+                  <h4 class="testing-rc-title">Generate Student Report Card</h4>
+                  <p class="testing-rc-desc">Direct student transcript lookup without OTP verification (Testing mode).</p>
+                </div>
+              </div>
+              <span class="badge-testing">Testing · No OTP</span>
+            </div>
+            <form id="admin-direct-rc-form" onsubmit="handleAdminDirectReportCard(event)" class="testing-rc-form">
+              <div class="testing-rc-input-group">
+                <span class="input-icon">🆔</span>
+                <input type="text" id="admin-rc-regno" class="has-icon" placeholder="Enter student Reg No (e.g. 2301104045)" required autocomplete="off" />
+              </div>
+              <button type="submit" id="admin-rc-btn" class="btn-primary testing-rc-btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-label">Generate Report Card</span>
+              </button>
+            </form>
+            <div id="admin-rc-msg" class="testing-rc-msg" style="display:none;"></div>
+          </div>
+          <!-- ============================================================
+               [TESTING ONLY] DIRECT REPORT CARD GENERATOR (END)
+               ============================================================ -->
+        </div>
+
+        <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: UPLOAD DATA            ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-upload" class="panel hidden" role="region" aria-label="Upload data">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon" style="background:var(--teal-glass);color:var(--teal);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </span>
+              Upload Data
+            </h3>
+            <span class="text-muted" style="font-size:0.82rem;">Bulk-import records or add a new result set</span>
+          </div>
+
+          <div class="upload-block">
+            <!-- Upload Students -->
+            <div class="upload-card" data-upload-card>
+              <div class="upload-card-icon">🧑‍🎓</div>
+              <h4>Upload Students</h4>
+              <p class="upload-card-hint">Excel workbook (.xlsx / .xls) with student roll details</p>
+              <form id="upload-students-form" onsubmit="handleUploadStudents(event)" enctype="multipart/form-data">
+                <label class="file-dropzone" for="students-file-input" tabindex="0">
+                  <input type="file" id="students-file-input" name="file" accept=".xlsx,.xls" required />
+                  <div class="file-dropzone-body">
+                    <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4H3v4a2 2 0 0 0 2 2z"/></svg>
+                    <span class="file-dropzone-text">Drag &amp; drop, or <em>browse</em></span>
+                    <span class="file-dropzone-filename"></span>
+                  </div>
+                </label>
+                <button type="submit" class="btn-primary upload-submit-btn">
+                  <span class="btn-spinner"></span><span class="btn-label">Upload Students</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Upload Subjects -->
+            <div class="upload-card" data-upload-card>
+              <div class="upload-card-icon">📚</div>
+              <h4>Upload Subjects</h4>
+              <p class="upload-card-hint">PDF containing the university subject master list</p>
+              <form id="upload-subjects-form" onsubmit="handleUploadSubjects(event)" enctype="multipart/form-data">
+                <label class="file-dropzone" for="subjects-file-input" tabindex="0">
+                  <input type="file" id="subjects-file-input" name="file" accept=".pdf" required />
+                  <div class="file-dropzone-body">
+                    <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4H3v4a2 2 0 0 0 2 2z"/></svg>
+                    <span class="file-dropzone-text">Drag &amp; drop, or <em>browse</em></span>
+                    <span class="file-dropzone-filename"></span>
+                  </div>
+                </label>
+                <button type="submit" class="btn-primary upload-submit-btn">
+                  <span class="btn-spinner"></span><span class="btn-label">Upload Subjects</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Upload Results -->
+            <div class="upload-card upload-card-wide upload-card-results" data-upload-card>
+              <div class="upload-results-grid">
+                <div class="upload-results-info">
+                  <div class="upload-card-icon upload-card-icon-lg">📋</div>
+                  <h4>Upload Results</h4>
+                  <p class="upload-card-hint">The PDF results sheet, tagged with semester &amp; batch so records file themselves into the right place automatically.</p>
+                  <ul class="upload-results-steps">
+                    <li><span class="step-num">1</span>Tell us which semester &amp; batch this belongs to</li>
+                    <li><span class="step-num">2</span>Drop in the results PDF</li>
+                    <li><span class="step-num">3</span>We parse it and match students automatically</li>
+                  </ul>
+                </div>
+                <form id="upload-results-form" onsubmit="handleUploadResults(event)" enctype="multipart/form-data" class="upload-results-form">
+                  <div class="form-row" style="margin-bottom:16px;">
+                    <div class="form-group">
+                      <label for="upload-semester">Semester</label>
+                      <select id="upload-semester" required>
+                        <option value="I">I</option><option value="II">II</option><option value="III">III</option>
+                        <option value="IV">IV</option><option value="V">V</option><option value="VI">VI</option>
+                        <option value="VII">VII</option><option value="VIII">VIII</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="upload-batch">Batch</label>
+                      <select id="upload-batch"><option value="">Select batch</option></select>
+                    </div>
+                  </div>
+                  <label class="file-dropzone" for="results-file-input" tabindex="0">
+                    <input type="file" id="results-file-input" name="file" accept=".pdf" required />
+                    <div class="file-dropzone-body">
+                      <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4H3v4a2 2 0 0 0 2 2z"/></svg>
+                      <span class="file-dropzone-text">Drag &amp; drop the results PDF, or <em>browse</em></span>
+                      <span class="file-dropzone-filename"></span>
+                    </div>
+                  </label>
+                  <button type="submit" class="btn-primary upload-submit-btn">
+                    <span class="btn-spinner"></span><span class="btn-label">Upload Results</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Upload Re-evaluation -->
+            <div class="upload-card upload-card-wide upload-card-results" data-upload-card>
+              <div class="upload-results-grid">
+                <div class="upload-results-info">
+                  <div class="upload-card-icon upload-card-icon-lg">🧾</div>
+                  <h4>Upload Re-Evaluation</h4>
+                  <p class="upload-card-hint">The PDF re-evaluation results sheet. Only corrects results that already exist — an improved grade clears the arrear status.</p>
+                  <ul class="upload-results-steps">
+                    <li><span class="step-num">1</span>Tell us which semester &amp; batch this belongs to</li>
+                    <li><span class="step-num">2</span>Drop in the re-evaluation results PDF</li>
+                    <li><span class="step-num">3</span>Existing results are validated &amp; updated</li>
+                  </ul>
+                </div>
+                <form id="upload-reevaluation-form" onsubmit="handleUploadReevaluation(event)" enctype="multipart/form-data" class="upload-results-form">
+                  <div class="form-row" style="margin-bottom:16px;">
+                    <div class="form-group">
+                      <label for="reeval-semester">Semester</label>
+                      <select id="reeval-semester" required>
+                        <option value="I">I</option><option value="II">II</option><option value="III">III</option>
+                        <option value="IV">IV</option><option value="V">V</option><option value="VI">VI</option>
+                        <option value="VII">VII</option><option value="VIII">VIII</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="reeval-batch">Batch</label>
+                      <select id="reeval-batch"><option value="">Select batch</option></select>
+                    </div>
+                  </div>
+                  <label class="file-dropzone" for="reeval-file-input" tabindex="0">
+                    <input type="file" id="reeval-file-input" name="file" accept=".pdf" required />
+                    <div class="file-dropzone-body">
+                      <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4H3v4a2 2 0 0 0 2 2z"/></svg>
+                      <span class="file-dropzone-text">Drag &amp; drop the re-evaluation PDF, or <em>browse</em></span>
+                      <span class="file-dropzone-filename"></span>
+                    </div>
+                  </label>
+                  <button type="submit" class="btn-primary upload-submit-btn">
+                    <span class="btn-spinner"></span><span class="btn-label">Upload Re-Evaluation</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+
+          </div><!-- /.upload-block -->
+          <div id="upload-status"></div>
+        </div>
+
+        <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: RESULTS                ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-results" class="panel hidden" role="region" aria-label="Student results">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon" style="background:var(--violet-glass);color:var(--violet);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </span>
+              Student Results
+            </h3>
+            <div class="counter-indicator-pill" id="results-count-display">
+              <span class="counter-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </span>
+              <span class="counter-text">
+                <strong id="results-showing-count" class="counter-number">0</strong>
+                <span id="results-total-count-wrap" class="counter-total-wrap"></span>
+                <span class="counter-label">Results</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Batch tabs for Results -->
+          <div class="dept-tabs" id="results-batch-tabs-container"></div>
+
+          <!-- Filters -->
+          <div class="filter-row" role="search" aria-label="Filter results">
+            <div class="form-group">
+              <label for="filter-department">Department</label>
+              <select id="filter-department" onchange="applyFilters()">
+                <option value="">All Depts</option>
+                <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
+                <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
+                <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filter-semester">Semester</label>
+              <select id="filter-semester" onchange="applyFilters()">
+                <option value="">All Sems</option>
+                <option value="I">I</option><option value="II">II</option><option value="III">III</option>
+                <option value="IV">IV</option><option value="V">V</option><option value="VI">VI</option>
+                <option value="VII">VII</option><option value="VIII">VIII</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filter-regno">Reg No</label>
+              <input type="text" id="filter-regno" placeholder="e.g. 2401106001" oninput="applyFilters()" />
+            </div>
+            <div class="form-group">
+              <label for="filter-name">Student Name</label>
+              <input type="text" id="filter-name" placeholder="Search name…" oninput="applyFilters()" />
+            </div>
+          </div>
+
+          <!-- Edit Result form -->
+          <div id="result-form-container" class="inline-form-panel" style="display:none;">
+            <form id="result-form" onsubmit="handleResultSubmit(event)">
+              <div class="inline-form-row">
+                <input type="text" id="result-edit-regno" placeholder="Reg No" disabled style="background:var(--bg-muted);" />
+                <input type="text" id="result-edit-name" placeholder="Name" disabled style="background:var(--bg-muted);" />
+                <input type="text" id="result-edit-subject" placeholder="Subject" disabled style="background:var(--bg-muted);" />
+                <input type="text" id="result-edit-semester" placeholder="Semester" disabled style="background:var(--bg-muted);" />
+                <select id="result-grade" required class="compact-select" style="flex:0 0 90px;">
+                  <option value="O">O</option><option value="A+">A+</option><option value="A">A</option>
+                  <option value="B+">B+</option><option value="B">B</option><option value="C">C</option>
+                  <option value="F">F</option>
+                </select>
+                <button type="submit" class="btn-primary" style="width:auto;">Save Grade</button>
+                <button type="button" class="btn-secondary" onclick="hideEditResultForm()" style="width:auto;">Cancel</button>
+              </div>
+              <p class="form-hint" style="margin-top:8px;">
+                ℹ️ Re-evaluation edit: Correcting a grade here removes an arrear. Arrear status is only set when results are published through Upload Results.
+              </p>
+              <input type="hidden" id="result-edit-id" />
+            </form>
+          </div>
+
+          <!-- Table -->
+          <div id="results-table-container" class="table-scroll-region">
+            <table class="data-table" id="results-table">
+              <thead>
+                <tr>
+                  <th>Reg No</th><th>Name</th><th>Dept</th><th>Sem</th>
+                  <th>Subject Code</th><th>Subject Name</th><th>Credits</th>
+                  <th>Grade</th><th>Grade Pt.</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="results-tbody">
+                <tr><td colspan="10" class="loading-cell">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination & Actions Row -->
+          <div class="results-pagination-bar" id="results-pagination-controls">
+            <div class="pagination-info">
+              <span id="results-page-info">Showing 0-0 of 0</span>
+              <div class="page-size-wrap">
+                <label for="results-page-size">Per page:</label>
+                <select id="results-page-size" onchange="changeResultsPageSize(this.value)">
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+            </div>
+            <div class="pagination-buttons">
+              <button type="button" class="btn-page" id="results-prev-btn" onclick="prevResultsPage()" title="Previous Page">← Prev</button>
+              <span class="page-current-indicator" id="results-current-page">1</span>
+              <button type="button" class="btn-page" id="results-next-btn" onclick="nextResultsPage()" title="Next Page">Next →</button>
+            </div>
+            <button class="btn-export" onclick="exportResultsToExcel()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Export Excel
+            </button>
+          </div>
+        </div>
+
+        <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: STUDENTS               ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-students" class="panel hidden" role="region" aria-label="Student management">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon" style="background:var(--teal-glass);color:var(--teal);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              </span>
+              Student Management
+            </h3>
+          </div>
+
+          <!-- Batch tabs -->
+          <div class="dept-tabs" id="batch-tabs-container"></div>
+          <!-- Section tabs -->
+          <div class="dept-tabs"><div class="dept-tabs-scroll" id="section-tabs-container"></div></div>
+
+          <div class="tab-content-area">
+            <div class="subjects-actions-row">
+              <button class="btn-small btn-small-accent" onclick="showAddStudentForm()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Student
+              </button>
+              <div class="table-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" id="students-search-input" placeholder="Search by name, reg no, department…" oninput="filterStudentsSearch(this.value)" />
+              </div>
+              <div class="counter-indicator-pill" id="students-count-display">
+                <span class="counter-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </span>
+                <span class="counter-text">
+                  <strong id="students-showing-count" class="counter-number">0</strong>
+                  <span id="students-total-count-wrap" class="counter-total-wrap"></span>
+                  <span class="counter-label">Students</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Add/Edit Student form -->
+            <div id="student-form-container" class="inline-form-panel" style="display:none;">
+              <form id="student-form" onsubmit="handleStudentSubmit(event)">
+                <div class="inline-form-row">
+                  <input type="text" id="student-regno" placeholder="Reg No" required />
+                  <input type="text" id="student-name" placeholder="Name" required />
+                  <input type="text" id="student-dept" placeholder="Department" required />
+                  <input type="text" id="student-programme" placeholder="Programme (e.g. Bachelor of Tech.)" />
+                  <input type="text" id="student-batch" placeholder="Batch (e.g. 2024-2028)" />
+                  <input type="text" id="student-section" placeholder="Section" />
+                  <input type="email" id="student-email" placeholder="Email (auto-generated)" disabled style="background:var(--bg-muted);" />
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="student-repeater" style="width:auto;" /> Repeater
+                  </label>
+                  <button type="submit" class="btn-primary" style="width:auto;">Save Student</button>
+                  <button type="button" class="btn-secondary" onclick="hideAddStudentForm()" style="width:auto;">Cancel</button>
+                </div>
+                <input type="hidden" id="student-edit-id" />
+              </form>
+            </div>
+
+            <div id="students-table-container" class="table-scroll-region">
+              <table class="data-table" id="students-table">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Reg No</th><th>Name</th><th>Department</th>
+                    <th>Programme</th><th>Batch</th><th>Section</th><th>Email</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="students-tbody">
+                  <tr><td colspan="9" class="loading-cell">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: SUBJECTS               ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-subjects" class="panel hidden" role="region" aria-label="Subject master">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon" style="background:var(--violet-glass);color:var(--violet);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              </span>
+              Subject Master
+            </h3>
+          </div>
+
+          <!-- Dept tabs -->
+          <div class="dept-tabs">
+            <div class="dept-tabs-scroll" id="dept-tabs-container"></div>
+          </div>
+
+          <div class="tab-content-area">
+            <div class="subjects-actions-row">
+              <button class="btn-small btn-small-accent" onclick="showAddSubjectForm()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Subject
+              </button>
+              <div class="table-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" id="subjects-search-input" placeholder="Search by code, name, department…" oninput="filterSubjectsSearch(this.value)" />
+              </div>
+              <div class="counter-indicator-pill" id="subjects-count-display">
+                <span class="counter-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                </span>
+                <span class="counter-text">
+                  <strong id="subjects-showing-count" class="counter-number">0</strong>
+                  <span id="subjects-total-count-wrap" class="counter-total-wrap"></span>
+                  <span class="counter-label">Subjects</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Add/Edit Subject form -->
+            <div id="subject-form-container" class="inline-form-panel" style="display:none;">
+              <form id="subject-form" onsubmit="handleSubjectSubmit(event)">
+                <div class="inline-form-row">
+                  <input type="text" id="subject-code" placeholder="Code (e.g. MAUC101)" required />
+                  <input type="text" id="subject-name" placeholder="Name" required />
+                  <input type="number" id="subject-credits" placeholder="Credits" step="0.5" required />
+                  <input type="text" id="subject-semester" placeholder="Semester (e.g. I)" required />
+                  <input type="text" id="subject-dept" placeholder="Department (optional)" />
+                  <button type="submit" class="btn-primary" style="width:auto;">Save Subject</button>
+                  <button type="button" class="btn-secondary" onclick="hideAddSubjectForm()" style="width:auto;">Cancel</button>
+                </div>
+                <input type="hidden" id="subject-edit-id" />
+              </form>
+            </div>
+
+            <div id="subjects-table-container" class="table-scroll-region">
+              <table class="data-table" id="subjects-table">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Code</th><th>Name</th><th>Credits</th>
+                    <th>Semester</th><th>Department</th><th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="subjects-tbody">
+                  <tr><td colspan="7" class="loading-cell">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: SGPA / CGPA            ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-grades" class="panel hidden" role="region" aria-label="SGPA and CGPA summary">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon" style="background:var(--indigo-glass);color:var(--indigo);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </span>
+              SGPA / CGPA Summary
+            </h3>
+            <button class="btn-export" onclick="exportGradesToExcel()" style="font-size:0.80rem; padding:7px 14px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Export Excel
+            </button>
+          </div>
+
+          <!-- Filters -->
+          <div class="filter-row grades-filter-row" role="search" aria-label="Filter grades">
+            <div class="form-group">
+              <label for="grade-filter-dept">Department</label>
+              <select class="compact-select" id="grade-filter-dept" onchange="loadGrades()">
+                <option value="">All</option>
+                <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
+                <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
+                <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="grade-filter-sem">Semester (SGPA)</label>
+              <select class="compact-select" id="grade-filter-sem" onchange="loadGrades()">
+                <option value="">Overall CGPA</option>
+                <option value="I">I</option><option value="II">II</option><option value="III">III</option>
+                <option value="IV">IV</option><option value="V">V</option><option value="VI">VI</option>
+                <option value="VII">VII</option><option value="VIII">VIII</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="grade-filter-batch">Batch</label>
+              <select class="compact-select" id="grade-filter-batch" onchange="loadGrades()">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="grade-filter-sort">Sort by CGPA</label>
+              <select class="compact-select" id="grade-filter-sort" onchange="loadGrades()">
+                <option value="desc">↓ Descending</option>
+                <option value="asc">↑ Ascending</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="grade-filter-credits-sort">Sort by Credits (Total Cr.)</label>
+              <select class="compact-select" id="grade-filter-credits-sort" onchange="loadGrades()">
+                <option value="none">None</option>
+                <option value="asc">↑ Ascending</option>
+                <option value="desc">↓ Descending</option>
+              </select>
+            </div>
+            <!-- Arrear multi-select -->
+            <div class="form-group">
+              <label>Arrear Status</label>
+              <div class="multi-select" id="grade-filter-arrears-wrap">
+                <button type="button" class="multi-select-btn compact-select" id="grade-filter-arrears-btn" onclick="toggleArrearDropdown(event)">
+                  <span id="grade-filter-arrears-label">ALL</span>
+                  <span class="multi-select-caret">▾</span>
+                </button>
+                <div class="multi-select-menu hidden" id="grade-filter-arrears-menu">
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="all" id="arrear-opt-all" checked onchange="onArrearAllToggle(this)" /> ALL
+                  </label>
+                  <div class="multi-select-divider"></div>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="0" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                    <span class="arrear-dot-0"></span> No Arrears
+                  </label>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="1" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                    <span class="arrear-dot-1"></span> 1 Arrear
+                  </label>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="2" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                    <span class="arrear-dot-2"></span> 2 Arrears
+                  </label>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="3+" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                    <span class="arrear-dot-3"></span> 3+ Arrears
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grades Table -->
+          <div id="grades-table-container" class="table-scroll-region">
+            <table class="data-table" id="grades-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Reg No</th><th>Name</th><th>Department</th>
+                  <th>Semester</th><th>SGPA</th><th>CGPA</th><th>Total Cr.</th>
+                  <th>Earned Cr.</th><th>Arrears</th>
+                </tr>
+              </thead>
+              <tbody id="grades-tbody">
+                <tr><td colspan="10" class="loading-cell">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /.content-grid -->
+    </main>
+
+  </div><!-- /#dashboard-section -->
+
+  <!-- ============================================================
+       [TESTING ONLY] ADMIN REPORT CARD MODAL (START)
+       To remove: delete this modal container.
+       ============================================================ -->
+  <div id="admin-rc-modal" class="admin-modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Student Report Card Transcript" onclick="if(event.target===this) closeAdminRcModal()">
+    <div class="admin-modal-content report-card-doc">
+      <div class="report-card-actions no-print">
+        <button type="button" class="btn-secondary" onclick="closeAdminRcModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 12H5M12 5l-7 7 7 7"/></svg>
+          Back to Dashboard
+        </button>
+        <button type="button" class="btn-primary" onclick="exportAdminReportCardPDF()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print / Save as PDF
+        </button>
+      </div>
+      <div class="report-card-paper" id="admin-report-card-paper">
+        <!-- populated by renderReportCard(data, 'admin-report-card-paper') -->
+      </div>
+    </div>
+  </div>
+  <!-- ============================================================
+       [TESTING ONLY] ADMIN REPORT CARD MODAL (END)
+       ============================================================ -->
+
+  <!-- App scripts -->
+  <script src="Result.js"></script>
+  <script src="Result-motion.js"></script>
+
+</body>
+</html>
