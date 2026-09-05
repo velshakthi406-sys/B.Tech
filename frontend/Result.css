@@ -583,6 +583,41 @@ h1,h2,h3,h4,h5,h6 {
   font-weight: 500;
 }
 
+/* ── Notice Marquee ── */
+.notice-marquee {
+  width: 100%;
+  max-width: 560px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: var(--primary-glass);
+  padding: 10px 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+}
+.notice-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: notice-marquee-scroll 18s linear infinite;
+}
+.notice-marquee-item {
+  flex-shrink: 0;
+  padding: 0 32px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+}
+@keyframes notice-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-marquee-track { animation: none; }
+}
+
 /* ── Portal Entry Cards ── */
 .portal-cards {
   display: grid;
