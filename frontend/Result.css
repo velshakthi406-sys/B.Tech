@@ -2238,7 +2238,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   border: 1.2px solid #cbd5e1;
   border-radius: 12px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible; /* was 'hidden' — clipped grade chips on mobile when table overflows horizontally */
   -webkit-overflow-scrolling: touch;
   background: #f8fafc;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -2523,12 +2523,12 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   /* Report Card Mobile Table & Grade Visibility */
   .rc-table-card {
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible; /* was 'hidden' — caused grade column to be clipped on narrow viewports */
     -webkit-overflow-scrolling: touch;
   }
   .rc-pdf-table {
     width: 100%;
-    min-width: 320px;
+    min-width: 480px; /* raised from 320px — ensures all 5 columns incl. grade are reachable via scroll */
     font-size: 0.78rem;
   }
   .rc-pdf-table th {
@@ -2566,6 +2566,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   }
   .rc-th-gr, .rc-cell-grade {
     width: 58px;
+    min-width: 52px; /* prevents grade column from being squeezed to zero */
     padding: 8px 4px;
   }
   .rc-cell-grade .grade-chip {
@@ -2793,6 +2794,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   }
   .rc-th-gr, .rc-cell-grade {
     width: 52px;
+    min-width: 48px; /* prevents grade column from being squeezed to zero */
     padding: 7px 2px;
   }
   .rc-cell-grade .grade-chip {
@@ -3011,10 +3013,10 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
     print-color-adjust: exact !important;
   }
 
-  /* Cumulative CGPA Summary Card — always render in dark style for print */
+  /* Cumulative CGPA Summary Card */
   .rc-pdf-cgpa-card {
-    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #172554 100%) !important;
-    border: 1.5px solid rgba(99, 102, 241, 0.35) !important;
+    background: #f1f5f9 !important;
+    border: 1.5px solid #cbd5e1 !important;
     border-radius: 12px !important;
     padding: 14px 20px !important;
     margin-top: 16px !important;
@@ -3022,55 +3024,37 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
     break-inside: avoid !important;
     page-break-inside: avoid !important;
     box-shadow: none !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
   }
 
   .rc-pdf-cgpa-card::before {
-    display: block !important;
-    background: linear-gradient(180deg, #dc2626 0%, #8b5cf6 100%) !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    display: none !important;
   }
 
   .rc-cgpa-card-score {
     font-size: 2.5rem !important;
-    background: linear-gradient(135deg, #f43f5e 0%, #fb7185 50%, #fca5a5 100%) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    color: transparent !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    color: #e11d48 !important;
+    -webkit-text-fill-color: #e11d48 !important;
+    background: none !important;
   }
 
   .rc-cgpa-card-title {
-    color: #a5b4fc !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    color: #475569 !important;
   }
 
   .rc-cgpa-stat-lbl {
-    color: #cbd5e1 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    color: #475569 !important;
   }
 
   .rc-cgpa-stat-val {
-    color: #f8fafc !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    color: #0f172a !important;
   }
 
   .rc-val-percent {
-    color: #38bdf8 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    color: #0284c7 !important;
   }
 
   .rc-val-earned {
-    color: #34d399 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    color: #059669 !important;
   }
 
   .data-table { min-width: unset; }
