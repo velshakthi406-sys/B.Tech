@@ -864,14 +864,14 @@ def _send_via_smtp(to_email: str, subject: str, text_body: str, html_body: str) 
 
 def _dispatch_email(to_email: str, subject: str, text_body: str, html_body: str) -> bool:
     """Send email using HTTPS APIs (works on Render free tier where SMTP is blocked) or standard SMTP."""
-    # 1. Resend API (HTTP port 443)
-    if RESEND_API_KEY:
-        if _send_via_resend(RESEND_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body):
-            return True
-
-    # 2. Brevo API (HTTP port 443)
+    # 1. Brevo API (HTTP port 443 - works without domain verification)
     if BREVO_API_KEY:
         if _send_via_brevo(BREVO_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body):
+            return True
+
+    # 2. Resend API (HTTP port 443 - requires verified custom domain for outside recipients)
+    if RESEND_API_KEY:
+        if _send_via_resend(RESEND_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body):
             return True
 
     # 3. SendGrid API (HTTP port 443)
