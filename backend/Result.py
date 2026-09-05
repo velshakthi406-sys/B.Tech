@@ -82,7 +82,9 @@ SubjectsBase = declarative_base()
 BatchBase = declarative_base()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("grade_system")
+logger.setLevel(logging.INFO)
 
 # ------------------------------------------
 # Report-card OTP configuration
@@ -737,7 +739,7 @@ def _verify_otp_hash(otp: str, hashed: str) -> bool:
     except ValueError:
         return False
 
-def _send_via_resend(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+def _send_via_resend(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> Tuple[bool, str]:
     url = "https://api.resend.com/emails"
     custom_from = os.getenv("RESEND_FROM_EMAIL", "").strip()
     if custom_from:
@@ -765,17 +767,22 @@ def _send_via_resend(api_key: str, from_email: str, from_name: str, to_email: st
     )
     try:
         with urllib.request.urlopen(req, timeout=8) as resp:
-            return 200 <= resp.status < 300
+            if 200 <= resp.status < 300:
+                print(f"[RESEND-SUCCESS] Sent email to {to_email}", flush=True)
+                return True, "OK"
+            return False, f"Resend returned HTTP {resp.status}"
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode("utf-8", errors="ignore")
+        print(f"[RESEND-ERROR] HTTP {e.code}: {err_msg} (sender={sender}, to={to_email})", flush=True)
         logger.error("Resend API HTTP %s: %s (from=%s, to=%s)", e.code, err_msg, sender, to_email)
-        return False
+        return False, f"Resend HTTP {e.code}: {err_msg}"
     except Exception as e:
+        print(f"[RESEND-ERROR] Exception: {e}", flush=True)
         logger.error("Resend API failed: %s", e)
-        return False
+        return False, f"Resend error: {e}"
 
 
-def _send_via_brevo(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+def _send_via_brevo(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> Tuple[bool, str]:
     url = "https://api.brevo.com/v3/smtp/email"
     sender_email = os.getenv("BREVO_FROM_EMAIL", "").strip() or from_email or "velshakthi406@gmail.com"
     payload = json.dumps({
@@ -797,17 +804,22 @@ def _send_via_brevo(api_key: str, from_email: str, from_name: str, to_email: str
     )
     try:
         with urllib.request.urlopen(req, timeout=8) as resp:
-            return 200 <= resp.status < 300
+            if 200 <= resp.status < 300:
+                print(f"[BREVO-SUCCESS] Sent email to {to_email}", flush=True)
+                return True, "OK"
+            return False, f"Brevo returned HTTP {resp.status}"
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode("utf-8", errors="ignore")
+        print(f"[BREVO-ERROR] HTTP {e.code}: {err_msg} (sender={sender_email}, to={to_email})", flush=True)
         logger.error("Brevo API HTTP %s: %s (sender=%s, to=%s)", e.code, err_msg, sender_email, to_email)
-        return False
+        return False, f"Brevo HTTP {e.code}: {err_msg}"
     except Exception as e:
+        print(f"[BREVO-ERROR] Exception: {e}", flush=True)
         logger.error("Brevo API failed: %s", e)
-        return False
+        return False, f"Brevo error: {e}"
 
 
-def _send_via_sendgrid(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+def _send_via_sendgrid(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> Tuple[bool, str]:
     url = "https://api.sendgrid.com/v3/mail/send"
     payload = json.dumps({
         "personalizations": [{"to": [{"email": to_email}]}],
@@ -829,14 +841,19 @@ def _send_via_sendgrid(api_key: str, from_email: str, from_name: str, to_email: 
     )
     try:
         with urllib.request.urlopen(req, timeout=8) as resp:
-            return 200 <= resp.status < 300
+            if 200 <= resp.status < 300:
+                print(f"[SENDGRID-SUCCESS] Sent email to {to_email}", flush=True)
+                return True, "OK"
+            return False, f"SendGrid returned HTTP {resp.status}"
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode("utf-8", errors="ignore")
+        print(f"[SENDGRID-ERROR] HTTP {e.code}: {err_msg}", flush=True)
         logger.error("SendGrid API HTTP %s: %s", e.code, err_msg)
-        return False
+        return False, f"SendGrid HTTP {e.code}: {err_msg}"
     except Exception as e:
+        print(f"[SENDGRID-ERROR] Exception: {e}", flush=True)
         logger.error("SendGrid API failed: %s", e)
-        return False
+        return False, f"SendGrid error: {e}"
 
 
 def _send_via_smtp(to_email: str, subject: str, text_body: str, html_body: str) -> bool:
@@ -862,35 +879,53 @@ def _send_via_smtp(to_email: str, subject: str, text_body: str, html_body: str) 
     return True
 
 
-def _dispatch_email(to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+def _dispatch_email(to_email: str, subject: str, text_body: str, html_body: str) -> Tuple[bool, str]:
     """Send email using HTTPS APIs (works on Render free tier where SMTP is blocked) or standard SMTP."""
+    errors = []
+
     # 1. Brevo API (HTTP port 443 - works without domain verification)
-    if BREVO_API_KEY:
-        if _send_via_brevo(BREVO_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body):
-            return True
+    brevo_key = (os.getenv("BREVO_API_KEY") or BREVO_API_KEY or "").strip()
+    if brevo_key:
+        ok, detail = _send_via_brevo(brevo_key, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body)
+        if ok:
+            return True, "Delivered via Brevo"
+        errors.append(detail)
 
     # 2. Resend API (HTTP port 443 - requires verified custom domain for outside recipients)
-    if RESEND_API_KEY:
-        if _send_via_resend(RESEND_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body):
-            return True
+    resend_key = (os.getenv("RESEND_API_KEY") or RESEND_API_KEY or "").strip()
+    if resend_key:
+        ok, detail = _send_via_resend(resend_key, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body)
+        if ok:
+            return True, "Delivered via Resend"
+        errors.append(detail)
 
     # 3. SendGrid API (HTTP port 443)
-    if SENDGRID_API_KEY:
-        if _send_via_sendgrid(SENDGRID_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body):
-            return True
+    sendgrid_key = (os.getenv("SENDGRID_API_KEY") or SENDGRID_API_KEY or "").strip()
+    if sendgrid_key:
+        ok, detail = _send_via_sendgrid(sendgrid_key, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body)
+        if ok:
+            return True, "Delivered via SendGrid"
+        errors.append(detail)
 
     # 4. Standard SMTP (works on local machine, VPS, or paid cloud instances)
     if SMTP_CONFIGURED:
         try:
-            return _send_via_smtp(to_email, subject, text_body, html_body)
+            _send_via_smtp(to_email, subject, text_body, html_body)
+            return True, "Delivered via SMTP"
         except Exception as e:
-            logger.warning("SMTP delivery failed (expected on Render free tier where ports 25/465/587 are blocked): %s", e)
-            return False
+            errors.append(f"SMTP error: {e}")
 
-    return False
+    if not errors:
+        msg = "No email service configured on server. Please set BREVO_API_KEY in Render Environment."
+        print(f"[EMAIL-DISPATCH-FAIL] {msg}", flush=True)
+        return False, msg
+
+    full_error = " | ".join(errors)
+    print(f"[EMAIL-DISPATCH-FAIL] to={to_email} errors: {full_error}", flush=True)
+    return False, full_error
 
 
-def _send_otp_email(to_email: str, student_name: str, reg_no: str, otp: str) -> bool:
+def _send_otp_email(to_email: str, student_name: str, reg_no: str, otp: str) -> Tuple[bool, str]:
     subject = "Your Report Card OTP - PTU Grade Portal"
     text_body = (
         f"Hello {student_name},\n\n"
@@ -926,20 +961,20 @@ def _send_otp_email(to_email: str, student_name: str, reg_no: str, otp: str) -> 
     </div>
     """
 
-    sent = _dispatch_email(to_email, subject, text_body, html_body)
+    sent, reason = _dispatch_email(to_email, subject, text_body, html_body)
     if not sent:
         logger.error(
-            "Failed to deliver Report Card OTP email to %s <%s>. (Check email service credentials, sender verification, or provider quotas)",
-            reg_no, to_email
+            "Failed to deliver Report Card OTP email to %s <%s>: %s",
+            reg_no, to_email, reason
         )
-    return sent
+    return sent, reason
 
 STAFF_OTP_EXPIRE_MINUTES = 10
 STAFF_OTP_MAX_ATTEMPTS = 5
 STAFF_OTP_TOKEN_SECRET = os.getenv("STAFF_OTP_TOKEN_SECRET", SECRET_KEY + "_staff_otp")
 STAFF_OTP_TOKEN_EXPIRE_MINUTES = 30   # window to set password after OTP verify
 
-def _send_staff_otp_email(to_email: str, name: str, otp: str, purpose: str) -> bool:
+def _send_staff_otp_email(to_email: str, name: str, otp: str, purpose: str) -> Tuple[bool, str]:
     """Send an OTP email to a staff member for registration or password reset."""
     action = "Registration Verification" if purpose == "register" else "Password Reset"
     subject = f"Your {action} OTP — PTU Grade Portal"
@@ -976,13 +1011,13 @@ def _send_staff_otp_email(to_email: str, name: str, otp: str, purpose: str) -> b
     </div>
     """
 
-    sent = _dispatch_email(to_email, subject, text_body, html_body)
+    sent, reason = _dispatch_email(to_email, subject, text_body, html_body)
     if not sent:
         logger.error(
-            "Failed to deliver Staff OTP email to %s <%s> purpose=%s.",
-            name, to_email, purpose
+            "Failed to deliver Staff OTP email to %s <%s> purpose=%s: %s",
+            name, to_email, purpose, reason
         )
-    return sent
+    return sent, reason
 
 def _issue_staff_otp_token(email: str, purpose: str) -> str:
     payload = {
@@ -1037,6 +1072,15 @@ def _verify_report_card_token(token: str, reg_no: str, email: str) -> None:
 app = FastAPI(title="University Grade Processing System")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+@app.on_event("startup")
+def log_email_startup():
+    brevo = bool((os.getenv("BREVO_API_KEY") or "").strip())
+    resend = bool((os.getenv("RESEND_API_KEY") or "").strip())
+    sendgrid = bool((os.getenv("SENDGRID_API_KEY") or "").strip())
+    smtp = SMTP_CONFIGURED
+    from_e = os.getenv("BREVO_FROM_EMAIL", "").strip() or SMTP_FROM_EMAIL
+    print(f"[STARTUP] Email providers: Brevo={brevo}, Resend={resend}, SendGrid={sendgrid}, SMTP={smtp} | from={from_e}", flush=True)
+
 # ==========================================
 # AUTH ROUTES
 # ==========================================
@@ -1063,8 +1107,8 @@ def request_staff_otp(data: StaffOtpRequestBody, db: Session = Depends(get_syste
         ).first()
         if not resource:
             raise HTTPException(
-                status_code=403,
-                detail="No resource record found with this name and email. Please contact your administrator."
+                status_code=400,
+                detail="No resource profile found for this name and email. Contact the administrator."
             )
         # Must not already have an account
         existing = db.query(User).filter(
@@ -1112,13 +1156,13 @@ def request_staff_otp(data: StaffOtpRequestBody, db: Session = Depends(get_syste
     db.add(staff_otp)
     db.commit()
 
-    sent = _send_staff_otp_email(to_email=clean_email, name=display_name, otp=otp, purpose=data.purpose)
+    sent, reason = _send_staff_otp_email(to_email=clean_email, name=display_name, otp=otp, purpose=data.purpose)
     if not sent:
         db.delete(staff_otp)
         db.commit()
         raise HTTPException(
             status_code=503,
-            detail="Unable to deliver OTP email. Please check your email configuration on the server."
+            detail=f"Unable to deliver OTP email: {reason}"
         )
 
     return {"message": f"OTP sent to {clean_email}. Valid for {STAFF_OTP_EXPIRE_MINUTES} minutes."}
@@ -3771,13 +3815,13 @@ def request_report_card_otp(data: OTPRequestRequest, db: Session = Depends(get_s
     db.add(otp_row)
     db.commit()
 
-    sent = _send_otp_email(email, student_name, reg_no, otp)
+    sent, reason = _send_otp_email(email, student_name, reg_no, otp)
     if not sent:
         db.delete(otp_row)
         db.commit()
         raise HTTPException(
             status_code=503,
-            detail="Unable to deliver OTP to your email. Please ensure your email service is configured or try again later."
+            detail=f"Unable to deliver OTP to your email: {reason}"
         )
 
     return generic_response
