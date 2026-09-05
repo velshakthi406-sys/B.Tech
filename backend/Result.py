@@ -3796,26 +3796,23 @@ def request_report_card_otp(data: OTPRequestRequest, db: Session = Depends(get_s
     if not reg_no or not email:
         raise HTTPException(status_code=400, detail="Reg No and Email are required")
 
-    generic_response = OTPRequestResponse(
-        message="If that Reg No and Email match our records, an OTP has been sent to the registered email address.",
-        expires_in_seconds=OTP_EXPIRE_MINUTES * 60,
-        resend_after_seconds=OTP_RESEND_COOLDOWN_SECONDS,
-    )
-
     found_info = find_student_batch(reg_no)
     if not found_info:
-        return generic_response
+        raise HTTPException(status_code=400, detail="Register Number and Email ID do not match our student records.")
 
     batch_db = get_batch_session(found_info[1])
     try:
         student = batch_db.query(Student).filter(Student.reg_no.ilike(reg_no)).first()
         if not student:
-            return generic_response
+            raise HTTPException(status_code=400, detail="Register Number and Email ID do not match our student records.")
         
-        # If student edited their email in student portal, save/update it so OTP and report card verification match
-        if email and (not student.email or student.email.strip().lower() != email):
-            student.email = email
-            batch_db.commit()
+        # Strictly verify that the provided email matches the student's registered email
+        registered_email = (student.email or f"{student.reg_no}@ptuniv.edu.in").strip().lower()
+        if email != registered_email:
+            raise HTTPException(
+                status_code=400,
+                detail="Register Number and Email ID do not match our student records."
+            )
 
         student_name = student.name
     finally:
@@ -3848,7 +3845,7 @@ def request_report_card_otp(data: OTPRequestRequest, db: Session = Depends(get_s
     otp = _generate_otp()
     otp_row = ReportCardOTP(
         reg_no=reg_no,
-        email=email,
+        email=registered_email,
         otp_hash=_hash_otp(otp),
         created_at=now,
         expires_at=now + datetime.timedelta(minutes=OTP_EXPIRE_MINUTES),
@@ -3858,7 +3855,7 @@ def request_report_card_otp(data: OTPRequestRequest, db: Session = Depends(get_s
     db.add(otp_row)
     db.commit()
 
-    sent, reason = _send_otp_email(email, student_name, reg_no, otp)
+    sent, reason = _send_otp_email(registered_email, student_name, reg_no, otp)
     if not sent:
         db.delete(otp_row)
         db.commit()
@@ -3867,7 +3864,11 @@ def request_report_card_otp(data: OTPRequestRequest, db: Session = Depends(get_s
             detail=f"Unable to deliver OTP to your email: {reason}"
         )
 
-    return generic_response
+    return OTPRequestResponse(
+        message="An OTP has been sent to your registered email address.",
+        expires_in_seconds=OTP_EXPIRE_MINUTES * 60,
+        resend_after_seconds=OTP_RESEND_COOLDOWN_SECONDS,
+    )
 
 @app.post("/report-card/verify-otp", response_model=OTPVerifyResponse)
 def verify_report_card_otp(data: OTPVerifyRequest, db: Session = Depends(get_system_db)):
@@ -3940,7 +3941,8 @@ def get_report_card(
     batch_db = get_batch_session(found_info[1])
     try:
         student = batch_db.query(Student).filter(Student.reg_no.ilike(reg_no)).first()
-        if not student or not student.email or student.email.strip().lower() != email:
+        student_email = (student.email or f"{student.reg_no}@ptuniv.edu.in").strip().lower() if student else ""
+        if not student or student_email != email:
             raise HTTPException(status_code=404, detail="No record found for that Reg No and Email combination")
         return _build_student_report_card(student, batch_db, subjects_db)
     finally:

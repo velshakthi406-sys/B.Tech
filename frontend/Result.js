@@ -2183,12 +2183,18 @@ function renderReportCard(data, targetId = 'report-card-paper') {
     const paper = $(targetId) || $('report-card-paper');
     if (!paper) return;
 
+    // Cache active report card data globally for export
+    window.activeReportCardData = data;
+
     const cgpa = data.cgpa != null ? Number(data.cgpa) : null;
     const cgpaStr = cgpa != null ? cgpa.toFixed(2) : '—';
     const cgpaPercent = cgpa != null ? (cgpa * 10).toFixed(2) + '%' : '—';
     const totalCr = Number(data.total_credits || 0);
     const earnedCr = Number(data.earned_credits || 0);
     const pendingCr = totalCr - earnedCr;
+
+    // Formatted issue date for official academic record
+    const issueDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     // Semesters Breakdown
     const semestersHtml = (data.semesters || []).map(sem => {
@@ -2222,8 +2228,8 @@ function renderReportCard(data, targetId = 'report-card-paper') {
                         <thead>
                             <tr>
                                 <th class="rc-th-idx">#</th>
-                                <th class="rc-th-code">CODE</th>
-                                <th class="rc-th-title">SUBJECT TITLE</th>
+                                <th class="rc-th-code">COURSE CODE</th>
+                                <th class="rc-th-title">COURSE TITLE</th>
                                 <th class="rc-th-cr">CREDITS</th>
                                 <th class="rc-th-gr">GRADE</th>
                             </tr>
@@ -2243,8 +2249,28 @@ function renderReportCard(data, targetId = 'report-card-paper') {
     paper.innerHTML = `
         <!-- Document Title Header -->
         <div class="rc-pdf-header">
-            <h1 class="rc-pdf-uni-title">Puducherry Technological University</h1>
-            <div class="rc-pdf-doc-sub">OFFICIAL GRADE TRANSCRIPT &amp; CUMULATIVE PERFORMANCE</div>
+            <div class="rc-pdf-header-top">
+                <div class="rc-pdf-emblem" aria-hidden="true">
+                    <svg width="46" height="46" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="48" height="48" rx="12" fill="url(#rcEmblemBg)" />
+                        <path d="M24 10L38 18L24 26L10 18L24 10Z" fill="#ffffff" />
+                        <path d="M15 21.5V29C15 33.5 19 37 24 37C29 37 33 33.5 33 29V21.5L24 26.5L15 21.5Z" fill="#ffffff" fill-opacity="0.92" />
+                        <path d="M38 18V28" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+                        <circle cx="38" cy="29" r="1.5" fill="#ffffff" />
+                        <defs>
+                            <linearGradient id="rcEmblemBg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#DC2626" />
+                                <stop offset="0.5" stop-color="#7C3AED" />
+                                <stop offset="1" stop-color="#2563EB" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div class="rc-pdf-uni-block">
+                    <h1 class="rc-pdf-uni-title">Puducherry Technological University</h1>
+                    <div class="rc-pdf-doc-sub">OFFICIAL GRADE TRANSCRIPT &amp; CUMULATIVE PERFORMANCE</div>
+                </div>
+            </div>
         </div>
 
         <!-- Student Info Card -->
@@ -2252,18 +2278,18 @@ function renderReportCard(data, targetId = 'report-card-paper') {
             <div class="rc-student-grid">
                 <div class="rc-info-line">
                     <span class="rc-info-lbl">REGISTER NO</span>
-                    <span class="rc-info-val rc-val-mono">${escapeHtml(data.reg_no)}</span>
+                    <span class="rc-info-val rc-val-mono rc-val-highlight">${escapeHtml(data.reg_no)}</span>
                 </div>
                 <div class="rc-info-line">
                     <span class="rc-info-lbl">PROGRAMME</span>
-                    <span class="rc-info-val">${escapeHtml(data.programme || 'Bachelor of Tech.')}</span>
+                    <span class="rc-info-val">${escapeHtml(data.programme || 'Bachelor of Technology (B.Tech)')}</span>
                 </div>
                 <div class="rc-info-line">
                     <span class="rc-info-lbl">STUDENT NAME</span>
                     <span class="rc-info-val rc-val-bold">${escapeHtml(data.name)}</span>
                 </div>
                 <div class="rc-info-line">
-                    <span class="rc-info-lbl">BATCH</span>
+                    <span class="rc-info-lbl">ACADEMIC BATCH</span>
                     <span class="rc-info-val">${escapeHtml(data.batch || '—')}</span>
                 </div>
                 <div class="rc-info-line">
@@ -2309,9 +2335,20 @@ function renderReportCard(data, targetId = 'report-card-paper') {
 
 function exportReportCardPDF() {
     const html = document.documentElement;
-    const originalTheme = html.getAttribute('data-theme');
-    if (originalTheme === 'dark') html.setAttribute('data-theme', 'light');
+    const originalTheme = html.getAttribute('data-theme') || 'light';
+    const originalTitle = document.title;
 
+    // Set student-specific filename for browser "Save as PDF" dialog
+    const rcData = window.activeReportCardData;
+    if (rcData && rcData.reg_no) {
+        const cleanName = (rcData.name || '').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').trim();
+        document.title = `PTU_ReportCard_${rcData.reg_no}${cleanName ? '_' + cleanName : ''}`;
+    } else {
+        document.title = 'PTU_Official_Grade_Transcript';
+    }
+
+    // Always guarantee Light Mode for export
+    html.setAttribute('data-theme', 'light');
     document.body.classList.add('is-printing-report-card');
 
     let restored = false;
@@ -2319,12 +2356,23 @@ function exportReportCardPDF() {
         if (restored) return;
         restored = true;
         document.body.classList.remove('is-printing-report-card');
-        if (originalTheme === 'dark') html.setAttribute('data-theme', originalTheme);
+        html.setAttribute('data-theme', originalTheme);
+        document.title = originalTitle;
         window.removeEventListener('afterprint', restoreTheme);
+        window.removeEventListener('focus', onFocusRestore);
+    };
+
+    const onFocusRestore = () => {
+        // Small delay to allow print spooler / save dialog to complete cleanly
+        setTimeout(restoreTheme, 800);
     };
 
     window.addEventListener('afterprint', restoreTheme);
-    setTimeout(restoreTheme, 6000);
+    window.addEventListener('focus', onFocusRestore);
+
+    // Safety fallback timer (60s) so user has plenty of time in print preview without theme jumping
+    setTimeout(restoreTheme, 60000);
+
     window.print();
 }
 
