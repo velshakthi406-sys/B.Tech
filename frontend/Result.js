@@ -60,6 +60,7 @@ let resultsAvailableBatches = [];
 let rcRegNo = '';
 let rcEmail = '';
 let rcAccessToken = '';
+let rcDevOtp = '';
 let rcResendTimerId = null;
 
 // ─── 1. Utility Functions ────────────────────────────────────
@@ -403,28 +404,100 @@ async function authFetch(url, options = {}) {
     return res.json();
 }
 
-// ─── 9. Authentication Logic ──────────────────────────────────
-function toggleAuthMode() {
-    const isSignUp = $('auth-submit-label').innerText === 'Sign Up';
-    if (isSignUp) {
-        $('auth-title').innerHTML = 'Staff <span class="accent">Sign In</span>';
-        $('auth-subtitle').innerText = 'Enter your credentials to access the management portal';
-        $('auth-submit-label').innerText = 'Sign In';
-        $('auth-toggle-link').innerText = 'Register new account';
-    } else {
-        $('auth-title').innerHTML = 'Staff <span class="accent">Register</span>';
-        $('auth-subtitle').innerText = 'Create a new staff management account';
-        $('auth-submit-label').innerText = 'Sign Up';
-        $('auth-toggle-link').innerText = 'Sign in instead';
+// ─── 9. Authentication & Wizard Flow Logic ───────────────────────
+let authFlow = {
+    mode: 'login',       // 'login' | 'register' | 'reset'
+    step: 'login',       // 'login' | 'otp-request' | 'otp-verify' | 'set-password'
+    name: '',
+    email: '',
+    otpToken: null
+};
+
+function updatePasswordCriteria(password) {
+    const container = document.getElementById('password-criteria');
+    if (!container) return;
+
+    const rules = [
+        { id: 'length',    test: password.length >= 8 },
+        { id: 'lowercase', test: /[a-z]/.test(password) },
+        { id: 'uppercase', test: /[A-Z]/.test(password) },
+        { id: 'digit',     test: /\d/.test(password) },
+        { id: 'special',   test: /[!@#$%^&*]/.test(password) }
+    ];
+
+    rules.forEach(rule => {
+        const item = container.querySelector(`[data-criteria="${rule.id}"]`);
+        if (!item) return;
+        const icon = item.querySelector('.criteria-icon');
+        if (rule.test) {
+            item.classList.add('valid');
+            item.classList.remove('invalid');
+            if (icon) icon.textContent = '✓';
+        } else {
+            item.classList.add('invalid');
+            item.classList.remove('valid');
+            if (icon) icon.textContent = '•';
+        }
+    });
+}
+
+function showAuthStep(stepName) {
+    authFlow.step = stepName;
+    const steps = ['login', 'otp-request', 'otp-verify', 'set-password'];
+    steps.forEach(s => {
+        const el = $(`auth-step-${s}`);
+        if (el) el.style.display = (s === stepName) ? 'block' : 'none';
+    });
+
+    if (stepName === 'login') {
+        if ($('auth-title')) $('auth-title').innerHTML = 'Staff <span class="accent">Sign In</span>';
+        if ($('auth-subtitle')) $('auth-subtitle').innerText = 'Enter your credentials to access the management portal';
+        authFlow.mode = 'login';
+        authFlow.otpToken = null;
+    } else if (authFlow.mode === 'register') {
+        if ($('auth-title')) $('auth-title').innerHTML = 'Staff <span class="accent">Register</span>';
+        if ($('auth-subtitle')) $('auth-subtitle').innerText = 'Pre-registered staff identity verification & account setup';
+    } else if (authFlow.mode === 'reset') {
+        if ($('auth-title')) $('auth-title').innerHTML = 'Reset <span class="accent">Password</span>';
+        if ($('auth-subtitle')) $('auth-subtitle').innerText = 'Verify your email identity to set a new password';
     }
 }
 
-async function handleAuthSubmit(e) {
+function startRegisterFlow() {
+    authFlow.mode = 'register';
+    authFlow.otpToken = null;
+    if ($('otp-name-group')) $('otp-name-group').style.display = 'block';
+    if ($('otp-req-name')) {
+        $('otp-req-name').value = '';
+        $('otp-req-name').setAttribute('required', 'required');
+    }
+    if ($('otp-req-email')) $('otp-req-email').value = '';
+    if ($('set-password-btn-label')) $('set-password-btn-label').innerText = 'Complete Registration';
+    if ($('set-password-label')) $('set-password-label').innerText = 'Password';
+    showAuthStep('otp-request');
+    $('otp-req-name')?.focus();
+}
+
+function startForgotPasswordFlow() {
+    authFlow.mode = 'reset';
+    authFlow.otpToken = null;
+    if ($('otp-name-group')) $('otp-name-group').style.display = 'none';
+    if ($('otp-req-name')) {
+        $('otp-req-name').value = '';
+        $('otp-req-name').removeAttribute('required');
+    }
+    if ($('otp-req-email')) $('otp-req-email').value = '';
+    if ($('set-password-btn-label')) $('set-password-btn-label').innerText = 'Reset Password';
+    if ($('set-password-label')) $('set-password-label').innerText = 'New Password';
+    showAuthStep('otp-request');
+    $('otp-req-email')?.focus();
+}
+
+async function handleLoginSubmit(e) {
     e.preventDefault();
     const btn = $('auth-submit-btn');
     const username = $('auth-username').value.trim();
     const password = $('auth-password').value;
-    const isSignUp = $('auth-submit-label').innerText === 'Sign Up';
 
     if (!username || !password) {
         showToast('Please enter both username and password', 'warning');
@@ -432,52 +505,209 @@ async function handleAuthSubmit(e) {
     }
 
     btn.classList.add('loading');
+    const formData = new URLSearchParams({ username, password });
+    try {
+        const res = await fetch(API_URL + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Invalid username or password');
 
-    if (isSignUp) {
-        try {
-            const res = await fetch(API_URL + '/auth/signup', {
+        localStorage.setItem('token', data.access_token);
+        localStorage.setItem('role', data.role);
+        localStorage.setItem('username', data.username);
+        authToken = data.access_token;
+        userRole = data.role;
+        currentUsername = data.username;
+
+        showToast(`Welcome back, ${data.username}! [${(data.role || 'Staff').toUpperCase()}]`, 'success');
+        evaluateSessionState();
+    } catch (err) {
+        let message = err.message;
+        if (err.message === 'Failed to fetch') {
+            message = 'Cannot connect to backend. Please ensure the server is running on ' + API_URL;
+        }
+        showToast(message, 'error');
+    } finally {
+        btn.classList.remove('loading');
+    }
+}
+
+async function handleOtpRequest(e) {
+    e.preventDefault();
+    const btn = $('otp-request-btn');
+    const name = ($('otp-req-name')?.value || '').trim();
+    const email = ($('otp-req-email')?.value || '').trim().toLowerCase();
+
+    if (authFlow.mode === 'register' && !name) {
+        showToast('Please enter your full name as recorded in Resources', 'warning');
+        return;
+    }
+    if (!email) {
+        showToast('Please enter your email address', 'warning');
+        return;
+    }
+
+    authFlow.name = name;
+    authFlow.email = email;
+
+    btn.classList.add('loading');
+    try {
+        const res = await fetch(API_URL + '/auth/otp/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, purpose: authFlow.mode })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to send OTP');
+
+        showToast(data.message || 'OTP sent successfully!', 'success');
+        if ($('otp-code-input')) $('otp-code-input').value = '';
+        if ($('otp-verify-hint')) $('otp-verify-hint').innerText = `A 6-digit OTP has been sent to ${email}. Valid for 10 minutes.`;
+        showAuthStep('otp-verify');
+        $('otp-code-input')?.focus();
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        btn.classList.remove('loading');
+    }
+}
+
+async function resendOtp() {
+    if (!authFlow.email) {
+        showAuthStep('otp-request');
+        return;
+    }
+    try {
+        const res = await fetch(API_URL + '/auth/otp/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: authFlow.name, email: authFlow.email, purpose: authFlow.mode })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to resend OTP');
+        showToast('New OTP sent to ' + authFlow.email, 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+async function handleOtpVerify(e) {
+    e.preventDefault();
+    const btn = $('otp-verify-btn');
+    const otp = ($('otp-code-input')?.value || '').trim();
+
+    if (!otp || otp.length !== 6) {
+        showToast('Please enter a valid 6-digit OTP code', 'warning');
+        return;
+    }
+
+    btn.classList.add('loading');
+    try {
+        const res = await fetch(API_URL + '/auth/otp/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: authFlow.email, otp, purpose: authFlow.mode })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'OTP verification failed');
+
+        authFlow.otpToken = data.otp_token;
+        showToast(data.message || 'OTP verified successfully!', 'success');
+
+        if ($('set-password-new')) $('set-password-new').value = '';
+        if ($('set-password-confirm')) $('set-password-confirm').value = '';
+        updatePasswordCriteria('');
+        showAuthStep('set-password');
+        $('set-password-new')?.focus();
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        btn.classList.remove('loading');
+    }
+}
+
+async function handleSetPassword(e) {
+    e.preventDefault();
+    const btn = $('set-password-btn');
+    const password = $('set-password-new')?.value || '';
+    const confirmPassword = $('set-password-confirm')?.value || '';
+
+    if (!password || !confirmPassword) {
+        showToast('Please fill in both password fields', 'warning');
+        return;
+    }
+    if (password !== confirmPassword) {
+        showToast('Passwords do not match', 'warning');
+        return;
+    }
+
+    // Password criteria check
+    if (password.length < 8) {
+        showToast('Password must be at least 8 characters long', 'warning');
+        return;
+    }
+    if (!/[a-z]/.test(password)) {
+        showToast('Password must contain at least one lowercase letter', 'warning');
+        return;
+    }
+    if (!/[A-Z]/.test(password)) {
+        showToast('Password must contain at least one uppercase letter', 'warning');
+        return;
+    }
+    if (!/\d/.test(password)) {
+        showToast('Password must contain at least one digit', 'warning');
+        return;
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+        showToast('Password must contain a special character (!@#$%^&*)', 'warning');
+        return;
+    }
+
+    btn.classList.add('loading');
+    try {
+        if (authFlow.mode === 'register') {
+            const res = await fetch(API_URL + '/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({
+                    name: authFlow.name,
+                    email: authFlow.email,
+                    otp_token: authFlow.otpToken,
+                    password,
+                    confirm_password: confirmPassword
+                })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Signup failed');
-            showToast('Account created! Please sign in.', 'success');
-            toggleAuthMode();
-        } catch (err) {
-            showToast(err.message, 'error');
-        } finally {
-            btn.classList.remove('loading');
-        }
-    } else {
-        const formData = new URLSearchParams({ username, password });
-        try {
-            const res = await fetch(API_URL + '/auth/login', {
+            if (!res.ok) throw new Error(data.detail || 'Registration failed');
+            const assignedUsername = data.username || authFlow.email.split('@')[0];
+            showToast(`Registration complete! Your username is "${assignedUsername}". Please sign in.`, 'success');
+            if ($('auth-username')) $('auth-username').value = assignedUsername;
+        } else {
+            const res = await fetch(API_URL + '/auth/reset-password', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: authFlow.email,
+                    otp_token: authFlow.otpToken,
+                    new_password: password,
+                    confirm_password: confirmPassword
+                })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Invalid username or password');
-
-            localStorage.setItem('token', data.access_token);
-            localStorage.setItem('role', data.role);
-            localStorage.setItem('username', data.username);
-            authToken = data.access_token;
-            userRole = data.role;
-            currentUsername = data.username;
-
-            showToast(`Welcome back, ${data.username}!`, 'success');
-            evaluateSessionState();
-        } catch (err) {
-            let message = err.message;
-            if (err.message === 'Failed to fetch') {
-                message = 'Cannot connect to backend. Please ensure the server is running on ' + API_URL;
-            }
-            showToast(message, 'error');
-        } finally {
-            btn.classList.remove('loading');
+            if (!res.ok) throw new Error(data.detail || 'Password reset failed');
+            showToast('Password reset successfully! Please sign in with your new password.', 'success');
         }
+
+        // Reset flow back to login
+        showAuthStep('login');
+        if ($('auth-username')) $('auth-username').value = authFlow.email;
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        btn.classList.remove('loading');
     }
 }
 
@@ -507,11 +737,28 @@ function evaluateSessionState() {
         dashboardSection?.classList.remove('hidden');
 
         if ($('user-display-name')) $('user-display-name').innerText = currentUsername || 'User';
-        if ($('user-role-badge')) $('user-role-badge').innerText = (userRole || 'VIEWER').toUpperCase();
+        if ($('user-role-badge')) $('user-role-badge').innerText = (userRole || 'STAFF').toUpperCase();
         if ($('user-avatar')) $('user-avatar').innerText = (currentUsername || 'U').charAt(0).toUpperCase();
 
-        const isAdmin = userRole === 'admin';
+        const roleNormalized = (userRole || '').toLowerCase();
+        const isAdmin = roleNormalized === 'admin';
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+
+        // Synchronize actual role and profile from server to prevent stale localStorage
+        authFetch('/auth/me').then(me => {
+            if (me && me.role) {
+                userRole = me.role;
+                localStorage.setItem('role', me.role);
+                if (me.username) {
+                    currentUsername = me.username;
+                    localStorage.setItem('username', me.username);
+                }
+                if ($('user-display-name')) $('user-display-name').innerText = currentUsername || 'User';
+                if ($('user-role-badge')) $('user-role-badge').innerText = (userRole || 'STAFF').toUpperCase();
+                const isRealAdmin = (userRole || '').toLowerCase() === 'admin';
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = isRealAdmin ? '' : 'none');
+            }
+        }).catch(() => {});
 
         loadDashboardStats();
         switchView(currentView || 'dashboard');
@@ -547,7 +794,8 @@ function switchView(view) {
         results: 'Student Results',
         students: 'Student Management',
         subjects: 'Subject Master',
-        grades: 'SGPA / CGPA Summary'
+        grades: 'SGPA / CGPA Summary',
+        resources: 'Resources Management'
     };
     if ($('module-title')) {
         $('module-title').innerText = titleMap[view] || (view.charAt(0).toUpperCase() + view.slice(1));
@@ -557,6 +805,7 @@ function switchView(view) {
         loadDashboardStats();
         populateBatchDropdown();
     }
+    if (view === 'resources') loadResources();
     if (view === 'results') loadResults();
     if (view === 'students') loadStudents();
     if (view === 'subjects') {
@@ -899,8 +1148,7 @@ async function loadResults() {
     try {
         const dept = $('filter-department')?.value || '';
         const sem  = $('filter-semester')?.value || '';
-        const reg  = $('filter-regno')?.value?.trim() || '';
-        const name = $('filter-name')?.value?.trim() || '';
+        const subCode = $('filter-subject-code')?.value?.trim() || '';
 
         let url = '/results?';
         if (currentResultsBatchFilter && currentResultsBatchFilter !== 'All') {
@@ -908,8 +1156,7 @@ async function loadResults() {
         }
         if (dept) url += `department=${encodeURIComponent(dept)}&`;
         if (sem)  url += `semester=${encodeURIComponent(sem)}&`;
-        if (reg)  url += `reg_no=${encodeURIComponent(reg)}&`;
-        if (name) url += `student_name=${encodeURIComponent(name)}&`;
+        if (subCode) url += `subject_code=${encodeURIComponent(subCode)}&`;
 
         const data = await authFetch(url);
         allResultsCache = data || [];
@@ -919,6 +1166,10 @@ async function loadResults() {
         renderResultsTable();
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
+        const countEl = $('results-showing-count');
+        const fCountEl = $('results-f-showing-count');
+        if (countEl) countEl.innerText = '0';
+        if (fCountEl) fCountEl.innerText = '0';
     }
 }
 
@@ -949,6 +1200,15 @@ function renderResultsTable() {
     if (totalWrap) totalWrap.innerText = '';
     if (pill) {
         pill.title = `Total loaded results: ${total}`;
+    }
+
+    // Update F-Grade indicator pill
+    const fCount = allResultsCache.filter(r => (r.grade || '').trim().toUpperCase() === 'F').length;
+    const fCountEl = $('results-f-showing-count');
+    const fPill = $('results-f-count-display');
+    if (fCountEl) fCountEl.innerText = fCount;
+    if (fPill) {
+        fPill.title = `Total F grades in results: ${fCount}`;
     }
 
     // Update Pagination info
@@ -1001,7 +1261,7 @@ function renderResultsTable() {
     });
     tbody.innerHTML = html;
 
-    const isAdmin = userRole === 'admin';
+    const isAdmin = (userRole || '').toLowerCase() === 'admin';
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
 }
 
@@ -1282,7 +1542,7 @@ function renderStudents() {
     `).join('');
     tbody.innerHTML = html;
 
-    const isAdmin = userRole === 'admin';
+    const isAdmin = (userRole || '').toLowerCase() === 'admin';
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
 }
 
@@ -1490,7 +1750,7 @@ function renderSubjects() {
     `).join('');
     tbody.innerHTML = html;
 
-    const isAdmin = userRole === 'admin';
+    const isAdmin = (userRole || '').toLowerCase() === 'admin';
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
 }
 
@@ -1762,10 +2022,14 @@ function showRcLookupStep() {
 function showRcOtpStep() {
     $('rc-step-lookup')?.classList.add('hidden');
     $('rc-step-otp')?.classList.remove('hidden');
-    if ($('rc-otp-target-email')) $('rc-otp-target-email').innerText = maskEmail(rcEmail);
+    if ($('rc-otp-target-email')) {
+        $('rc-otp-target-email').innerText = rcDevOtp
+            ? `${maskEmail(rcEmail)} (Verification Code: ${rcDevOtp})`
+            : maskEmail(rcEmail);
+    }
     const input = $('rc-otp-input');
     if (input) {
-        input.value = '';
+        input.value = rcDevOtp || '';
         input.focus();
     }
 }
@@ -1801,8 +2065,13 @@ async function handleReportCardLookup(event) {
         rcRegNo = regNo;
         rcEmail = email;
         rcAccessToken = '';
+        rcDevOtp = data.dev_otp || '';
 
-        showToast(data.message || 'OTP sent to your registered email', 'success');
+        if (data.dev_otp) {
+            showToast(`Verification code: ${data.dev_otp}`, 'info');
+        } else {
+            showToast(data.message || 'OTP sent to your registered email', 'success');
+        }
         showRcOtpStep();
         startResendCountdown(data.resend_after_seconds || 45);
     } catch (err) {
@@ -1882,7 +2151,14 @@ async function handleResendOtp() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Could not resend OTP');
-        showToast('A fresh OTP has been sent', 'success');
+        rcDevOtp = data.dev_otp || '';
+        if (data.dev_otp) {
+            showToast(`Fresh verification code: ${data.dev_otp}`, 'info');
+            if ($('rc-otp-input')) $('rc-otp-input').value = data.dev_otp;
+            if ($('rc-otp-target-email')) $('rc-otp-target-email').innerText = `${maskEmail(rcEmail)} (Verification Code: ${rcDevOtp})`;
+        } else {
+            showToast('A fresh OTP has been sent', 'success');
+        }
         startResendCountdown(data.resend_after_seconds || 45);
     } catch (err) {
         showToast(err.message, 'error');
@@ -2131,6 +2407,248 @@ function exportAdminReportCardPDF() {
 // ============================================================
 // [TESTING ONLY] DIRECT REPORT CARD GENERATOR (END)
 // ============================================================
+
+// ============================================================
+// RESOURCES MANAGEMENT (Admin Personnel Directory)
+// ============================================================
+let allResourcesCache = [];
+
+async function loadResources() {
+    const tbody = $('resources-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="loading-cell">Loading resources…</td></tr>';
+    try {
+        const data = await authFetch('/resources/');
+        allResourcesCache = data || [];
+        renderResourcesTable(allResourcesCache);
+    } catch (err) {
+        showToast('Failed to load resources: ' + err.message, 'error');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="empty-cell" style="color:var(--red);">Error loading resources: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function renderResourcesTable(resources) {
+    const tbody = $('resources-tbody');
+    if (!tbody) return;
+
+    if (!resources || resources.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">No resources found matching the criteria.</td></tr>';
+        updateResourcesCount(0, allResourcesCache.length);
+        return;
+    }
+
+    const isAdmin = (userRole || '').toLowerCase() === 'admin';
+
+    tbody.innerHTML = resources.map((r, idx) => {
+        const accType = r.account_type || 'Faculty';
+        const typeClass = 'badge-' + accType.toLowerCase().replace(/\s+/g, '-');
+        const statusBadge = r.has_account
+            ? '<span class="badge badge-active" title="Registered User Account Active">✓ Registered</span>'
+            : '<span class="badge badge-pending" title="Pre-registered. Waiting for user signup.">⏳ Pending Signup</span>';
+
+        const actions = isAdmin ? `
+            <div class="table-actions" style="justify-content:center;">
+              <button class="action-btn edit" onclick="editResource(${r.id})" title="Edit Resource">✏️</button>
+              <button class="action-btn delete" onclick="deleteResource(${r.id}, '${escapeHtml(r.name)}')" title="Delete Resource">🗑️</button>
+            </div>
+        ` : '—';
+
+        return `
+            <tr>
+              <td>${idx + 1}</td>
+              <td style="font-weight:600; color:var(--text-primary);">${escapeHtml(r.name)}</td>
+              <td><code>${escapeHtml(r.email)}</code></td>
+              <td><span class="badge ${typeClass}">${escapeHtml(accType)}</span></td>
+              <td>${statusBadge}</td>
+              <td class="admin-only" style="text-align:center;">${actions}</td>
+            </tr>
+        `;
+    }).join('');
+
+    updateResourcesCount(resources.length, allResourcesCache.length);
+
+    // Sync admin-only visibility
+    document.querySelectorAll('#resources-table .admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+}
+
+function updateResourcesCount(showing, total) {
+    if ($('resources-showing-count')) $('resources-showing-count').innerText = showing;
+    const wrap = $('resources-total-count-wrap');
+    if (wrap) {
+        wrap.innerText = showing !== total ? ` of ${total}` : '';
+    }
+}
+
+function filterResourcesSearch() {
+    const q = ($('resources-search-input')?.value || '').trim().toLowerCase();
+    const type = $('resources-type-filter')?.value || '';
+
+    const filtered = allResourcesCache.filter(r => {
+        const matchesQuery = !q || (r.name && r.name.toLowerCase().includes(q)) || (r.email && r.email.toLowerCase().includes(q));
+        const matchesType = !type || (r.account_type && r.account_type.toLowerCase() === type.toLowerCase());
+        return matchesQuery && matchesType;
+    });
+
+    renderResourcesTable(filtered);
+}
+
+async function populateAccountTypeOptions(isEdit = false, editingResource = null) {
+    const select = $('resource-account-type');
+    if (!select) return;
+
+    let currentRole = (userRole || '').trim();
+    let allowed = [];
+
+    // Query backend to get current user's allowed creation types directly from DB
+    try {
+        const res = await authFetch('/auth/allowed-types');
+        if (res && res.allowed && res.allowed.length) {
+            allowed = res.allowed;
+        }
+    } catch (_) {}
+
+    if (!allowed.length) {
+        if (currentRole.toLowerCase() === 'admin') {
+            allowed = ['Admin', 'TNP', 'Faculty', 'Exam Wing'];
+        } else if (currentRole) {
+            allowed = [currentRole];
+        } else {
+            allowed = ['Admin', 'TNP', 'Faculty', 'Exam Wing'];
+        }
+    }
+
+    const isAdmin = (userRole || '').toLowerCase() === 'admin' || allowed.includes('Admin');
+
+    select.innerHTML = '';
+    if (isEdit && editingResource) {
+        // "1) An admin can only create new accounts and cannot change his/her account type to anything else,
+        //     so remove admin choice in the change account type."
+        const isEditingSelf = (editingResource.name && editingResource.name.toLowerCase() === (currentUsername || '').toLowerCase()) ||
+                              (editingResource.email && editingResource.email.toLowerCase() === (currentUsername || '').toLowerCase()) ||
+                              (editingResource.account_type === 'Admin');
+
+        if (isEditingSelf && isAdmin) {
+            // Admin cannot change own account type
+            select.innerHTML = `<option value="Admin" selected>Admin (Locked)</option>`;
+            select.disabled = true;
+        } else {
+            // "remove admin choice in the change account type"
+            select.disabled = false;
+            const changeTypes = ['TNP', 'Faculty', 'Exam Wing'];
+            select.innerHTML = changeTypes.map(t =>
+                `<option value="${t}" ${t.toLowerCase() === (editingResource.account_type || '').toLowerCase() ? 'selected' : ''}>${t}</option>`
+            ).join('');
+        }
+    } else {
+        // Create mode
+        select.disabled = false;
+        if (isAdmin) {
+            // Admin can create accounts of all types
+            select.innerHTML = `
+                <option value="" disabled selected>— Select Account Type —</option>
+                <option value="Admin">Admin</option>
+                <option value="TNP">TNP</option>
+                <option value="Faculty">Faculty</option>
+                <option value="Exam Wing">Exam Wing</option>
+            `;
+        } else {
+            // "2) Other users can only create new account of their type only that is A faculty can only create faculty account."
+            const types = allowed.length ? allowed : [currentRole || 'Faculty'];
+            select.innerHTML = types.map(t =>
+                `<option value="${escapeHtml(t)}" selected>${escapeHtml(t)}</option>`
+            ).join('');
+        }
+    }
+}
+
+function showAddResourceForm() {
+    const container = $('resource-form-container');
+    if (!container) return;
+    $('resource-edit-id').value = '';
+    $('resource-name').value = '';
+    $('resource-email').value = '';
+    populateAccountTypeOptions(false);
+    $('resource-submit-btn').innerText = 'Save Resource';
+    container.style.display = 'block';
+    $('resource-name').focus();
+    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function hideAddResourceForm() {
+    const container = $('resource-form-container');
+    if (container) container.style.display = 'none';
+    $('resource-edit-id').value = '';
+    if ($('resource-account-type')) $('resource-account-type').disabled = false;
+}
+
+async function handleResourceSubmit(e) {
+    e.preventDefault();
+    const id = $('resource-edit-id').value;
+    const name = $('resource-name').value.trim();
+    const email = $('resource-email').value.trim();
+    const account_type = $('resource-account-type').value || (id ? 'Admin' : '');
+
+    if (!name || !email || !account_type) {
+        showToast('Please fill in Name, Email address, and Account type', 'warning');
+        return;
+    }
+
+    const btn = $('resource-submit-btn');
+    btn.disabled = true;
+    try {
+        if (id) {
+            // Update
+            await authFetch(`/resources/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, email, account_type })
+            });
+            showToast(`Resource '${name}' updated successfully!`, 'success');
+        } else {
+            // Create
+            await authFetch('/resources/', {
+                method: 'POST',
+                body: JSON.stringify({ name, email, account_type })
+            });
+            showToast(`Resource '${name}' added to directory!`, 'success');
+        }
+        hideAddResourceForm();
+        loadResources();
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function editResource(id) {
+    const res = allResourcesCache.find(r => r.id === id);
+    if (!res) return;
+
+    $('resource-edit-id').value = res.id;
+    $('resource-name').value = res.name;
+    $('resource-email').value = res.email;
+    populateAccountTypeOptions(true, res);
+    $('resource-submit-btn').innerText = 'Update Resource';
+
+    const container = $('resource-form-container');
+    if (container) {
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+async function deleteResource(id, name) {
+    if (!confirm(`Are you sure you want to remove resource '${name}'? Any associated portal access will also be revoked.`)) {
+        return;
+    }
+
+    try {
+        await authFetch(`/resources/${id}`, { method: 'DELETE' });
+        showToast(`Resource '${name}' deleted successfully.`, 'info');
+        loadResources();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
 
 // ─── 17. Lifecycle & Event Binding ────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {

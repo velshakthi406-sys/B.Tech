@@ -179,39 +179,150 @@
         <p id="auth-subtitle">Enter your credentials to access the management portal</p>
       </div>
 
-      <form id="auth-form" onsubmit="handleAuthSubmit(event)" autocomplete="off" novalidate>
-        <div class="form-group">
-          <label for="auth-username">Username</label>
-          <div style="position:relative;">
-            <span class="input-icon">👤</span>
-            <input type="text" id="auth-username" required placeholder="admin or viewer" autocomplete="username" class="has-icon" />
+      <!-- ── STEP 1: Sign In ── -->
+      <div id="auth-step-login">
+        <form id="auth-form" onsubmit="handleLoginSubmit(event)" autocomplete="off" novalidate>
+          <div class="form-group">
+            <label for="auth-username">Username / Email</label>
+            <div style="position:relative;">
+              <span class="input-icon">👤</span>
+              <input type="text" id="auth-username" required placeholder="admin or email" autocomplete="username" class="has-icon" />
+            </div>
           </div>
-        </div>
-        <div class="form-group">
-          <label for="auth-password">Password</label>
-          <div class="password-wrapper">
-            <input type="password" id="auth-password" required placeholder="••••••••" autocomplete="current-password" />
-            <button type="button" class="password-toggle" onclick="togglePasswordVisibility('auth-password', this)" aria-label="Toggle password visibility">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <div class="form-group">
+            <label for="auth-password">Password</label>
+            <div class="password-wrapper">
+              <input type="password" id="auth-password" required placeholder="••••••••" autocomplete="current-password" />
+              <button type="button" class="password-toggle" onclick="togglePasswordVisibility('auth-password', this)" aria-label="Toggle password visibility">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div style="margin-bottom:4px;">
+            <button type="submit" id="auth-submit-btn" class="btn-primary">
+              <span class="btn-spinner"></span>
+              <span class="btn-label">Sign In</span>
             </button>
           </div>
+        </form>
+        <div class="auth-footer" style="margin-top:10px;">
+          <span onclick="startRegisterFlow()">Register new account</span>
+          &nbsp;·&nbsp;
+          <span onclick="startForgotPasswordFlow()">Forgot password?</span>
         </div>
-        <div style="margin-bottom:4px;">
-          <button type="submit" id="auth-submit-btn" class="btn-primary">
-            <span class="btn-spinner"></span>
-            <span class="btn-label" id="auth-submit-label">Sign In</span>
-          </button>
+        <div class="auth-footer" style="margin-top:6px;">
+          <span onclick="closeStaffPortalFromHome()">← Back to Homepage</span>
         </div>
-      </form>
+      </div><!-- /#auth-step-login -->
 
-      <div class="auth-footer">
-        <span id="auth-toggle-link" onclick="toggleAuthMode()">Register new account</span>
-      </div>
-      <div class="auth-footer" style="margin-top:8px;">
-        <span onclick="closeStaffPortalFromHome()">← Back to Homepage</span>
-      </div>
-    </div>
+      <!-- ── STEP 2: OTP Request ── -->
+      <div id="auth-step-otp-request" style="display:none;">
+        <div class="step-indicator" style="margin-bottom:18px;" role="progressbar">
+          <div class="step-item active"><div class="step-circle">1</div><div class="step-label">Identity</div></div>
+          <div class="step-item"><div class="step-circle">2</div><div class="step-label">Verify OTP</div></div>
+          <div class="step-item"><div class="step-circle">3</div><div class="step-label">Set Password</div></div>
+        </div>
+        <form id="otp-request-form" onsubmit="handleOtpRequest(event)" autocomplete="off" novalidate>
+          <div class="form-group" id="otp-name-group">
+            <label for="otp-req-name">Full Name</label>
+            <div style="position:relative;">
+              <span class="input-icon">👤</span>
+              <input type="text" id="otp-req-name" placeholder="Exactly as pre-registered (e.g. Dr. Ramesh)" class="has-icon" />
+            </div>
+            <small style="font-size:12px; color:var(--text-muted); margin-top:4px; display:block;">* Must exactly match the name recorded in Resources.</small>
+          </div>
+          <div class="form-group">
+            <label for="otp-req-email">Email Address</label>
+            <div style="position:relative;">
+              <span class="input-icon">✉️</span>
+              <input type="email" id="otp-req-email" required placeholder="your.email@ptuniv.edu.in" autocomplete="email" class="has-icon" />
+            </div>
+          </div>
+          <button type="submit" id="otp-request-btn" class="btn-primary">
+            <span class="btn-spinner"></span>
+            <span class="btn-label">Send OTP</span>
+          </button>
+        </form>
+        <div class="auth-footer" style="margin-top:12px;">
+          <span onclick="showAuthStep('login')">← Back to Sign In</span>
+        </div>
+      </div><!-- /#auth-step-otp-request -->
+
+      <!-- ── STEP 3: OTP Verify ── -->
+      <div id="auth-step-otp-verify" style="display:none;">
+        <div class="step-indicator" style="margin-bottom:18px;" role="progressbar">
+          <div class="step-item done"><div class="step-circle">✓</div><div class="step-label">Identity</div></div>
+          <div class="step-item active"><div class="step-circle">2</div><div class="step-label">Verify OTP</div></div>
+          <div class="step-item"><div class="step-circle">3</div><div class="step-label">Set Password</div></div>
+        </div>
+        <p id="otp-verify-hint" style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">A 6-digit OTP has been sent to your email. Enter it below.</p>
+        <form id="otp-verify-form" onsubmit="handleOtpVerify(event)" autocomplete="off" novalidate>
+          <div class="form-group">
+            <label for="otp-code-input">6-Digit OTP</label>
+            <input type="text" id="otp-code-input" required placeholder="• • • • • •" maxlength="6" pattern="\d{6}"
+                   inputmode="numeric" class="otp-digit-input" autocomplete="one-time-code" />
+          </div>
+          <button type="submit" id="otp-verify-btn" class="btn-primary">
+            <span class="btn-spinner"></span>
+            <span class="btn-label">Verify OTP</span>
+          </button>
+        </form>
+        <div class="auth-footer" style="margin-top:12px;">
+          <span onclick="resendOtp()">Resend OTP</span>
+          &nbsp;·&nbsp;
+          <span onclick="showAuthStep('login')">Cancel</span>
+        </div>
+      </div><!-- /#auth-step-otp-verify -->
+
+      <!-- ── STEP 4: Set Password ── -->
+      <div id="auth-step-set-password" style="display:none;">
+        <div class="step-indicator" style="margin-bottom:18px;" role="progressbar">
+          <div class="step-item done"><div class="step-circle">✓</div><div class="step-label">Identity</div></div>
+          <div class="step-item done"><div class="step-circle">✓</div><div class="step-label">Verify OTP</div></div>
+          <div class="step-item active"><div class="step-circle">3</div><div class="step-label">Set Password</div></div>
+        </div>
+        <form id="set-password-form" onsubmit="handleSetPassword(event)" autocomplete="off" novalidate>
+          <div class="form-group">
+            <label for="set-password-new" id="set-password-label">New Password</label>
+            <div class="password-wrapper">
+              <input type="password" id="set-password-new" required placeholder="••••••••"
+                     autocomplete="new-password" oninput="updatePasswordCriteria(this.value)" />
+              <button type="button" class="password-toggle" onclick="togglePasswordVisibility('set-password-new', this)" aria-label="Toggle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div id="password-criteria" class="password-criteria">
+              <ul>
+                <li data-criteria="length"><span class="criteria-icon">•</span> At least 8 characters</li>
+                <li data-criteria="lowercase"><span class="criteria-icon">•</span> At least one lowercase letter</li>
+                <li data-criteria="uppercase"><span class="criteria-icon">•</span> At least one uppercase letter</li>
+                <li data-criteria="digit"><span class="criteria-icon">•</span> At least one digit</li>
+                <li data-criteria="special"><span class="criteria-icon">•</span> At least one special character (!@#$%^&amp;*)</li>
+              </ul>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="set-password-confirm">Confirm Password</label>
+            <div class="password-wrapper">
+              <input type="password" id="set-password-confirm" required placeholder="••••••••" autocomplete="new-password" />
+              <button type="button" class="password-toggle" onclick="togglePasswordVisibility('set-password-confirm', this)" aria-label="Toggle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="set-password-btn" class="btn-primary">
+            <span class="btn-spinner"></span>
+            <span id="set-password-btn-label" class="btn-label">Complete Registration</span>
+          </button>
+        </form>
+        <div class="auth-footer" style="margin-top:12px;">
+          <span onclick="showAuthStep('login')">Cancel</span>
+        </div>
+      </div><!-- /#auth-step-set-password -->
+
+    </div><!-- /.auth-card -->
   </section>
+
 
   <!-- ═══════════════════════════════════════════
        SECTION 3: REPORT CARD (Student Self-Service)
@@ -412,6 +523,12 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           </span>
           <span class="label">SGPA / CGPA</span>
+        </button>
+        <button class="nav-item" onclick="switchView('resources')" aria-label="Resources">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="label">Resources</span>
         </button>
       </nav>
 
@@ -743,15 +860,26 @@
               </span>
               Student Results
             </h3>
-            <div class="counter-indicator-pill" id="results-count-display">
-              <span class="counter-icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </span>
-              <span class="counter-text">
-                <strong id="results-showing-count" class="counter-number">0</strong>
-                <span id="results-total-count-wrap" class="counter-total-wrap"></span>
-                <span class="counter-label">Results</span>
-              </span>
+            <div style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div class="counter-indicator-pill" id="results-count-display">
+                <span class="counter-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </span>
+                <span class="counter-text">
+                  <strong id="results-showing-count" class="counter-number">0</strong>
+                  <span id="results-total-count-wrap" class="counter-total-wrap"></span>
+                  <span class="counter-label">Results</span>
+                </span>
+              </div>
+              <div class="counter-indicator-pill indicator-f-grades" id="results-f-count-display" title="Total F grades in results">
+                <span class="counter-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </span>
+                <span class="counter-text">
+                  <strong id="results-f-showing-count" class="counter-number">0</strong>
+                  <span class="counter-label">F Grades</span>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -779,12 +907,8 @@
               </select>
             </div>
             <div class="form-group">
-              <label for="filter-regno">Reg No</label>
-              <input type="text" id="filter-regno" placeholder="e.g. 2401106001" oninput="applyFilters()" />
-            </div>
-            <div class="form-group">
-              <label for="filter-name">Student Name</label>
-              <input type="text" id="filter-name" placeholder="Search name…" oninput="applyFilters()" />
+              <label for="filter-subject-code">Subject Code</label>
+              <input type="text" id="filter-subject-code" placeholder="e.g. MAUC101" oninput="applyFilters()" />
             </div>
           </div>
 
@@ -1109,6 +1233,94 @@
                 <tr><td colspan="10" class="loading-cell">Loading…</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: RESOURCES              ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-resources" class="panel hidden" role="region" aria-label="Resources management">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon" style="background:var(--red-glass);color:var(--red);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </span>
+              Resources Management
+            </h3>
+          </div>
+
+          <div class="tab-content-area">
+            <div class="subjects-actions-row">
+              <button class="btn-small btn-small-accent" onclick="showAddResourceForm()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add Resource
+              </button>
+              <div class="table-search" style="flex:1; max-width:320px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" id="resources-search-input" placeholder="Search by name or email…" oninput="filterResourcesSearch()" />
+              </div>
+              <div class="form-group" style="margin:0; min-width:180px;">
+                <select class="compact-select" id="resources-type-filter" onchange="filterResourcesSearch()">
+                  <option value="">All Account Types</option>
+                  <option value="Admin">Admin</option>
+                  <option value="TNP">TNP</option>
+                  <option value="Faculty">Faculty</option>
+                  <option value="Exam Wing">Exam Wing</option>
+                </select>
+              </div>
+              <div class="counter-indicator-pill" id="resources-count-display">
+                <span class="counter-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </span>
+                <span class="counter-text">
+                  <strong id="resources-showing-count" class="counter-number">0</strong>
+                  <span id="resources-total-count-wrap" class="counter-total-wrap"></span>
+                  <span class="counter-label">Resources</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Add/Edit Resource Form -->
+            <div id="resource-form-container" class="inline-form-panel" style="display:none;">
+              <form id="resource-form" onsubmit="handleResourceSubmit(event)">
+                <div class="inline-form-row">
+                  <input type="text" id="resource-name" placeholder="Full Name (e.g. Dr. Ramesh)" required style="flex:1.5; min-width:180px;" />
+                  <input type="email" id="resource-email" placeholder="Email Address (e.g. ramesh@ptuniv.edu.in)" required style="flex:2; min-width:220px;" />
+                  <select id="resource-account-type" required class="compact-select" style="flex:1.2; min-width:140px;">
+                    <option value="" disabled selected>— Select Account Type —</option>
+                    <option value="Admin">Admin</option>
+                    <option value="TNP">TNP</option>
+                    <option value="Faculty">Faculty</option>
+                    <option value="Exam Wing">Exam Wing</option>
+                  </select>
+                  <button type="submit" id="resource-submit-btn" class="btn-primary" style="width:auto;">Save Resource</button>
+                  <button type="button" class="btn-secondary" onclick="hideAddResourceForm()" style="width:auto;">Cancel</button>
+                </div>
+                <p class="form-hint" style="margin-top:8px;">
+                  ℹ️ <strong>Pre-Registration Requirement:</strong> Personnel must be added here first. When they signup in the portal with their Name and Email, their account type is automatically assigned.
+                </p>
+                <input type="hidden" id="resource-edit-id" />
+              </form>
+            </div>
+
+            <!-- Resources Table -->
+            <div id="resources-table-container" class="table-scroll-region">
+              <table class="data-table" id="resources-table">
+                <thead>
+                  <tr>
+                    <th style="width:50px;">#</th>
+                    <th>Name</th>
+                    <th>Email Address</th>
+                    <th>Account Type</th>
+                    <th>Portal Status</th>
+                    <th class="admin-only" style="width:120px; text-align:center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="resources-tbody">
+                  <tr><td colspan="6" class="loading-cell">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 

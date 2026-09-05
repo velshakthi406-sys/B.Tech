@@ -947,7 +947,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
 [data-theme="dark"] .checkbox-label input[type="checkbox"] { accent-color: var(--indigo); }
 
 /* ── OTP Input ── */
-.otp-input {
+.otp-input, .otp-digit-input {
   letter-spacing: 0.5em;
   font-family: var(--font-mono);
   font-size: 1.3rem !important;
@@ -1937,6 +1937,34 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
 [data-theme="dark"] .counter-indicator-pill.is-filtered {
   background: var(--indigo-glass);
   border-color: rgba(99, 102, 241, 0.35);
+}
+
+.counter-indicator-pill.indicator-f-grades {
+  background: var(--danger-light);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+.counter-indicator-pill.indicator-f-grades:hover {
+  background: var(--danger-light);
+  border-color: rgba(220, 38, 38, 0.55);
+}
+.counter-indicator-pill.indicator-f-grades .counter-icon {
+  color: var(--danger);
+}
+.counter-indicator-pill.indicator-f-grades .counter-number {
+  color: var(--danger);
+}
+[data-theme="dark"] .counter-indicator-pill.indicator-f-grades {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+[data-theme="dark"] .counter-indicator-pill.indicator-f-grades:hover {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+[data-theme="dark"] .counter-indicator-pill.indicator-f-grades .counter-icon {
+  color: #f87171;
+}
+[data-theme="dark"] .counter-indicator-pill.indicator-f-grades .counter-number {
+  color: #f87171;
 }
 
 .counter-icon {
@@ -3203,4 +3231,110 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   font-size: 0.82rem;
   border: 1px solid var(--violet);
 }
+
+/* ============================================================
+   PASSWORD CRITERIA (Live Sheet Reference)
+   ============================================================ */
+.password-criteria {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  background: var(--bg-muted);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  transition: all 0.25s ease;
+}
+
+.password-criteria ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.password-criteria li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  transition: color 0.25s ease;
+  font-weight: 500;
+}
+
+.password-criteria li .criteria-icon {
+  display: inline-block;
+  width: 18px;
+  text-align: center;
+  font-weight: 800;
+  transition: color 0.25s ease;
+}
+
+.password-criteria li.valid {
+  color: var(--success);
+}
+
+.password-criteria li.invalid {
+  color: var(--danger);
+}
+
+.password-criteria li.valid .criteria-icon {
+  color: var(--success);
+}
+
+.password-criteria li.invalid .criteria-icon {
+  color: var(--danger);
+}
+
+/* ============================================================
+   RESOURCES & ACCOUNT TYPE BADGES
+   ============================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-admin {
+  background: var(--red-glass);
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+
+.badge-tnp {
+  background: var(--indigo-glass);
+  color: var(--indigo);
+  border: 1px solid var(--indigo);
+}
+
+.badge-faculty {
+  background: var(--amber-glass);
+  color: var(--amber);
+  border: 1px solid var(--amber);
+}
+
+.badge-exam-wing {
+  background: var(--teal-glass);
+  color: var(--teal);
+  border: 1px solid var(--teal);
+}
+
+.badge-active {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.badge-pending {
+  background: var(--warning-light);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+
 

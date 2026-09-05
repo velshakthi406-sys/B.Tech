@@ -18,8 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, UniqueConstraint, func, event, text
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, UniqueConstraint, func, event, text, inspect
 from sqlalchemy.orm import sessionmaker, Session, declarative_base, relationship
 from sqlalchemy.exc import IntegrityError
 import bcrypt
@@ -28,8 +28,14 @@ import numpy as np
 import pandas as pd
 import pdfplumber
 import openpyxl
+import json
+import urllib.request
+import urllib.error
 from dotenv import load_dotenv
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Always load .env from backend directory first, then fallback to current working directory
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 load_dotenv()
 
 # ==========================================
@@ -41,7 +47,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BATCHES_DIR = os.path.join(BASE_DIR, "batches")
 os.makedirs(BATCHES_DIR, exist_ok=True)
 
@@ -100,6 +105,11 @@ SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME or "no-reply@ptuniv
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "PTU Grade Portal")
 SMTP_CONFIGURED = bool(SMTP_HOST and SMTP_USERNAME and SMTP_PASSWORD)
 
+# HTTPS Email APIs (port 443 — works seamlessly on Render free tier where SMTP ports 25/465/587 are blocked)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+
 GRADE_POINTS = {
     "O": 10, "A+": 9, "A": 8, "B+": 7, "B": 6, "C": 5, "D": 4,
     "F": 0, "AB": 0, "ABSENT": 0, "S": 0, "E": 0, "Z": 0, "P": 0,
@@ -134,13 +144,22 @@ def normalize_grade(raw: str) -> str:
 # DATABASE MODELS
 # ==========================================
 
-# 1. System DB Models (Users & OTPs)
+# 1. System DB Models (Users, Resources & OTPs)
 class User(SystemBase):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String)
     role = Column(String, default="viewer")
+
+class Resource(SystemBase):
+    __tablename__ = "resources"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String, nullable=False, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    account_type = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
 
 class ReportCardOTP(SystemBase):
     __tablename__ = "report_card_otps"
@@ -152,6 +171,19 @@ class ReportCardOTP(SystemBase):
     expires_at = Column(DateTime, nullable=False)
     attempts = Column(Integer, nullable=False, default=0)
     consumed = Column(Boolean, nullable=False, default=False)
+
+class StaffOTP(SystemBase):
+    """OTP records for staff registration and password reset."""
+    __tablename__ = "staff_otps"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, nullable=False, index=True)
+    purpose = Column(String, nullable=False)        # 'register' or 'reset'
+    otp_hash = Column(String, nullable=False)
+    verified = Column(Boolean, nullable=False, default=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
 
 # 2. Subjects DB Models (University Subjects Master)
 class Subject(SubjectsBase):
@@ -551,6 +583,7 @@ class OTPRequestResponse(BaseModel):
     message: str
     expires_in_seconds: int
     resend_after_seconds: int
+    dev_otp: Optional[str] = None
 
 class OTPVerifyRequest(BaseModel):
     reg_no: str
@@ -664,16 +697,31 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+ACCOUNT_TYPES = ["Admin", "TNP", "Faculty", "Exam Wing"]
+
+def validate_password_strength(password: str):
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+    if not re.search(r"[a-z]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter.")
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter.")
+    if not re.search(r"\d", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one digit.")
+    if not re.search(r"[!@#$%^&*]", password):
+        raise HTTPException(status_code=400, detail="Password must contain a special character (!@#$%^&*).")
+
 def role_checker(allowed_roles: List[str]):
+    allowed_lower = [r.lower() for r in allowed_roles]
     def checker(user: User = Depends(get_current_user)):
-        if user.role not in allowed_roles:
+        if not user.role or user.role.lower() not in allowed_lower:
             raise HTTPException(status_code=403, detail="Insufficient privileges")
         return user
     return checker
 
-allow_all = role_checker(["admin", "manager", "viewer"])
-allow_write = role_checker(["admin", "manager"])
-allow_admin = role_checker(["admin"])
+allow_all = role_checker(["Admin", "TNP", "Faculty", "Exam Wing", "manager", "viewer"])
+allow_write = role_checker(["Admin", "Exam Wing", "manager"])
+allow_admin = role_checker(["Admin"])
 
 # ==========================================
 # REPORT CARD OTP HELPERS
@@ -690,7 +738,133 @@ def _verify_otp_hash(otp: str, hashed: str) -> bool:
     except ValueError:
         return False
 
-def _send_otp_email(to_email: str, student_name: str, reg_no: str, otp: str) -> None:
+def _send_via_resend(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+    url = "https://api.resend.com/emails"
+    sender = f"{from_name} <{from_email}>" if from_name else from_email
+    payload = json.dumps({
+        "from": sender,
+        "to": [to_email],
+        "subject": subject,
+        "html": html_body,
+        "text": text_body
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "PTU-Grade-Portal/1.0"
+        }
+    )
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        return 200 <= resp.status < 300
+
+
+def _send_via_brevo(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+    url = "https://api.brevo.com/v3/smtp/email"
+    payload = json.dumps({
+        "sender": {"name": from_name or "PTU Grade Portal", "email": from_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_body,
+        "textContent": text_body
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+            "User-Agent": "PTU-Grade-Portal/1.0"
+        }
+    )
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        return 200 <= resp.status < 300
+
+
+def _send_via_sendgrid(api_key: str, from_email: str, from_name: str, to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+    url = "https://api.sendgrid.com/v3/mail/send"
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": from_email, "name": from_name or "PTU Grade Portal"},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": text_body},
+            {"type": "text/html", "value": html_body}
+        ]
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "PTU-Grade-Portal/1.0"
+        }
+    )
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        return 200 <= resp.status < 300
+
+
+def _send_via_smtp(to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
+    message["To"] = to_email
+    message.attach(MIMEText(text_body, "plain"))
+    message.attach(MIMEText(html_body, "html"))
+
+    if SMTP_USE_SSL:
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=5) as server:
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.sendmail(SMTP_FROM_EMAIL, [to_email], message.as_string())
+    else:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
+            server.ehlo()
+            server.starttls(context=ssl.create_default_context())
+            server.ehlo()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.sendmail(SMTP_FROM_EMAIL, [to_email], message.as_string())
+    return True
+
+
+def _dispatch_email(to_email: str, subject: str, text_body: str, html_body: str) -> bool:
+    """Send email using HTTPS APIs (works on Render free tier where SMTP is blocked) or standard SMTP."""
+    # 1. Resend API (HTTP port 443)
+    if RESEND_API_KEY:
+        try:
+            return _send_via_resend(RESEND_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body)
+        except Exception as e:
+            logger.warning("Resend API delivery failed: %s", e)
+
+    # 2. Brevo API (HTTP port 443)
+    if BREVO_API_KEY:
+        try:
+            return _send_via_brevo(BREVO_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body)
+        except Exception as e:
+            logger.warning("Brevo API delivery failed: %s", e)
+
+    # 3. SendGrid API (HTTP port 443)
+    if SENDGRID_API_KEY:
+        try:
+            return _send_via_sendgrid(SENDGRID_API_KEY, SMTP_FROM_EMAIL, SMTP_FROM_NAME, to_email, subject, text_body, html_body)
+        except Exception as e:
+            logger.warning("SendGrid API delivery failed: %s", e)
+
+    # 4. Standard SMTP (works on local machine, VPS, or paid cloud instances)
+    if SMTP_CONFIGURED:
+        try:
+            return _send_via_smtp(to_email, subject, text_body, html_body)
+        except Exception as e:
+            logger.warning("SMTP delivery failed (expected on Render free tier where ports 25/465/587 are blocked): %s", e)
+            return False
+
+    return False
+
+
+def _send_otp_email(to_email: str, student_name: str, reg_no: str, otp: str) -> bool:
     subject = "Your Report Card OTP - PTU Grade Portal"
     text_body = (
         f"Hello {student_name},\n\n"
@@ -726,40 +900,86 @@ def _send_otp_email(to_email: str, student_name: str, reg_no: str, otp: str) -> 
     </div>
     """
 
-    if not SMTP_CONFIGURED:
+    sent = _dispatch_email(to_email, subject, text_body, html_body)
+    if not sent:
         logger.warning(
-            "SMTP is not configured (SMTP_HOST/SMTP_USERNAME/SMTP_PASSWORD). "
-            "OTP for %s <%s> is: %s (DEV FALLBACK - configure SMTP for production)",
+            "OTP for %s <%s> is: %s (Email delivery unavailable; code returned for verification)",
             reg_no, to_email, otp,
         )
-        return
+    return sent
 
-    message = MIMEMultipart("alternative")
-    message["Subject"] = subject
-    message["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
-    message["To"] = to_email
-    message.attach(MIMEText(text_body, "plain"))
-    message.attach(MIMEText(html_body, "html"))
+STAFF_OTP_EXPIRE_MINUTES = 10
+STAFF_OTP_MAX_ATTEMPTS = 5
+STAFF_OTP_TOKEN_SECRET = os.getenv("STAFF_OTP_TOKEN_SECRET", SECRET_KEY + "_staff_otp")
+STAFF_OTP_TOKEN_EXPIRE_MINUTES = 30   # window to set password after OTP verify
 
-    try:
-        if SMTP_USE_SSL:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=15) as server:
-                server.login(SMTP_USERNAME, SMTP_PASSWORD)
-                server.sendmail(SMTP_FROM_EMAIL, [to_email], message.as_string())
-        else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-                server.ehlo()
-                server.starttls(context=ssl.create_default_context())
-                server.ehlo()
-                server.login(SMTP_USERNAME, SMTP_PASSWORD)
-                server.sendmail(SMTP_FROM_EMAIL, [to_email], message.as_string())
-    except Exception:
-        logger.exception("Failed to send OTP email to %s", to_email)
-        raise HTTPException(
-            status_code=503,
-            detail="Could not send the OTP email right now. Please try again in a moment."
+def _send_staff_otp_email(to_email: str, name: str, otp: str, purpose: str) -> bool:
+    """Send an OTP email to a staff member for registration or password reset."""
+    action = "Registration Verification" if purpose == "register" else "Password Reset"
+    subject = f"Your {action} OTP — PTU Grade Portal"
+    text_body = (
+        f"Hello {name},\n\n"
+        f"Your one-time passcode (OTP) for {action.lower()} is:\n\n"
+        f"    {otp}\n\n"
+        f"This code is valid for {STAFF_OTP_EXPIRE_MINUTES} minutes and can be used only once.\n\n"
+        f"If you did not request this, please ignore this email.\n\n"
+        f"— PTU Grade Portal"
+    )
+    html_body = f"""
+    <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:auto;
+                border:1px solid #e5e5e5;border-radius:12px;overflow:hidden;">
+      <div style="background:#7a1230;color:#fff;padding:20px 24px;">
+        <h2 style="margin:0;font-size:18px;">PTU Grade Portal – Staff Portal</h2>
+      </div>
+      <div style="padding:24px;">
+        <p>Hello <strong>{name}</strong>,</p>
+        <p>Your one-time passcode for <strong>{action}</strong>:</p>
+        <div style="text-align:center;margin:24px 0;">
+          <span style="display:inline-block;font-size:32px;letter-spacing:8px;
+                       font-weight:700;color:#7a1230;background:#f6f0f2;
+                       padding:12px 20px;border-radius:8px;">{otp}</span>
+        </div>
+        <p style="color:#555;font-size:14px;">
+          This code expires in {STAFF_OTP_EXPIRE_MINUTES} minutes and can only be used once.
+          Never share it with anyone.
+        </p>
+        <p style="color:#999;font-size:12px;">
+          If you did not request this, you can safely ignore this email.
+        </p>
+      </div>
+    </div>
+    """
+
+    sent = _dispatch_email(to_email, subject, text_body, html_body)
+    if not sent:
+        logger.warning(
+            "Staff OTP for %s <%s> purpose=%s is: %s (Email delivery unavailable)",
+            name, to_email, purpose, otp,
         )
+    return sent
+
+def _issue_staff_otp_token(email: str, purpose: str) -> str:
+    payload = {
+        "purpose": f"staff_{purpose}",
+        "email": email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=STAFF_OTP_TOKEN_EXPIRE_MINUTES),
+    }
+    return jwt.encode(payload, STAFF_OTP_TOKEN_SECRET, algorithm=ALGORITHM)
+
+def _verify_staff_otp_token(token: str, email: str, purpose: str) -> None:
+    try:
+        payload = jwt.decode(token, STAFF_OTP_TOKEN_SECRET, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Your verification session has expired. Please request a new OTP.")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid verification session. Please request a new OTP.")
+
+    if (
+        payload.get("purpose") != f"staff_{purpose}"
+        or payload.get("email", "").strip().lower() != email.strip().lower()
+    ):
+        raise HTTPException(status_code=401, detail="Invalid verification session. Please request a new OTP.")
+
 
 def _issue_report_card_token(reg_no: str, email: str) -> str:
     payload = {
@@ -794,26 +1014,266 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # ==========================================
 # AUTH ROUTES
 # ==========================================
-class SignupRequest(BaseModel):
-    username: str
-    password: str
 
-@app.post("/auth/signup")
-def signup(data: SignupRequest, db: Session = Depends(get_system_db)):
-    existing = db.query(User).filter(User.username == data.username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    hashed = hash_password(data.password)
-    user = User(username=data.username, hashed_password=hashed, role="viewer")
-    db.add(user)
+# ── OTP Request ──────────────────────────────
+class StaffOtpRequestBody(BaseModel):
+    name: str              # Full name (required for 'register', optional hint for 'reset')
+    email: EmailStr
+    purpose: str           # 'register' or 'reset'
+
+@app.post("/auth/otp/request")
+def request_staff_otp(data: StaffOtpRequestBody, db: Session = Depends(get_system_db)):
+    if data.purpose not in ("register", "reset"):
+        raise HTTPException(status_code=400, detail="purpose must be 'register' or 'reset'")
+
+    clean_email = str(data.email).strip().lower()
+    clean_name  = data.name.strip()
+
+    if data.purpose == "register":
+        # Must pre-exist in Resources with matching name + email
+        resource = db.query(Resource).filter(
+            func.lower(Resource.name) == clean_name.lower(),
+            func.lower(Resource.email) == clean_email
+        ).first()
+        if not resource:
+            raise HTTPException(
+                status_code=403,
+                detail="No resource record found with this name and email. Please contact your administrator."
+            )
+        # Must not already have an account
+        existing = db.query(User).filter(
+            func.lower(User.email) == clean_email
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail="This email already has a registered account. Please sign in."
+            )
+        display_name = clean_name
+
+    else:  # reset
+        # Must have an existing account
+        user = db.query(User).filter(
+            func.lower(User.email) == clean_email
+        ).first()
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="No account found with this email address."
+            )
+        display_name = user.username
+
+    # Invalidate any previous unverified OTPs for this email+purpose
+    db.query(StaffOTP).filter(
+        func.lower(StaffOTP.email) == clean_email,
+        StaffOTP.purpose == data.purpose,
+        StaffOTP.verified == False
+    ).delete(synchronize_session=False)
     db.commit()
-    return {"message": "User created"}
+
+    otp = _generate_otp()
+    otp_hash = _hash_otp(otp)
+    expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=STAFF_OTP_EXPIRE_MINUTES)
+
+    staff_otp = StaffOTP(
+        email=clean_email,
+        purpose=data.purpose,
+        otp_hash=otp_hash,
+        verified=False,
+        attempts=0,
+        expires_at=expires_at,
+    )
+    db.add(staff_otp)
+    db.commit()
+
+    sent = _send_staff_otp_email(to_email=clean_email, name=display_name, otp=otp, purpose=data.purpose)
+
+    resp_data = {"message": f"OTP sent to {clean_email}. Valid for {STAFF_OTP_EXPIRE_MINUTES} minutes."}
+    if not sent or not SMTP_CONFIGURED or os.getenv("TEST_MODE") == "1":
+        resp_data["dev_otp"] = otp
+    return resp_data
+
+
+# ── OTP Verify ───────────────────────────────
+class StaffOtpVerifyBody(BaseModel):
+    email: EmailStr
+    otp: str
+    purpose: str
+
+@app.post("/auth/otp/verify")
+def verify_staff_otp(data: StaffOtpVerifyBody, db: Session = Depends(get_system_db)):
+    if data.purpose not in ("register", "reset"):
+        raise HTTPException(status_code=400, detail="purpose must be 'register' or 'reset'")
+
+    clean_email = str(data.email).strip().lower()
+
+    record = db.query(StaffOTP).filter(
+        func.lower(StaffOTP.email) == clean_email,
+        StaffOTP.purpose == data.purpose,
+        StaffOTP.verified == False
+    ).order_by(StaffOTP.created_at.desc()).first()
+
+    if not record:
+        raise HTTPException(status_code=400, detail="No active OTP found. Please request a new one.")
+
+    if datetime.datetime.utcnow() > record.expires_at:
+        db.delete(record)
+        db.commit()
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+
+    if record.attempts >= STAFF_OTP_MAX_ATTEMPTS:
+        db.delete(record)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Too many failed attempts. Please request a new OTP.")
+
+    record.attempts += 1
+    db.commit()
+
+    if not _verify_otp_hash(data.otp.strip(), record.otp_hash):
+        remaining = STAFF_OTP_MAX_ATTEMPTS - record.attempts
+        raise HTTPException(
+            status_code=400,
+            detail=f"Incorrect OTP. {remaining} attempt(s) remaining."
+        )
+
+    # Mark as verified
+    record.verified = True
+    db.commit()
+
+    # Issue a short-lived token to allow the password step
+    otp_token = _issue_staff_otp_token(email=clean_email, purpose=data.purpose)
+    return {"otp_token": otp_token, "message": "OTP verified successfully. You may now set your password."}
+
+
+# ── Register (complete with password) ────────
+class StaffRegisterBody(BaseModel):
+    name: str
+    email: EmailStr
+    otp_token: str
+    password: str
+    confirm_password: str
+
+@app.post("/auth/register")
+def register_staff(data: StaffRegisterBody, db: Session = Depends(get_system_db)):
+    clean_email = str(data.email).strip().lower()
+    clean_name  = data.name.strip()
+
+    # Validate OTP token
+    _verify_staff_otp_token(data.otp_token, email=clean_email, purpose="register")
+
+    # Re-verify resource exists
+    resource = db.query(Resource).filter(
+        func.lower(Resource.name) == clean_name.lower(),
+        func.lower(Resource.email) == clean_email
+    ).first()
+    if not resource:
+        raise HTTPException(
+            status_code=403,
+            detail="Resource record not found. Please contact your administrator."
+        )
+
+    # Ensure no account exists
+    existing = db.query(User).filter(
+        func.lower(User.email) == clean_email
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists. Please sign in.")
+
+    # Validate passwords
+    if data.password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match.")
+    validate_password_strength(data.password)
+
+    # Derive a unique username from the email local part (before the @)
+    # This ensures uniqueness since email is already unique.
+    base_username = clean_email.split("@")[0]
+
+    # Create user with role from resource
+    hashed = hash_password(data.password)
+    user = User(
+        username=base_username,
+        email=clean_email,
+        hashed_password=hashed,
+        role=resource.account_type
+    )
+    db.add(user)
+
+    # Clean up verified OTP records for this email
+    db.query(StaffOTP).filter(
+        func.lower(StaffOTP.email) == clean_email,
+        StaffOTP.purpose == "register"
+    ).delete(synchronize_session=False)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="An account with this email or username already exists. Please sign in.")
+
+    return {"message": "Registration complete! You can now sign in.", "role": user.role, "username": user.username}
+
+
+# ── Reset Password ────────────────────────────
+class StaffResetPasswordBody(BaseModel):
+    email: EmailStr
+    otp_token: str
+    new_password: str
+    confirm_password: str
+
+@app.post("/auth/reset-password")
+def reset_staff_password(data: StaffResetPasswordBody, db: Session = Depends(get_system_db)):
+    clean_email = str(data.email).strip().lower()
+
+    # Validate OTP token
+    _verify_staff_otp_token(data.otp_token, email=clean_email, purpose="reset")
+
+    user = db.query(User).filter(func.lower(User.email) == clean_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+    if data.new_password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match.")
+    validate_password_strength(data.new_password)
+
+    user.hashed_password = hash_password(data.new_password)
+
+    # Clean up reset OTP records
+    db.query(StaffOTP).filter(
+        func.lower(StaffOTP.email) == clean_email,
+        StaffOTP.purpose == "reset"
+    ).delete(synchronize_session=False)
+
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
+
 
 @app.post("/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_system_db)):
-    user = db.query(User).filter(User.username == form_data.username).first()
+    ident = form_data.username.strip().lower()
+    user = db.query(User).filter(
+        (func.lower(User.username) == ident) |
+        (func.lower(User.email) == ident)
+    ).first()
+
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    # Verify that the matching resource record pre-exists!
+    resource = db.query(Resource).filter(
+        (func.lower(Resource.email) == func.lower(user.email or "")) |
+        (func.lower(Resource.name) == func.lower(user.username))
+    ).first()
+    if not resource:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your associated resource record no longer exists. Access denied."
+        )
+
+    # Sync role with resource account_type
+    if user.role != resource.account_type:
+        user.role = resource.account_type
+        db.commit()
+
     access_token = jwt.encode(
         {"sub": user.username, "role": user.role, "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)},
         SECRET_KEY, algorithm=ALGORITHM
@@ -822,7 +1282,223 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         {"sub": user.username, "role": user.role, "exp": datetime.datetime.utcnow() + datetime.timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)},
         REFRESH_SECRET_KEY, algorithm=ALGORITHM
     )
-    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer", "role": user.role, "username": user.username}
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "role": user.role,
+        "username": user.username
+    }
+
+@app.get("/auth/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role
+    }
+
+@app.get("/auth/allowed-types")
+def get_allowed_account_types(current_user: User = Depends(allow_all)):
+    """Return account types the current user is allowed to assign when creating resources."""
+    role = (current_user.role or "").strip()
+    if role.lower() == "admin":
+        return {"allowed": ACCOUNT_TYPES}
+    # Non-admin: can only create resources of their own type
+    if role in ACCOUNT_TYPES:
+        return {"allowed": [role]}
+    return {"allowed": []}
+
+
+
+# ==========================================
+# RESOURCE SCHEMAS & ROUTES
+# ==========================================
+class ResourceBase(BaseModel):
+    name: str = Field(..., min_length=1)
+    email: EmailStr
+    account_type: str
+
+    @field_validator('account_type')
+    @classmethod
+    def validate_account_type(cls, v: str) -> str:
+        for t in ACCOUNT_TYPES:
+            if v.strip().lower() == t.lower():
+                return t
+        raise ValueError(f"Account type must be one of: {', '.join(ACCOUNT_TYPES)}")
+
+class ResourceCreate(ResourceBase):
+    pass
+
+class ResourceUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    account_type: Optional[str] = None
+
+class ResourceResponse(ResourceBase):
+    id: int
+    has_account: bool = False
+    created_at: Optional[datetime.datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+@app.get("/resources/", response_model=List[ResourceResponse])
+def get_resources(db: Session = Depends(get_system_db), user: User = Depends(allow_all)):
+    resources = db.query(Resource).order_by(Resource.id.asc()).all()
+    user_names_and_emails = set()
+    for u in db.query(User.username, User.email).all():
+        if u[0]:
+            user_names_and_emails.add(u[0].strip().lower())
+        if u[1]:
+            user_names_and_emails.add(u[1].strip().lower())
+
+    result = []
+    for r in resources:
+        has_acc = (r.name.strip().lower() in user_names_and_emails or r.email.strip().lower() in user_names_and_emails)
+        result.append(ResourceResponse(
+            id=r.id,
+            name=r.name,
+            email=r.email,
+            account_type=r.account_type,
+            has_account=has_acc,
+            created_at=r.created_at
+        ))
+    return result
+
+@app.post("/resources/", response_model=ResourceResponse)
+def create_resource(data: ResourceCreate, db: Session = Depends(get_system_db), user: User = Depends(allow_all)):
+    clean_email = str(data.email).strip().lower()
+    clean_name = data.name.strip()
+    requester_role = (user.role or "").strip()
+
+    # --- Role-based type enforcement ---
+    if requester_role.lower() != "admin":
+        # Non-admin: must only create resources of their own account type
+        if data.account_type.lower() != requester_role.lower():
+            raise HTTPException(
+                status_code=403,
+                detail=f"You can only create resources of your own account type ({requester_role})."
+            )
+
+    # --- Email must be unique (name can repeat) ---
+    existing_email = db.query(Resource).filter(
+        func.lower(Resource.email) == clean_email
+    ).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="A resource with this email already exists.")
+
+    new_res = Resource(
+        name=clean_name,
+        email=clean_email,
+        account_type=data.account_type
+    )
+    db.add(new_res)
+    db.commit()
+    db.refresh(new_res)
+    return ResourceResponse(
+        id=new_res.id,
+        name=new_res.name,
+        email=new_res.email,
+        account_type=new_res.account_type,
+        has_account=False,
+        created_at=new_res.created_at
+    )
+
+@app.put("/resources/{resource_id}", response_model=ResourceResponse)
+def update_resource(resource_id: int, data: ResourceUpdate, db: Session = Depends(get_system_db), user: User = Depends(allow_admin)):
+    res = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not res:
+        raise HTTPException(status_code=404, detail="Resource not found.")
+
+    old_email = res.email
+
+    # Name can now repeat — just update it without a uniqueness check
+    if data.name is not None and data.name.strip():
+        res.name = data.name.strip()
+
+    if data.email is not None and str(data.email).strip():
+        clean_email = str(data.email).strip().lower()
+        dup_email = db.query(Resource).filter(
+            func.lower(Resource.email) == clean_email,
+            Resource.id != resource_id
+        ).first()
+        if dup_email:
+            raise HTTPException(status_code=400, detail="Another resource already uses this email.")
+        res.email = clean_email
+
+    if data.account_type is not None and data.account_type.strip():
+        # Admin cannot change their OWN account type
+        own_res = db.query(Resource).filter(
+            func.lower(Resource.email) == func.lower(user.email or ""),
+            Resource.id == resource_id
+        ).first()
+        if own_res:
+            raise HTTPException(
+                status_code=403,
+                detail="You cannot change your own account type."
+            )
+
+        # Remove Admin choice in change account type
+        if data.account_type.strip().lower() == "admin":
+            raise HTTPException(
+                status_code=400,
+                detail="Account type cannot be changed to Admin."
+            )
+
+        valid_type = None
+        for t in ["TNP", "Faculty", "Exam Wing"]:
+            if data.account_type.strip().lower() == t.lower():
+                valid_type = t
+                break
+        if not valid_type:
+            raise HTTPException(status_code=400, detail="Account type must be one of: TNP, Faculty, Exam Wing")
+        res.account_type = valid_type
+
+    # Sync active User record if one exists for this resource (match by old email)
+    active_user = db.query(User).filter(
+        func.lower(User.email) == old_email.lower()
+    ).first()
+    if active_user:
+        active_user.role = res.account_type
+        active_user.username = res.name
+        active_user.email = res.email
+
+    db.commit()
+    db.refresh(res)
+
+    has_acc = db.query(User).filter(
+        func.lower(User.email) == res.email.lower()
+    ).first() is not None
+
+    return ResourceResponse(
+        id=res.id,
+        name=res.name,
+        email=res.email,
+        account_type=res.account_type,
+        has_account=has_acc,
+        created_at=res.created_at
+    )
+
+@app.delete("/resources/{resource_id}")
+def delete_resource(resource_id: int, db: Session = Depends(get_system_db), user: User = Depends(allow_admin)):
+    res = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not res:
+        raise HTTPException(status_code=404, detail="Resource not found.")
+
+    if res.email.lower() == (user.email or "").lower():
+        raise HTTPException(status_code=400, detail="You cannot delete your own active resource record.")
+
+    # Remove linked user account
+    linked_user = db.query(User).filter(
+        func.lower(User.email) == res.email.lower()
+    ).first()
+    if linked_user:
+        db.delete(linked_user)
+
+    db.delete(res)
+    db.commit()
+    return {"message": f"Resource '{res.name}' deleted successfully."}
+
 
 @app.post("/auth/refresh")
 def refresh(refresh_token: str):
@@ -2385,12 +3061,18 @@ def get_results(
     user: User = Depends(allow_all)
 ):
     subjects_map = get_subjects_map(subjects_db)
-    target_subject_id = None
-    if subject_code:
-        for sid, sub in subjects_map.items():
-            if sub.code.upper() == subject_code.upper():
-                target_subject_id = sid
-                break
+    target_subject_ids = None
+    if subject_code and subject_code.strip():
+        sc = subject_code.strip().upper()
+        exact_ids = [sid for sid, sub in subjects_map.items() if sub.code and sub.code.strip().upper() == sc]
+        if exact_ids:
+            target_subject_ids = set(exact_ids)
+        else:
+            partial_ids = [sid for sid, sub in subjects_map.items() if sub.code and sc in sub.code.strip().upper()]
+            target_subject_ids = set(partial_ids)
+
+        if not target_subject_ids:
+            return []
 
     response: List[ResultWithDetails] = []
 
@@ -2407,8 +3089,8 @@ def get_results(
                 query = query.filter(Student.department == department)
             if semester:
                 query = query.filter(Result.semester == semester)
-            if target_subject_id:
-                query = query.filter(Result.subject_id == target_subject_id)
+            if target_subject_ids is not None:
+                query = query.filter(Result.subject_id.in_(target_subject_ids))
 
             for r in query.all():
                 sub = subjects_map.get(r.subject_id)
@@ -2446,8 +3128,8 @@ def get_results(
                 query = query.filter(Student.department == department)
             if semester:
                 query = query.filter(Result.semester == semester)
-            if target_subject_id:
-                query = query.filter(Result.subject_id == target_subject_id)
+            if target_subject_ids is not None:
+                query = query.filter(Result.subject_id.in_(target_subject_ids))
 
             for r in query.all():
                 sub = subjects_map.get(r.subject_id)
@@ -3059,7 +3741,15 @@ def request_report_card_otp(data: OTPRequestRequest, db: Session = Depends(get_s
     db.add(otp_row)
     db.commit()
 
-    _send_otp_email(email, student_name, reg_no, otp)
+    sent = _send_otp_email(email, student_name, reg_no, otp)
+    if not sent:
+        return OTPRequestResponse(
+            message=f"Verification code generated (email service unavailable on host): {otp}",
+            expires_in_seconds=OTP_EXPIRE_MINUTES * 60,
+            resend_after_seconds=OTP_RESEND_COOLDOWN_SECONDS,
+            dev_otp=otp
+        )
+
     return generic_response
 
 @app.post("/report-card/verify-otp", response_model=OTPVerifyResponse)
@@ -3195,17 +3885,51 @@ if os.path.exists(FRONTEND_DIR):
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize System and Subjects DB tables
+    # Schema migration check: ensure 'email' column exists on 'users' table
+    with system_engine.connect() as conn:
+        insp = inspect(system_engine)
+        if insp.has_table("users"):
+            cols = [c["name"] for c in insp.get_columns("users")]
+            if "email" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR"))
+                conn.commit()
+
+    # Initialize System and Subjects DB tables (creates resources table if missing)
     SystemBase.metadata.create_all(bind=system_engine)
     SubjectsBase.metadata.create_all(bind=subjects_engine)
 
-    # Initialize default admin in system.db
+    # Initialize default admin and admin resource in system.db
     sys_db = SystemSessionLocal()
     try:
         admin = sys_db.query(User).filter(User.username == "shakthivel").first()
         if not admin:
-            admin = User(username="shakthivel", hashed_password=hash_password("mK9#vP2$xL8%rQ4!"), role="admin")
+            admin = User(
+                username="shakthivel",
+                email="shakthivel@ptuniv.edu.in",
+                hashed_password=hash_password("mK9#vP2$xL8%rQ4!"),
+                role="Admin"
+            )
             sys_db.add(admin)
+            sys_db.commit()
+        else:
+            if not admin.email:
+                admin.email = "shakthivel@ptuniv.edu.in"
+            if admin.role.lower() == "admin":
+                admin.role = "Admin"
+            sys_db.commit()
+
+        # Ensure corresponding Resource exists for admin so pre-existence validation passes
+        admin_res = sys_db.query(Resource).filter(
+            (func.lower(Resource.name) == "shakthivel") |
+            (func.lower(Resource.email) == "shakthivel@ptuniv.edu.in")
+        ).first()
+        if not admin_res:
+            admin_res = Resource(
+                name="shakthivel",
+                email="shakthivel@ptuniv.edu.in",
+                account_type="Admin"
+            )
+            sys_db.add(admin_res)
             sys_db.commit()
     finally:
         sys_db.close()
