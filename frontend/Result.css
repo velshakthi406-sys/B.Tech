@@ -3011,10 +3011,10 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
     print-color-adjust: exact !important;
   }
 
-  /* Cumulative CGPA Summary Card */
+  /* Cumulative CGPA Summary Card — always render in dark style for print */
   .rc-pdf-cgpa-card {
-    background: #f1f5f9 !important;
-    border: 1.5px solid #cbd5e1 !important;
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #172554 100%) !important;
+    border: 1.5px solid rgba(99, 102, 241, 0.35) !important;
     border-radius: 12px !important;
     padding: 14px 20px !important;
     margin-top: 16px !important;
@@ -3022,37 +3022,55 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
     break-inside: avoid !important;
     page-break-inside: avoid !important;
     box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .rc-pdf-cgpa-card::before {
-    display: none !important;
+    display: block !important;
+    background: linear-gradient(180deg, #dc2626 0%, #8b5cf6 100%) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .rc-cgpa-card-score {
     font-size: 2.5rem !important;
-    color: #e11d48 !important;
-    -webkit-text-fill-color: #e11d48 !important;
-    background: none !important;
+    background: linear-gradient(135deg, #f43f5e 0%, #fb7185 50%, #fca5a5 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .rc-cgpa-card-title {
-    color: #475569 !important;
+    color: #a5b4fc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .rc-cgpa-stat-lbl {
-    color: #475569 !important;
+    color: #cbd5e1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .rc-cgpa-stat-val {
-    color: #0f172a !important;
+    color: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .rc-val-percent {
-    color: #0284c7 !important;
+    color: #38bdf8 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .rc-val-earned {
-    color: #059669 !important;
+    color: #34d399 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .data-table { min-width: unset; }
@@ -3480,5 +3498,3 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   color: var(--warning);
   border: 1px solid var(--warning);
 }
-
-
