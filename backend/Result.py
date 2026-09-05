@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, UniqueConstraint, func, event, text, inspect
 from sqlalchemy.orm import sessionmaker, Session, declarative_base, relationship
 from sqlalchemy.exc import IntegrityError
@@ -1018,7 +1018,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # ── OTP Request ──────────────────────────────
 class StaffOtpRequestBody(BaseModel):
     name: str              # Full name (required for 'register', optional hint for 'reset')
-    email: EmailStr
+    email: str
     purpose: str           # 'register' or 'reset'
 
 @app.post("/auth/otp/request")
@@ -1096,7 +1096,7 @@ def request_staff_otp(data: StaffOtpRequestBody, db: Session = Depends(get_syste
 
 # ── OTP Verify ───────────────────────────────
 class StaffOtpVerifyBody(BaseModel):
-    email: EmailStr
+    email: str
     otp: str
     purpose: str
 
@@ -1148,7 +1148,7 @@ def verify_staff_otp(data: StaffOtpVerifyBody, db: Session = Depends(get_system_
 # ── Register (complete with password) ────────
 class StaffRegisterBody(BaseModel):
     name: str
-    email: EmailStr
+    email: str
     otp_token: str
     password: str
     confirm_password: str
@@ -1215,7 +1215,7 @@ def register_staff(data: StaffRegisterBody, db: Session = Depends(get_system_db)
 
 # ── Reset Password ────────────────────────────
 class StaffResetPasswordBody(BaseModel):
-    email: EmailStr
+    email: str
     otp_token: str
     new_password: str
     confirm_password: str
@@ -1317,7 +1317,7 @@ def get_allowed_account_types(current_user: User = Depends(allow_all)):
 # ==========================================
 class ResourceBase(BaseModel):
     name: str = Field(..., min_length=1)
-    email: EmailStr
+    email: str
     account_type: str
 
     @field_validator('account_type')
@@ -1333,7 +1333,7 @@ class ResourceCreate(ResourceBase):
 
 class ResourceUpdate(BaseModel):
     name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     account_type: Optional[str] = None
 
 class ResourceResponse(ResourceBase):
