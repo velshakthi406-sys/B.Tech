@@ -60,7 +60,6 @@ let resultsAvailableBatches = [];
 let rcRegNo = '';
 let rcEmail = '';
 let rcAccessToken = '';
-let rcDevOtp = '';
 let rcResendTimerId = null;
 
 // ─── 1. Utility Functions ────────────────────────────────────
@@ -2023,13 +2022,11 @@ function showRcOtpStep() {
     $('rc-step-lookup')?.classList.add('hidden');
     $('rc-step-otp')?.classList.remove('hidden');
     if ($('rc-otp-target-email')) {
-        $('rc-otp-target-email').innerText = rcDevOtp
-            ? `${maskEmail(rcEmail)} (Verification Code: ${rcDevOtp})`
-            : maskEmail(rcEmail);
+        $('rc-otp-target-email').innerText = maskEmail(rcEmail);
     }
     const input = $('rc-otp-input');
     if (input) {
-        input.value = rcDevOtp || '';
+        input.value = '';
         input.focus();
     }
 }
@@ -2065,13 +2062,8 @@ async function handleReportCardLookup(event) {
         rcRegNo = regNo;
         rcEmail = email;
         rcAccessToken = '';
-        rcDevOtp = data.dev_otp || '';
 
-        if (data.dev_otp) {
-            showToast(`Verification code: ${data.dev_otp}`, 'info');
-        } else {
-            showToast(data.message || 'OTP sent to your registered email', 'success');
-        }
+        showToast(data.message || 'OTP sent to your registered email', 'success');
         showRcOtpStep();
         startResendCountdown(data.resend_after_seconds || 45);
     } catch (err) {
@@ -2151,14 +2143,7 @@ async function handleResendOtp() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Could not resend OTP');
-        rcDevOtp = data.dev_otp || '';
-        if (data.dev_otp) {
-            showToast(`Fresh verification code: ${data.dev_otp}`, 'info');
-            if ($('rc-otp-input')) $('rc-otp-input').value = data.dev_otp;
-            if ($('rc-otp-target-email')) $('rc-otp-target-email').innerText = `${maskEmail(rcEmail)} (Verification Code: ${rcDevOtp})`;
-        } else {
-            showToast('A fresh OTP has been sent', 'success');
-        }
+        showToast('A fresh OTP has been sent to your email', 'success');
         startResendCountdown(data.resend_after_seconds || 45);
     } catch (err) {
         showToast(err.message, 'error');
