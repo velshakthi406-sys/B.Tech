@@ -2237,13 +2237,28 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
 .rc-table-card {
   border: 1.2px solid #cbd5e1;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   background: #f8fafc;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.rc-table-card::-webkit-scrollbar {
+  height: 5px;
+}
+.rc-table-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rc-table-card::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 [data-theme="dark"] .rc-table-card {
   border-color: #334155;
   background: #1e293b;
+}
+[data-theme="dark"] .rc-table-card::-webkit-scrollbar-thumb {
+  background: #475569;
 }
 .rc-pdf-table {
   width: 100%;
@@ -2383,15 +2398,15 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
 
 /* Cumulative CGPA Summary Card with Multi-Color Gradient */
 .rc-pdf-cgpa-card {
-  background: linear-gradient(135deg, #f1f5f9 0%, #ede9fe 55%, #e0e7ff 100%);
-  border: 1.5px solid #c7d2fe;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 55%, #172554 100%);
+  border: 1.5px solid rgba(99, 102, 241, 0.35);
   border-radius: 18px;
   padding: 22px 28px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  box-shadow: 0 8px 24px -6px rgba(99, 102, 241, 0.12);
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
   position: relative;
   overflow: hidden;
 }
@@ -2417,7 +2432,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
 .rc-cgpa-card-title {
   font-size: 0.78rem;
   font-weight: 800;
-  color: #475569;
+  color: #a5b4fc;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -2430,7 +2445,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   line-height: 1;
   letter-spacing: -0.02em;
   font-family: var(--font-head);
-  background: linear-gradient(135deg, #e11d48 0%, #dc2626 50%, #991b1b 100%);
+  background: linear-gradient(135deg, #f43f5e 0%, #fb7185 50%, #fca5a5 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline-block;
@@ -2452,7 +2467,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   font-size: 0.88rem;
 }
 .rc-cgpa-stat-lbl {
-  color: #475569;
+  color: #cbd5e1;
   font-weight: 600;
   min-width: 180px;
 }
@@ -2462,20 +2477,20 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
 .rc-cgpa-stat-val {
   font-size: 1.02rem;
   font-weight: 800;
-  color: #0f172a;
+  color: #f8fafc;
   font-family: var(--font-mono);
 }
 [data-theme="dark"] .rc-cgpa-stat-val {
   color: #f8fafc;
 }
 .rc-val-percent {
-  color: #0284c7;
+  color: #38bdf8;
 }
 [data-theme="dark"] .rc-val-percent {
   color: #38bdf8;
 }
 .rc-val-earned {
-  color: #059669;
+  color: #34d399;
 }
 [data-theme="dark"] .rc-val-earned {
   color: #34d399;
@@ -2500,10 +2515,70 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .report-card-paper { padding: 22px 18px; border-radius: 20px; }
+  .report-card-paper { padding: 20px 14px; border-radius: 20px; }
   .rc-student-grid { grid-template-columns: 1fr; gap: 8px; }
   .rc-pdf-cgpa-card { flex-direction: column; align-items: flex-start; gap: 16px; }
   .rc-cgpa-stat-lbl { min-width: 140px; }
+
+  /* Report Card Mobile Table & Grade Visibility */
+  .rc-table-card {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rc-pdf-table {
+    width: 100%;
+    min-width: 320px;
+    font-size: 0.78rem;
+  }
+  .rc-pdf-table th {
+    padding: 8px 5px;
+    font-size: 0.68rem;
+    letter-spacing: 0.03em;
+  }
+  .rc-pdf-table td {
+    padding: 8px 5px;
+    font-size: 0.78rem;
+  }
+  .rc-th-idx, .rc-cell-idx {
+    width: 26px;
+    padding: 8px 2px;
+    font-size: 0.72rem;
+  }
+  .rc-th-code, .rc-cell-code {
+    width: 75px;
+  }
+  .rc-th-code code, .rc-cell-code code {
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .rc-th-title, .rc-cell-name {
+    min-width: 110px;
+    font-size: 0.76rem;
+    line-height: 1.25;
+    word-break: break-word;
+    white-space: normal;
+  }
+  .rc-th-cr, .rc-cell-credits {
+    width: 42px;
+    padding: 8px 3px;
+    font-size: 0.76rem;
+  }
+  .rc-th-gr, .rc-cell-grade {
+    width: 58px;
+    padding: 8px 4px;
+  }
+  .rc-cell-grade .grade-chip {
+    min-width: 30px;
+    height: 22px;
+    padding: 0 5px;
+    font-size: 0.72rem;
+  }
+  .rc-semester-footbar {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    justify-content: flex-start;
+  }
 }
 
 /* ============================================================
@@ -2673,7 +2748,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   .inline-form-row input, .inline-form-row select { min-width: 100%; }
 
   .rc-student-info { grid-template-columns: 1fr; }
-  .report-card-paper { padding: 24px 18px; }
+  .report-card-paper { padding: 20px 14px; }
 
   .stats-row { grid-template-columns: 1fr 1fr; }
   .sidebar-toggle-btn { display: flex; }
@@ -2684,6 +2759,55 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   .stats-row { grid-template-columns: 1fr; }
   .portal-cards { grid-template-columns: 1fr; }
   .home-stats { flex-direction: column; gap: 12px; }
+
+  /* Small Mobile Report Card Optimizations */
+  .report-card-paper { padding: 16px 10px; border-radius: 16px; }
+  .rc-pdf-header { margin-bottom: 16px; }
+  .rc-pdf-uni-title { font-size: 1.15rem; }
+  .rc-pdf-student-card { padding: 12px 12px; margin-bottom: 16px; }
+  .rc-pdf-semesters-list { gap: 16px; margin-bottom: 16px; }
+  .rc-pdf-table th,
+  .rc-pdf-table td {
+    padding: 7px 3px;
+  }
+  .rc-th-idx, .rc-cell-idx {
+    width: 22px;
+    padding: 7px 1px;
+    font-size: 0.68rem;
+  }
+  .rc-th-code, .rc-cell-code {
+    width: 68px;
+    padding: 7px 2px;
+  }
+  .rc-th-code code, .rc-cell-code code {
+    font-size: 0.68rem;
+  }
+  .rc-th-title, .rc-cell-name {
+    min-width: 95px;
+    font-size: 0.74rem;
+  }
+  .rc-th-cr, .rc-cell-credits {
+    width: 38px;
+    padding: 7px 2px;
+    font-size: 0.72rem;
+  }
+  .rc-th-gr, .rc-cell-grade {
+    width: 52px;
+    padding: 7px 2px;
+  }
+  .rc-cell-grade .grade-chip {
+    min-width: 28px;
+    height: 20px;
+    padding: 0 3px;
+    font-size: 0.70rem;
+  }
+  .rc-semester-footbar {
+    font-size: 0.74rem;
+    gap: 6px 10px;
+  }
+  .rc-pdf-cgpa-card {
+    padding: 16px 14px;
+  }
 }
 
 /* ============================================================
@@ -2909,6 +3033,26 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
     color: #e11d48 !important;
     -webkit-text-fill-color: #e11d48 !important;
     background: none !important;
+  }
+
+  .rc-cgpa-card-title {
+    color: #475569 !important;
+  }
+
+  .rc-cgpa-stat-lbl {
+    color: #475569 !important;
+  }
+
+  .rc-cgpa-stat-val {
+    color: #0f172a !important;
+  }
+
+  .rc-val-percent {
+    color: #0284c7 !important;
+  }
+
+  .rc-val-earned {
+    color: #059669 !important;
   }
 
   .data-table { min-width: unset; }

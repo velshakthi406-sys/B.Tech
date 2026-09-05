@@ -3354,6 +3354,18 @@ def delete_result(result_id: int, batch: Optional[str] = None, user: User = Depe
 # ==========================================
 # SGPA / CGPA CALCULATION
 # ==========================================
+_ROMAN_SEM_ORDER = {r: i for i, r in enumerate(
+    ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+)}
+
+def _semester_sort_key(sem: str):
+    s = (sem or "").strip().upper()
+    if s.isdigit():
+        return (int(s), s)
+    if s in _ROMAN_SEM_ORDER:
+        return (_ROMAN_SEM_ORDER[s] + 1, s)
+    return (99, s)
+
 def _arrear_bucket(count: int) -> str:
     if count <= 0:
         return "0"
@@ -3407,16 +3419,14 @@ def get_grade_summary(
 
             # Fetch results
             res_query = batch_db.query(
-                Result.student_id, Result.subject_id, Result.grade_point, Result.had_arrear
+                Result.student_id, Result.subject_id, Result.semester, Result.grade, Result.grade_point, Result.attempt, Result.id
             ).filter(Result.student_id.in_(stu_ids))
-            if semester:
-                res_query = res_query.filter(Result.semester == semester)
             res_rows = res_query.all()
 
-            # Group results by student
-            student_results: Dict[int, List[Tuple[int, float, bool]]] = {}
-            for sid, sub_id, gp, had_arr in res_rows:
-                student_results.setdefault(sid, []).append((sub_id, gp, had_arr))
+            # Group results by student -> subject -> list of Result records
+            student_subject_map: Dict[int, Dict[int, list]] = {}
+            for row in res_rows:
+                student_subject_map.setdefault(row.student_id, {}).setdefault(row.subject_id, []).append(row)
 
             # Arrear counts (across all semesters for each student in this batch DB)
             arr_rows = (
@@ -3428,17 +3438,35 @@ def get_grade_summary(
             arr_map = {s_id: cnt for s_id, cnt in arr_rows}
 
             for stu_id, stu_reg, stu_name, stu_dept in students:
-                results_list = student_results.get(stu_id, [])
+                subj_dict = student_subject_map.get(stu_id, {})
                 total_credits = 0.0
                 grade_points_sum = 0.0
                 earned_credits = 0.0
 
-                for sub_id, gp, _had_arr in results_list:
+                for sub_id, att_list in subj_dict.items():
+                    sorted_atts = sorted(att_list, key=lambda x: (x.attempt or 1, _semester_sort_key(x.semester), x.id or 0))
+                    orig_sem = sorted_atts[0].semester
+
+                    if semester and str(orig_sem).strip().upper() != str(semester).strip().upper():
+                        # When filtering by semester, only subjects whose first attempt belongs to that semester are counted
+                        continue
+
                     cr = credits_map.get(sub_id, 0.0)
-                    total_credits += cr
-                    grade_points_sum += (gp * cr)
-                    if gp > 0:
+                    if cr <= 0:
+                        continue
+
+                    passed_atts = [
+                        a for a in sorted_atts
+                        if a.grade_point > 0 and (a.grade or "").strip().upper() not in ("F", "AB", "ABSENT", "NC", "E", "Z")
+                    ]
+                    if passed_atts:
+                        best_gp = max(a.grade_point for a in passed_atts)
+                        total_credits += cr
+                        grade_points_sum += (best_gp * cr)
                         earned_credits += cr
+                    else:
+                        total_credits += cr
+                        # failed / uncleared: 0 grade point
 
                 gpa = round(grade_points_sum / total_credits, 2) if total_credits > 0 else None
                 arrear_count = arr_map.get(stu_id, 0)
@@ -3512,13 +3540,6 @@ def get_public_stats(subjects_db: Session = Depends(get_subjects_db)):
 # ==========================================
 # REPORT CARD (Public & Testing Direct Generator)
 # ==========================================
-_ROMAN_SEM_ORDER = {r: i for i, r in enumerate(
-    ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
-)}
-
-def _semester_sort_key(sem: str):
-    return (_ROMAN_SEM_ORDER.get((sem or "").strip().upper(), 99), sem or "")
-
 def _build_student_report_card(student: Student, batch_db: Session, subjects_db: Session) -> ReportCardResponse:
     results = batch_db.query(Result).filter(Result.student_id == student.id).order_by(Result.attempt.asc(), Result.id.asc()).all()
     if not results:
@@ -3558,7 +3579,8 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
 
         had_fail = len(failed_atts) > 0 or any(a.had_arrear for a in sorted_atts) or len(sorted_atts) > 1
         is_cleared = len(passed_atts) > 0
-        cleared_att = passed_atts[-1] if is_cleared else None
+        cleared_att = max(passed_atts, key=lambda a: a.grade_point) if is_cleared else None
+        cleared_gp = cleared_att.grade_point if cleared_att else 0.0
         first_fail = failed_atts[0] if failed_atts else (sorted_atts[0] if had_fail else None)
 
         failed_sem = first_fail.semester if first_fail else (sorted_atts[0].semester if had_fail else None)
@@ -3609,6 +3631,7 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
             "cleared_sem": cleared_sem,
             "cleared_grd": cleared_grd,
             "cleared_attempt": cleared_att_num,
+            "cleared_gp": cleared_gp,
             "total_attempts": total_atts_count,
             "original_sem": sorted_atts[0].semester,
             "history": hist_details,
@@ -3625,9 +3648,6 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
     for sem in sorted(by_sem.keys(), key=_semester_sort_key):
         res_list = by_sem[sem]
         sub_items: List[ReportCardSubject] = []
-        sem_credits = 0.0
-        sem_weighted = 0.0
-        sem_earned = 0.0
 
         for r in res_list:
             sub = subjects_map.get(r.subject_id)
@@ -3659,12 +3679,35 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
                 attempts_history=meta.get("history", [])
             ))
 
-            sem_credits += credits
-            sem_weighted += (r.grade_point * credits)
-            if r.grade_point > 0:
-                sem_earned += credits
-
         sub_items.sort(key=lambda s: s.code)
+
+        # SGPA & Semester Credits Calculation:
+        # A subject belongs to this semester ONLY if its first attempt occurred in this semester.
+        # Arrear attempts (second/third/etc attempt of a subject from an earlier semester)
+        # are NOT included in this semester's SGPA or credits.
+        sem_credits = 0.0
+        sem_weighted = 0.0
+        sem_earned = 0.0
+        seen_sem_subjects = set()
+
+        for r in res_list:
+            meta = subject_meta.get(r.subject_id, {})
+            orig_sem = meta.get("original_sem")
+
+            # Only count subjects whose first attempt belongs to this semester
+            if str(orig_sem).strip().upper() == str(sem).strip().upper() and r.subject_id not in seen_sem_subjects:
+                seen_sem_subjects.add(r.subject_id)
+                sub = subjects_map.get(r.subject_id)
+                credits = sub.credits if sub else 0.0
+                if credits > 0:
+                    sem_credits += credits
+                    if meta.get("is_cleared"):
+                        cleared_gp = meta.get("cleared_gp", 0.0)
+                        sem_weighted += (cleared_gp * credits)
+                        sem_earned += credits
+                    else:
+                        sem_weighted += 0.0
+
         sgpa = round(sem_weighted / sem_credits, 2) if sem_credits > 0 else None
 
         semesters.append(ReportCardSemester(
