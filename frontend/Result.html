@@ -131,23 +131,31 @@
       <div class="portal-cards" role="navigation" aria-label="Portal entry">
         <!-- Student Portal -->
         <button class="portal-card student" onclick="openReportCardFromHome()" aria-label="Open student self-service portal">
-          <div class="portal-card-icon">🎓</div>
-          <div class="portal-card-title">Student Portal</div>
-          <div class="portal-card-desc">View your report card, SGPA &amp; CGPA with instant OTP verification.</div>
-          <div class="portal-card-arrow">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </div>
-        </button>
+            <div class="portal-card-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+            </div>
+            <div class="portal-card-text">
+              <div class="portal-card-title">Student Portal</div>
+              <div class="portal-card-desc">View your report card, SGPA &amp; CGPA with instant OTP verification.</div>
+            </div>
+            <div class="portal-card-arrow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </button>
 
         <!-- Staff Portal -->
         <button class="portal-card staff" onclick="openStaffPortalFromHome()" aria-label="Open staff and faculty login">
-          <div class="portal-card-icon">🔐</div>
-          <div class="portal-card-title">Staff &amp; Faculty</div>
-          <div class="portal-card-desc">Manage students, upload results, and administer grades seamlessly.</div>
-          <div class="portal-card-arrow">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </div>
-        </button>
+            <div class="portal-card-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div class="portal-card-text">
+              <div class="portal-card-title">Staff &amp; Faculty</div>
+              <div class="portal-card-desc">Manage students, upload results, and administer grades seamlessly.</div>
+            </div>
+            <div class="portal-card-arrow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </button>
       </div>
 
       <!-- Stats Ticker -->
@@ -193,7 +201,7 @@
           <div class="form-group">
             <label for="auth-username">Username / Email</label>
             <div style="position:relative;">
-              <span class="input-icon">👤</span>
+              <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
               <input type="text" id="auth-username" required placeholder="admin or email" autocomplete="username" class="has-icon" />
             </div>
           </div>
@@ -348,7 +356,7 @@
     <div class="auth-card report-card-lookup-card" id="rc-step-lookup">
       <div class="auth-card-header">
         <div class="rc-badge-pill"><span class="rc-badge-dot"></span>Student Portal</div>
-        <h2>🎓 Report Card</h2>
+        <h2>Student Report Card</h2>
         <p>Enter your register number and email to receive your one-time passcode</p>
       </div>
 
@@ -505,7 +513,13 @@
 
       <!-- Navigation -->
       <nav class="nav-menu" aria-label="Dashboard navigation">
-        <button class="nav-item active" onclick="switchView('dashboard')" aria-label="Dashboard">
+        <button class="nav-item active" onclick="switchView('resources')" aria-label="Resources">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="label">Resources</span>
+        </button>
+        <button class="nav-item" onclick="switchView('dashboard')" aria-label="Dashboard">
           <span class="nav-item-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           </span>
@@ -516,12 +530,6 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </span>
           <span class="label">Upload Data</span>
-        </button>
-        <button class="nav-item" onclick="switchView('results')" aria-label="View Results">
-          <span class="nav-item-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </span>
-          <span class="label">View Results</span>
         </button>
         <button class="nav-item" onclick="switchView('students')" aria-label="Students">
           <span class="nav-item-icon">
@@ -535,17 +543,17 @@
           </span>
           <span class="label">Subjects</span>
         </button>
+        <button class="nav-item" onclick="switchView('results')" aria-label="View Results">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </span>
+          <span class="label">View Results</span>
+        </button>
         <button class="nav-item" onclick="switchView('grades')" aria-label="SGPA / CGPA">
           <span class="nav-item-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           </span>
           <span class="label">SGPA / CGPA</span>
-        </button>
-        <button class="nav-item" onclick="switchView('resources')" aria-label="Resources">
-          <span class="nav-item-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </span>
-          <span class="label">Resources</span>
         </button>
       </nav>
 
@@ -571,7 +579,7 @@
           <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" onclick="toggleSidebarView()" aria-label="Toggle sidebar">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
-          <h1 id="module-title">Dashboard</h1>
+          <h1 id="module-title">Resources Management</h1>
         </div>
         <div class="header-actions">
           <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle theme (Alt + T)" onclick="toggleTheme()">
@@ -596,7 +604,7 @@
         <!-- ╔═══════════════════════════════╗ -->
         <!-- ║  VIEW: DASHBOARD              ║ -->
         <!-- ╚═══════════════════════════════╝ -->
-        <div id="view-dashboard" class="panel" role="region" aria-label="System overview">
+        <div id="view-dashboard" class="panel hidden" role="region" aria-label="System overview">
           <div class="panel-header">
             <h3>
               <span class="panel-header-icon">
@@ -664,7 +672,7 @@
           <!-- ============================================================
                BATCH LIFECYCLE & PURGE GRADUATED BATCH DATA
                ============================================================ -->
-          <div class="panel-section purge-batch-card admin-only" id="admin-purge-batch-section">
+          <div class="panel-section purge-batch-card" id="admin-purge-batch-section" style="display:none;">
             <div class="purge-batch-header">
               <div class="purge-batch-title-wrap">
                 <span class="purge-batch-icon">🗑️</span>
@@ -673,7 +681,7 @@
                   <p class="purge-batch-desc">Permanently delete all student rosters and exam results for a graduated batch.</p>
                 </div>
               </div>
-              <span class="badge-danger">Admin Action</span>
+              <span class="badge-danger">Admin / Exam Wing</span>
             </div>
             <form id="admin-purge-batch-form" onsubmit="handlePurgeBatchSubmit(event)" class="purge-batch-form">
               <div class="purge-batch-input-group">
@@ -690,19 +698,18 @@
           </div>
 
           <!-- ============================================================
-               [TESTING ONLY] DIRECT REPORT CARD GENERATOR (START)
-               To remove: delete this block and the modal markup below.
+               GENERATE STUDENT REPORT CARD (Admin Only)
                ============================================================ -->
-          <div class="panel-section testing-report-card-card" id="admin-direct-rc-section">
+          <div class="panel-section testing-report-card-card" id="admin-direct-rc-section" style="display:none;">
             <div class="testing-rc-header">
               <div class="testing-rc-title-wrap">
                 <span class="testing-rc-icon">🎓</span>
                 <div>
                   <h4 class="testing-rc-title">Generate Student Report Card</h4>
-                  <p class="testing-rc-desc">Direct student transcript lookup without OTP verification (Testing mode).</p>
+                  <p class="testing-rc-desc">Direct student transcript lookup without OTP verification.</p>
                 </div>
               </div>
-              <span class="badge-testing">Testing · No OTP</span>
+              <span class="badge-testing">Admin Only · No OTP</span>
             </div>
             <form id="admin-direct-rc-form" onsubmit="handleAdminDirectReportCard(event)" class="testing-rc-form">
               <div class="testing-rc-input-group">
@@ -716,9 +723,6 @@
             </form>
             <div id="admin-rc-msg" class="testing-rc-msg" style="display:none;"></div>
           </div>
-          <!-- ============================================================
-               [TESTING ONLY] DIRECT REPORT CARD GENERATOR (END)
-               ============================================================ -->
         </div>
 
         <!-- ╔═══════════════════════════════╗ -->
@@ -738,7 +742,9 @@
           <div class="upload-block">
             <!-- Upload Students -->
             <div class="upload-card" data-upload-card>
-              <div class="upload-card-icon">🧑‍🎓</div>
+              <div class="upload-card-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
               <h4>Upload Students</h4>
               <p class="upload-card-hint">Excel workbook (.xlsx / .xls) with student roll details</p>
               <form id="upload-students-form" onsubmit="handleUploadStudents(event)" enctype="multipart/form-data">
@@ -758,7 +764,9 @@
 
             <!-- Upload Subjects -->
             <div class="upload-card" data-upload-card>
-              <div class="upload-card-icon">📚</div>
+              <div class="upload-card-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              </div>
               <h4>Upload Subjects</h4>
               <p class="upload-card-hint">PDF containing the university subject master list</p>
               <form id="upload-subjects-form" onsubmit="handleUploadSubjects(event)" enctype="multipart/form-data">
@@ -780,7 +788,9 @@
             <div class="upload-card upload-card-wide upload-card-results" data-upload-card>
               <div class="upload-results-grid">
                 <div class="upload-results-info">
-                  <div class="upload-card-icon upload-card-icon-lg">📋</div>
+                  <div class="upload-card-icon upload-card-icon-lg">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                  </div>
                   <h4>Upload Results</h4>
                   <p class="upload-card-hint">The PDF results sheet, tagged with semester &amp; batch so records file themselves into the right place automatically.</p>
                   <ul class="upload-results-steps">
@@ -823,7 +833,9 @@
             <div class="upload-card upload-card-wide upload-card-results" data-upload-card>
               <div class="upload-results-grid">
                 <div class="upload-results-info">
-                  <div class="upload-card-icon upload-card-icon-lg">🧾</div>
+                  <div class="upload-card-icon upload-card-icon-lg">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  </div>
                   <h4>Upload Re-Evaluation</h4>
                   <p class="upload-card-hint">The PDF re-evaluation results sheet. Only corrects results that already exist — an improved grade clears the arrear status.</p>
                   <ul class="upload-results-steps">
@@ -1256,7 +1268,7 @@
         <!-- ╔═══════════════════════════════╗ -->
         <!-- ║  VIEW: RESOURCES              ║ -->
         <!-- ╚═══════════════════════════════╝ -->
-        <div id="view-resources" class="panel hidden" role="region" aria-label="Resources management">
+        <div id="view-resources" class="panel" role="region" aria-label="Resources management">
           <div class="panel-header">
             <h3>
               <span class="panel-header-icon" style="background:var(--red-glass);color:var(--red);">

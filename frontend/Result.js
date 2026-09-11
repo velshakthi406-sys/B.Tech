@@ -24,7 +24,7 @@ const API_URL = (() => {
 let authToken = localStorage.getItem('token') || null;
 let userRole = localStorage.getItem('role') || null;
 let currentUsername = localStorage.getItem('username') || null;
-let currentView = 'dashboard';
+let currentView = 'resources';
 
 // Active navigation view state
 let _activePublicView = 'home'; // 'home' | 'auth' | 'report-card'
@@ -594,16 +594,16 @@ async function resendOtp() {
 }
 
 async function handleOtpVerify(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     const btn = $('otp-verify-btn');
-    const otp = ($('otp-code-input')?.value || '').trim();
+    const otp = ($('otp-code-input')?.value || '').replace(/\s+/g, '').trim();
 
     if (!otp || otp.length !== 6) {
         showToast('Please enter a valid 6-digit OTP code', 'warning');
         return;
     }
 
-    btn.classList.add('loading');
+    btn?.classList.add('loading');
     try {
         const res = await fetch(API_URL + '/auth/otp/verify', {
             method: 'POST',
@@ -624,7 +624,7 @@ async function handleOtpVerify(e) {
     } catch (err) {
         showToast(err.message, 'error');
     } finally {
-        btn.classList.remove('loading');
+        btn?.classList.remove('loading');
     }
 }
 
@@ -667,6 +667,7 @@ async function handleSetPassword(e) {
 
     btn.classList.add('loading');
     try {
+        let loginIdentifier = authFlow.email;
         if (authFlow.mode === 'register') {
             const res = await fetch(API_URL + '/auth/register', {
                 method: 'POST',
@@ -681,9 +682,8 @@ async function handleSetPassword(e) {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Registration failed');
-            const assignedUsername = data.username || authFlow.email.split('@')[0];
-            showToast(`Registration complete! Your username is "${assignedUsername}". Please sign in.`, 'success');
-            if ($('auth-username')) $('auth-username').value = assignedUsername;
+            loginIdentifier = data.username || authFlow.name || authFlow.email;
+            showToast(`Registration complete! Your username is "${loginIdentifier}". Please sign in.`, 'success');
         } else {
             const res = await fetch(API_URL + '/auth/reset-password', {
                 method: 'POST',
@@ -697,12 +697,15 @@ async function handleSetPassword(e) {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Password reset failed');
-            showToast('Password reset successfully! Please sign in with your new password.', 'success');
+            if (data.username) loginIdentifier = data.username;
+            showToast(`Password reset successfully! Please sign in with your username "${loginIdentifier}".`, 'success');
         }
 
         // Reset flow back to login
         showAuthStep('login');
-        if ($('auth-username')) $('auth-username').value = authFlow.email;
+        if ($('auth-username')) $('auth-username').value = loginIdentifier;
+        if ($('auth-password')) $('auth-password').value = '';
+        $('auth-password')?.focus();
     } catch (err) {
         showToast(err.message, 'error');
     } finally {
@@ -743,6 +746,9 @@ function evaluateSessionState() {
         const isAdmin = roleNormalized === 'admin';
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
 
+        // Apply role-based nav immediately from cached role (smooth UX)
+        applyRoleBasedNavigation(userRole);
+
         // Synchronize actual role and profile from server to prevent stale localStorage
         authFetch('/auth/me').then(me => {
             if (me && me.role) {
@@ -756,11 +762,13 @@ function evaluateSessionState() {
                 if ($('user-role-badge')) $('user-role-badge').innerText = (userRole || 'STAFF').toUpperCase();
                 const isRealAdmin = (userRole || '').toLowerCase() === 'admin';
                 document.querySelectorAll('.admin-only').forEach(el => el.style.display = isRealAdmin ? '' : 'none');
+                // Re-apply nav with authoritative server role
+                applyRoleBasedNavigation(userRole);
             }
         }).catch(() => {});
 
         loadDashboardStats();
-        switchView(currentView || 'dashboard');
+        switchView(currentView || 'resources');
     } else {
         dashboardSection?.classList.add('hidden');
         if (_activePublicView === 'auth') {
@@ -777,7 +785,59 @@ function evaluateSessionState() {
     }
 }
 
-// ─── 10. Dashboard & View Switching ───────────────────────────
+// ─── 10. Role-Based Navigation ────────────────────────────────
+/**
+ * Hide/show nav items and privileged sections based on the logged-in role.
+ * Call this every time the role is known (initial load + after /auth/me refresh).
+ *
+ * Rules:
+ *  Faculty   → hide Upload Data, SGPA/CGPA
+ *  TNP       → hide Upload Data
+ *  Exam Wing → hide SGPA/CGPA; can delete batches (along with Admin)
+ *  Admin     → sees everything (including direct report card generator)
+ */
+function applyRoleBasedNavigation(role) {
+    const r = (role || '').trim().toLowerCase();
+    const isAdmin    = r === 'admin';
+    const isExamWing = r === 'exam wing';
+    const isFaculty  = r === 'faculty';
+    const isTNP      = r === 'tnp';
+
+    // Views that should be hidden per role
+    const hiddenViews = new Set();
+    if (isFaculty)  { hiddenViews.add('upload'); hiddenViews.add('grades'); }
+    if (isTNP)      { hiddenViews.add('upload'); }
+    if (isExamWing) { hiddenViews.add('grades'); }
+
+    // Show/hide nav buttons
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        const onclick = btn.getAttribute('onclick') || '';
+        const match = onclick.match(/switchView\('([^']+)'\)/);
+        if (match) {
+            const viewName = match[1];
+            btn.style.display = hiddenViews.has(viewName) ? 'none' : '';
+        }
+    });
+
+    // Purge-batch section: Admin + Exam Wing only
+    const purgeSection = $('admin-purge-batch-section');
+    if (purgeSection) {
+        purgeSection.style.display = (isAdmin || isExamWing) ? '' : 'none';
+    }
+
+    // Direct report card generator: Admin only
+    const rcSection = $('admin-direct-rc-section');
+    if (rcSection) {
+        rcSection.style.display = isAdmin ? '' : 'none';
+    }
+
+    // If currently on a hidden view, redirect to resources
+    if (hiddenViews.has(currentView)) {
+        switchView('resources');
+    }
+}
+
+// ─── 11. Dashboard & View Switching ───────────────────────────
 function switchView(view) {
     currentView = view;
     document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
@@ -2073,7 +2133,7 @@ async function handleReportCardLookup(event) {
     }
 }
 
-async function handleOtpVerify(event) {
+async function handleRcOtpVerify(event) {
     if (event && event.preventDefault) event.preventDefault();
     const btn = $('rc-otp-verify-btn');
     const msg = $('rc-otp-msg');
@@ -2699,11 +2759,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    $('rc-otp-verify-btn')?.addEventListener('click', handleOtpVerify);
+    $('rc-otp-verify-btn')?.addEventListener('click', handleRcOtpVerify);
     $('rc-otp-form')?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            handleOtpVerify(e);
+            handleRcOtpVerify(e);
         }
     });
 

@@ -96,7 +96,7 @@ OTP_LENGTH = 6
 OTP_EXPIRE_MINUTES = 2
 OTP_MAX_ATTEMPTS = 3
 OTP_RESEND_COOLDOWN_SECONDS = 10
-OTP_MAX_REQUESTS_PER_HOUR = 100
+OTP_MAX_REQUESTS_PER_HOUR = 20
 
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -723,6 +723,7 @@ def role_checker(allowed_roles: List[str]):
 allow_all = role_checker(["Admin", "TNP", "Faculty", "Exam Wing", "manager", "viewer"])
 allow_write = role_checker(["Admin", "Exam Wing", "manager"])
 allow_admin = role_checker(["Admin"])
+allow_batch_delete = role_checker(["Admin", "Exam Wing"])  # batch purge: Admin + Exam Wing
 
 # ==========================================
 # REPORT CARD OTP HELPERS
@@ -1258,14 +1259,13 @@ def register_staff(data: StaffRegisterBody, db: Session = Depends(get_system_db)
         raise HTTPException(status_code=400, detail="Passwords do not match.")
     validate_password_strength(data.password)
 
-    # Derive a unique username from the email local part (before the @)
-    # This ensures uniqueness since email is already unique.
-    base_username = clean_email.split("@")[0]
+    # Use the username specified in the Resource record
+    username_from_resource = resource.name.strip()
 
     # Create user with role from resource
     hashed = hash_password(data.password)
     user = User(
-        username=base_username,
+        username=username_from_resource,
         email=clean_email,
         hashed_password=hashed,
         role=resource.account_type
@@ -1311,6 +1311,11 @@ def reset_staff_password(data: StaffResetPasswordBody, db: Session = Depends(get
 
     user.hashed_password = hash_password(data.new_password)
 
+    # Ensure username matches the name specified in Resources
+    resource = db.query(Resource).filter(func.lower(Resource.email) == clean_email).first()
+    if resource and resource.name:
+        user.username = resource.name.strip()
+
     # Clean up reset OTP records
     db.query(StaffOTP).filter(
         func.lower(StaffOTP.email) == clean_email,
@@ -1318,16 +1323,29 @@ def reset_staff_password(data: StaffResetPasswordBody, db: Session = Depends(get
     ).delete(synchronize_session=False)
 
     db.commit()
-    return {"message": "Password reset successfully. You can now sign in with your new password."}
+    return {"message": "Password reset successfully. You can now sign in with your new password.", "username": user.username}
 
 
 @app.post("/auth/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_system_db)):
-    ident = form_data.username.strip().lower()
+    ident = form_data.username.strip()
     user = db.query(User).filter(
-        (func.lower(User.username) == ident) |
-        (func.lower(User.email) == ident)
+        (func.lower(User.username) == ident.lower()) |
+        (func.lower(User.email) == ident.lower())
     ).first()
+
+    # If not found directly, check if ident matches a Resource name
+    if not user:
+        res = db.query(Resource).filter(
+            func.lower(Resource.name) == ident.lower()
+        ).first()
+        if res:
+            user = db.query(User).filter(
+                func.lower(User.email) == func.lower(res.email)
+            ).first()
+            if user:
+                user.username = res.name.strip()
+                db.commit()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
@@ -1343,9 +1361,15 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             detail="Your associated resource record no longer exists. Access denied."
         )
 
-    # Sync role with resource account_type
+    # Sync role with resource account_type and ensure username matches resource.name
+    updated = False
     if user.role != resource.account_type:
         user.role = resource.account_type
+        updated = True
+    if user.username != resource.name.strip():
+        user.username = resource.name.strip()
+        updated = True
+    if updated:
         db.commit()
 
     access_token = jwt.encode(
@@ -2882,7 +2906,7 @@ def get_batch_info(batch_name: str, user: User = Depends(allow_all)):
     }
 
 @app.delete("/batches/{batch_name}")
-def delete_batch(batch_name: str, user: User = Depends(allow_admin)):
+def delete_batch(batch_name: str, user: User = Depends(allow_batch_delete)):
     cleaned = (batch_name or "").strip()
     if not cleaned:
         raise HTTPException(status_code=400, detail="Batch name is required")
@@ -4050,6 +4074,22 @@ async def lifespan(app: FastAPI):
             )
             sys_db.add(admin_res)
             sys_db.commit()
+
+        # Synchronize all users with their resource name so usernames always match Resources
+        all_resources = sys_db.query(Resource).all()
+        for r in all_resources:
+            if r.email:
+                u = sys_db.query(User).filter(func.lower(User.email) == func.lower(r.email)).first()
+                if u:
+                    changed = False
+                    if u.username != r.name.strip():
+                        u.username = r.name.strip()
+                        changed = True
+                    if u.role != r.account_type:
+                        u.role = r.account_type
+                        changed = True
+                    if changed:
+                        sys_db.commit()
     finally:
         sys_db.close()
 
