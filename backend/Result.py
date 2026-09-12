@@ -4040,6 +4040,13 @@ if os.path.isdir(FRONTEND_DIR):
             return FileResponse(img, media_type="image/jpeg")
         raise HTTPException(status_code=404, detail="ptu_campus.jpg not found")
 
+    @app.get("/ptu_campus.mp4", include_in_schema=False)
+    def serve_ptu_campus_video():
+        vid = os.path.join(FRONTEND_DIR, "ptu_campus.mp4")
+        if os.path.exists(vid):
+            return FileResponse(vid, media_type="video/mp4")
+        raise HTTPException(status_code=404, detail="ptu_campus.mp4 not found")
+
     # Mount static files to serve any remaining assets (CSS, JS, XLSX bundle, fonts, etc.)
     app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
 

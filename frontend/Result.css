@@ -530,13 +530,13 @@ h1,h2,h3,h4,h5,h6 {
   align-items: center;
   overflow-x: hidden;
   background:
-    linear-gradient(180deg, rgba(10, 14, 23, 0.74) 0%, rgba(10, 14, 23, 0.68) 50%, rgba(10, 14, 23, 0.82) 100%),
+    linear-gradient(180deg, rgba(10, 14, 23, 0.35) 0%, rgba(10, 14, 23, 0.20) 50%, rgba(10, 14, 23, 0.40) 100%),
     url('ptu_campus.jpg') center/cover no-repeat fixed;
   position: relative;
 }
 [data-theme="dark"] #home-section {
   background:
-    linear-gradient(180deg, rgba(8, 12, 20, 0.80) 0%, rgba(8, 12, 20, 0.74) 50%, rgba(8, 12, 20, 0.88) 100%),
+    linear-gradient(180deg, rgba(8, 12, 20, 0.55) 0%, rgba(8, 12, 20, 0.40) 50%, rgba(8, 12, 20, 0.60) 100%),
     url('ptu_campus.jpg') center/cover no-repeat fixed;
 }
 
@@ -4870,4 +4870,9 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   background: var(--warning-light);
   color: var(--warning);
   border: 1px solid var(--warning);
+}
+
+#home-section .home-title,
+#home-section .hero-title {
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.75);
 }
