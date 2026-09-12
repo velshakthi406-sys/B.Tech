@@ -531,13 +531,13 @@ h1,h2,h3,h4,h5,h6 {
   overflow-x: hidden;
   background:
     linear-gradient(180deg, rgba(10, 14, 23, 0.74) 0%, rgba(10, 14, 23, 0.68) 50%, rgba(10, 14, 23, 0.82) 100%),
-    url('ptu_campus.jpg') center/cover no-repeat fixed;
+    url('https://ptu-grade-portal.onrender.com/ptu_campus.jpg') center/cover no-repeat fixed;
   position: relative;
 }
 [data-theme="dark"] #home-section {
   background:
     linear-gradient(180deg, rgba(8, 12, 20, 0.80) 0%, rgba(8, 12, 20, 0.74) 50%, rgba(8, 12, 20, 0.88) 100%),
-    url('ptu_campus.jpg') center/cover no-repeat fixed;
+    url('https://ptu-grade-portal.onrender.com/ptu_campus.jpg') center/cover no-repeat fixed;
 }
 
 /* Force readable light text on the homepage hero regardless of active theme,
@@ -2654,7 +2654,7 @@ select option { background: var(--bg-primary); color: var(--text-primary); }
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('ptu_logo.png');
+  background-image: url('https://ptu-grade-portal.onrender.com/ptu_logo.png');
   background-repeat: no-repeat;
   background-position: center;
   background-size: 380px;
