@@ -2731,7 +2731,7 @@ function renderReportCard(data, targetId = 'report-card-paper') {
         <div class="rc-pdf-header">
             <div class="rc-pdf-header-top">
                 <div class="rc-pdf-emblem" aria-hidden="true">
-                    <img src="ptu_logo.png" alt="PTU Logo" class="rc-pdf-logo-img" />
+                    <img src="/frontend/ptu_logo.png" alt="PTU Logo" class="rc-pdf-logo-img" />
                 </div>
                 <div class="rc-pdf-uni-block">
                     <h1 class="rc-pdf-uni-title">Puducherry Technological University</h1>
@@ -2808,7 +2808,7 @@ function renderReportCard(data, targetId = 'report-card-paper') {
             </div>
             <div class="rc-pdf-footer-right">
                 <div class="rc-seal-badge" aria-hidden="true">
-                    <img src="ptu_logo.png" alt="" class="rc-seal-img" />
+                    <img src="/frontend/ptu_logo.png" alt="" class="rc-seal-img" />
                     <span class="rc-seal-ring"></span>
                 </div>
                 <div class="rc-signature-block">
