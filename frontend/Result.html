@@ -27,7 +27,8 @@
 
   <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="xlsx.bundle.js"></script>
+  <script>if (!window.XLSX) { document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"><\/script>'); }</script>
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="Result.css" />
@@ -46,18 +47,9 @@
        PUBLIC NAVIGATION (Homepage / Login / Report Card)
   ════════════════════════════════════════════ -->
   <header id="public-navbar" class="public-nav no-print" aria-label="Public portal navigation">
-    <button class="public-nav-brand" onclick="navigateToHome()" title="Back to Homepage">
-      <div class="public-nav-logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M7 4h14l5 6L14 26 2 10z" fill="url(#publicNavGrad)" />
-          <defs>
-            <linearGradient id="publicNavGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%"   stop-color="#DC2626" />
-              <stop offset="50%"  stop-color="#2563EB" />
-              <stop offset="100%" stop-color="#059669" />
-            </linearGradient>
-          </defs>
-        </svg>
+    <button class="public-nav-brand nav-brand" onclick="navigateToHome()" title="Back to Homepage">
+      <div class="public-nav-logo nav-logo">
+        <img src="ptu_logo.png" alt="Puducherry Technological University Logo" class="public-nav-logo-img" />
       </div>
       <div class="public-nav-title">
         <span class="public-nav-name">PTU Grade Hub</span>
@@ -65,19 +57,19 @@
       </div>
     </button>
 
-    <div class="public-nav-links">
-      <button class="public-nav-btn" id="nav-btn-home" onclick="navigateToHome()">
+    <div class="public-nav-links nav-links">
+      <button class="public-nav-btn nav-link" id="nav-btn-home" onclick="navigateToHome()">
         <span>Home</span>
       </button>
-      <button class="public-nav-btn" id="nav-btn-student" onclick="openReportCardFromHome()">
+      <button class="public-nav-btn nav-link" id="nav-btn-student" onclick="openReportCardFromHome()">
         <span>Student Portal</span>
       </button>
-      <button class="public-nav-btn" id="nav-btn-staff" onclick="openStaffPortalFromHome()">
-        <span>Staff &amp; Faculty</span>
+      <button class="public-nav-btn nav-link" id="nav-btn-staff" onclick="openStaffPortalFromHome()">
+        <span>Management Portal</span>
       </button>
 
       <!-- Segmented Theme Switch Pill -->
-      <div class="theme-switch-pill" role="radiogroup" aria-label="Theme switcher">
+      <div class="theme-switch-pill theme-pill" role="radiogroup" aria-label="Theme switcher">
         <button type="button" class="theme-switch-option" id="theme-btn-light" onclick="setTheme('light')" role="radio" aria-checked="false" title="Switch to Light Mode">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="4"/>
@@ -99,63 +91,59 @@
        SECTION 1: HOMEPAGE
   ════════════════════════════════════════════ -->
   <section id="home-section" class="auth-wrapper" aria-label="Homepage">
-    <div class="home-hero">
+    <div class="home-hero hero">
 
       <!-- Badge -->
-      <div class="home-badge" role="status">
-        <span class="home-badge-dot"></span>
+      <div class="home-badge hero-badge" role="status">
+        <span class="home-badge-dot badge-dot"></span>
         Puducherry Technological University
       </div>
 
       <!-- Title -->
-      <h1 class="home-title">
+      <h1 class="home-title hero-title">
         Academic Grade<br />
         <span class="accent-red">Portal</span> &amp;
         <span class="accent-teal">Analytics</span>
       </h1>
 
       <!-- Description -->
-      <p class="home-desc">
+      <p class="home-desc hero-desc">
         Unified grade processing, CGPA computation, and student self-service — all in one modern, accessible platform.
       </p>
 
       <!-- Notice Marquee -->
-      <div class="notice-marquee" role="status" aria-label="Important notice">
-        <div class="notice-marquee-track">
-          <span class="notice-marquee-item">📢 Kindly share the result PDF (Arrear / Semester / Re-evaluation) for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
-          <span class="notice-marquee-item">📢 Kindly share the result PDF (Arrear / Semester / Re-evaluation) for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
+      <div class="notice-marquee marquee" role="status" aria-label="Important notice">
+        <div class="notice-marquee-track marquee-track">
+          <span class="notice-marquee-item marquee-item">📢 Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
+          <span class="notice-marquee-item marquee-item">📢 Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
         </div>
       </div>
 
       <!-- Portal Entry Cards -->
-      <div class="portal-cards" role="navigation" aria-label="Portal entry">
+      <div class="portal-cards portal-grid" role="navigation" aria-label="Portal entry">
         <!-- Student Portal -->
         <button class="portal-card student" onclick="openReportCardFromHome()" aria-label="Open student self-service portal">
-            <div class="portal-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-            </div>
-            <div class="portal-card-text">
-              <div class="portal-card-title">Student Portal</div>
-              <div class="portal-card-desc">View your report card, SGPA &amp; CGPA with instant OTP verification.</div>
-            </div>
-            <div class="portal-card-arrow">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </button>
+          <div class="portal-card-icon portal-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+          </div>
+          <div class="portal-card-title portal-title">Student Portal</div>
+          <div class="portal-card-desc portal-desc">View your report card, SGPA &amp; CGPA with instant OTP verification.</div>
+          <div class="portal-card-arrow portal-arrow">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </button>
 
-        <!-- Staff Portal -->
-        <button class="portal-card staff" onclick="openStaffPortalFromHome()" aria-label="Open staff and faculty login">
-            <div class="portal-card-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            </div>
-            <div class="portal-card-text">
-              <div class="portal-card-title">Staff &amp; Faculty</div>
-              <div class="portal-card-desc">Manage students, upload results, and administer grades seamlessly.</div>
-            </div>
-            <div class="portal-card-arrow">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </button>
+        <!-- Management Portal -->
+        <button class="portal-card staff" onclick="openStaffPortalFromHome()" aria-label="Open management portal">
+          <div class="portal-card-icon portal-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          </div>
+          <div class="portal-card-title portal-title">Management Portal</div>
+          <div class="portal-card-desc portal-desc">Manage students, upload results, and administer grades seamlessly.</div>
+          <div class="portal-card-arrow portal-arrow">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </button>
       </div>
 
       <!-- Stats Ticker -->
@@ -178,7 +166,7 @@
         </div>
       </div>
 
-      <p class="home-footer">
+      <p class="home-footer hero-footer">
         © 2026 Puducherry Technological University &nbsp;·&nbsp; All Rights Reserved
       </p>
 
@@ -1020,7 +1008,7 @@
           </div>
 
           <!-- Batch tabs -->
-          <div class="dept-tabs" id="batch-tabs-container"></div>
+          <div class="dept-tabs"><div class="dept-tabs-scroll" id="batch-tabs-container"></div></div>
           <!-- Section tabs -->
           <div class="dept-tabs"><div class="dept-tabs-scroll" id="section-tabs-container"></div></div>
 

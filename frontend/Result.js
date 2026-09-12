@@ -208,12 +208,9 @@ function initParticleCanvas() {
             if (this.y < 0 || this.y > H) this.vy *= -1;
         }
         draw() {
-            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-            ctx.fillStyle = isDark
-                ? `rgba(129, 140, 248, ${this.alpha})`
-                : `rgba(220, 38, 38, ${this.alpha * 0.85})`;
+            ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha * 0.35})`;
             ctx.fill();
         }
     }
@@ -224,7 +221,6 @@ function initParticleCanvas() {
 
     function animate() {
         ctx.clearRect(0, 0, W, H);
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
         for (let i = 0; i < particles.length; i++) {
             particles[i].update();
@@ -235,13 +231,11 @@ function initParticleCanvas() {
                 const dy = particles[i].y - particles[j].y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist < 130) {
-                    const lineAlpha = (1 - dist / 130) * (isDark ? 0.18 : 0.12);
+                    const lineAlpha = (1 - dist / 130) * 0.08;
                     ctx.beginPath();
                     ctx.moveTo(particles[i].x, particles[i].y);
                     ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.strokeStyle = isDark
-                        ? `rgba(99, 102, 241, ${lineAlpha})`
-                        : `rgba(220, 38, 38, ${lineAlpha})`;
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${lineAlpha})`;
                     ctx.lineWidth = 1;
                     ctx.stroke();
                 }
@@ -1463,15 +1457,17 @@ function buildBatchTabs(students) {
     const container = $('batch-tabs-container');
     if (!container) return;
     const batches = new Set();
-    students.forEach(s => { if (s.batch) batches.add(s.batch); });
+    students.forEach(s => {
+        if (s.batch && s.batch.trim()) batches.add(s.batch.trim());
+    });
     const sortedBatches = Array.from(batches).sort();
     let html = `<button class="dept-tab ${currentBatchFilter === 'All' ? 'active' : ''}" data-batch="All" onclick="selectBatchTab('All')">
         All Batches <span class="badge-count">${students.length}</span>
     </button>`;
     sortedBatches.forEach(b => {
-        const count = students.filter(s => s.batch === b).length;
-        html += `<button class="dept-tab ${currentBatchFilter === b ? 'active' : ''}" data-batch="${b}" onclick="selectBatchTab('${b}')">
-            ${b} <span class="badge-count">${count}</span>
+        const count = students.filter(s => (s.batch || '').trim() === b).length;
+        html += `<button class="dept-tab ${currentBatchFilter === b ? 'active' : ''}" data-batch="${escapeHtml(b)}" onclick="selectBatchTab('${escapeHtml(b)}')">
+            ${escapeHtml(b)} <span class="badge-count">${count}</span>
         </button>`;
     });
     container.innerHTML = html;
@@ -1586,9 +1582,9 @@ function renderStudents() {
             <td>${idx + 1}</td>
             <td><strong>${escapeHtml(s.reg_no)}</strong></td>
             <td>${escapeHtml(s.name)}</td>
-            <td>${escapeHtml(s.department)}</td>
+            <td><span class="student-dept-pill">${escapeHtml(s.department || '—')}</span></td>
             <td>${escapeHtml(s.programme || '—')}</td>
-            <td>${escapeHtml(s.batch || '—')}</td>
+            <td><span class="student-batch-pill">${escapeHtml(s.batch || '—')}</span></td>
             <td>${escapeHtml(s.section || '—')}</td>
             <td><code>${escapeHtml(s.email || (s.reg_no + '@ptuniv.edu.in'))}</code></td>
             <td>
@@ -2040,27 +2036,451 @@ async function loadGrades() {
 }
 
 function exportGradesToExcel() {
-    if (!allGradesCache.length) {
+    if (!allGradesCache || !allGradesCache.length) {
         showToast('No grades to export', 'warning');
         return;
     }
-    const exportData = allGradesCache.map((g, i) => ({
-        'Rank': i + 1,
-        'Reg No': g.reg_no,
-        'Name': g.name,
-        'Department': g.department,
-        'Semester': g.semester,
-        'SGPA': g.sgpa ?? '',
-        'CGPA': g.cgpa ?? '',
-        'Total Credits': g.total_credits,
-        'Earned Credits': g.earned_credits,
-        'Arrears': g.arrear_count || 0
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'SGPA_CGPA_Summary');
-    XLSX.writeFile(wb, `PTU_Grades_Summary_${new Date().toISOString().slice(0,10)}.xlsx`);
-    showToast('Grades summary exported to Excel', 'success');
+
+    try {
+        // ── 1. Extract Active Filter States ──
+        const deptSelect = $('grade-filter-dept');
+        const deptVal = deptSelect?.value || '';
+        const deptNames = {
+            'CE': 'Civil Engineering (CE)',
+            'CHE': 'Chemical Engineering (CHE)',
+            'CSE': 'Computer Science & Engineering (CSE)',
+            'ECE': 'Electronics & Communication Engineering (ECE)',
+            'EEE': 'Electrical & Electronics Engineering (EEE)',
+            'EIE': 'Electronics & Instrumentation Engineering (EIE)',
+            'IT': 'Information Technology (IT)',
+            'ME': 'Mechanical Engineering (ME)',
+            'MT': 'Mechatronics Engineering (MT)'
+        };
+        const deptDisplay = deptNames[deptVal] || (deptVal ? deptVal : 'All Departments');
+
+        const semVal = $('grade-filter-sem')?.value || '';
+        const semDisplay = semVal ? `Semester ${semVal} (SGPA)` : 'Overall Cumulative (CGPA)';
+
+        const batchVal = $('grade-filter-batch')?.value || '';
+        const batchDisplay = (batchVal && batchVal.toLowerCase() !== 'all') ? batchVal : 'All Batches';
+
+        let arrearDisplay = 'All Students (No Filter)';
+        if (typeof currentArrearFilter !== 'undefined' && currentArrearFilter && !currentArrearFilter.includes('all') && currentArrearFilter.length > 0) {
+            const arrearLabels = {
+                '0': 'No Arrears (Clear Only)',
+                '1': '1 Arrear Only',
+                '2': '2 Arrears Only',
+                '3+': '3+ Arrears Only'
+            };
+            arrearDisplay = currentArrearFilter.map(a => arrearLabels[a] || `${a} Arrears`).join(', ');
+        }
+
+        const cgpaSort = $('grade-filter-sort')?.value || 'desc';
+        const sortDisplay = cgpaSort === 'desc'
+            ? (semVal ? 'SGPA (Highest to Lowest)' : 'CGPA (Highest to Lowest)')
+            : cgpaSort === 'asc'
+                ? (semVal ? 'SGPA (Lowest to Highest)' : 'CGPA (Lowest to Highest)')
+                : 'None / Natural Order';
+
+        const creditsSort = $('grade-filter-credits-sort')?.value || 'none';
+        const creditsSortDisplay = creditsSort === 'asc' ? 'Total Credits (Ascending)' : creditsSort === 'desc' ? 'Total Credits (Descending)' : 'None';
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const exportTimestamp = `${dateStr}, ${timeStr}`;
+
+        // ── 2. Summary Statistics ──
+        const totalStudents = allGradesCache.length;
+        const clearCount = allGradesCache.filter(g => (Number(g.arrear_count) || 0) === 0).length;
+        const arrearStudentsCount = totalStudents - clearCount;
+        const clearRate = totalStudents > 0 ? ((clearCount / totalStudents) * 100).toFixed(1) + '%' : '0%';
+
+        const validSgpas = allGradesCache.map(g => Number(g.sgpa)).filter(v => !isNaN(v) && v >= 0);
+        const avgSgpa = validSgpas.length ? (validSgpas.reduce((a, b) => a + b, 0) / validSgpas.length).toFixed(2) : null;
+
+        const validCgpas = allGradesCache.map(g => Number(g.cgpa)).filter(v => !isNaN(v) && v >= 0);
+        const avgCgpa = validCgpas.length ? (validCgpas.reduce((a, b) => a + b, 0) / validCgpas.length).toFixed(2) : null;
+
+        const validTotCredits = allGradesCache.map(g => Number(g.total_credits)).filter(v => !isNaN(v) && v > 0);
+        const avgTotCredits = validTotCredits.length ? Math.round(validTotCredits.reduce((a, b) => a + b, 0) / validTotCredits.length) : null;
+
+        const validEarnCredits = allGradesCache.map(g => Number(g.earned_credits)).filter(v => !isNaN(v) && v >= 0);
+        const avgEarnCredits = validEarnCredits.length ? Math.round(validEarnCredits.reduce((a, b) => a + b, 0) / validEarnCredits.length) : null;
+
+        // ── 3. Build Styled Excel Sheet ──
+        const ws = {};
+
+        function colToLetter(n) {
+            let s = '';
+            while (n >= 0) {
+                s = String.fromCharCode((n % 26) + 65) + s;
+                n = Math.floor(n / 26) - 1;
+            }
+            return s;
+        }
+
+        function setCell(r, c, val, style, type = 's') {
+            const ref = colToLetter(c) + (r + 1);
+            ws[ref] = { v: val, t: type, s: style };
+        }
+
+        // Shared Style Presets
+        const thinBorder = {
+            top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+            bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+            left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+            right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+        };
+
+        const filterLabelStyle = {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '475569' } },
+            fill: { fgColor: { rgb: 'F8FAFC' } },
+            alignment: { horizontal: 'right', vertical: 'center' },
+            border: thinBorder
+        };
+
+        const filterValueStyle = {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '0F172A' } },
+            fill: { fgColor: { rgb: 'FFFFFF' } },
+            alignment: { horizontal: 'left', vertical: 'center' },
+            border: thinBorder
+        };
+
+        // Row 0: University Header Banner
+        const univTitleStyle = {
+            font: { name: 'Calibri', sz: 16, bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '0F2942' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+        };
+        for (let c = 0; c <= 9; c++) {
+            setCell(0, c, c === 0 ? 'PUDUCHERRY TECHNOLOGICAL UNIVERSITY' : '', univTitleStyle);
+        }
+
+        // Row 1: Subtitle Banner
+        const subtitleStyle = {
+            font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'DBEAFE' } },
+            fill: { fgColor: { rgb: '1E3A8A' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+        };
+        for (let c = 0; c <= 9; c++) {
+            setCell(1, c, c === 0 ? 'OFFICE OF TRAINING & PLACEMENT — SGPA / CGPA PERFORMANCE REPORT' : '', subtitleStyle);
+        }
+
+        // Row 2: Applied Filter Section Heading
+        const filterSectionStyle = {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '1E293B' } },
+            fill: { fgColor: { rgb: 'E2E8F0' } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+                top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                bottom: { style: 'thin', color: { rgb: 'CBD5E1' } }
+            }
+        };
+        for (let c = 0; c <= 9; c++) {
+            setCell(2, c, c === 0 ? 'APPLIED FILTER CRITERIA & REPORT METADATA' : '', filterSectionStyle);
+        }
+
+        // Row 3: Filter Values Row 1
+        setCell(3, 0, 'Department:', filterLabelStyle);
+        setCell(3, 1, deptDisplay, filterValueStyle);
+        setCell(3, 2, '', filterValueStyle);
+
+        setCell(3, 3, 'Semester / Scope:', filterLabelStyle);
+        setCell(3, 4, semDisplay, filterValueStyle);
+        setCell(3, 5, '', filterValueStyle);
+
+        setCell(3, 6, 'Batch:', filterLabelStyle);
+        setCell(3, 7, batchDisplay, filterValueStyle);
+
+        setCell(3, 8, 'Exported On:', filterLabelStyle);
+        setCell(3, 9, exportTimestamp, filterValueStyle);
+
+        // Row 4: Filter Values Row 2
+        setCell(4, 0, 'Arrear Filter:', filterLabelStyle);
+        setCell(4, 1, arrearDisplay, filterValueStyle);
+        setCell(4, 2, '', filterValueStyle);
+
+        setCell(4, 3, 'Sort By (CGPA):', filterLabelStyle);
+        setCell(4, 4, sortDisplay, filterValueStyle);
+        setCell(4, 5, '', filterValueStyle);
+
+        setCell(4, 6, 'Credits Sort:', filterLabelStyle);
+        setCell(4, 7, creditsSortDisplay, filterValueStyle);
+
+        setCell(4, 8, 'Total Records:', filterLabelStyle);
+        setCell(4, 9, `${totalStudents} Students (${clearCount} Clear, ${arrearStudentsCount} Arrear)`, Object.assign({}, filterValueStyle, {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '1E3A8A' } }
+        }));
+
+        // Row 5: Blank Spacer Row
+        for (let c = 0; c <= 9; c++) {
+            setCell(5, c, '', { fill: { fgColor: { rgb: 'FFFFFF' } } });
+        }
+
+        // Row 6: Main Table Column Headers
+        const tableHeaders = ['Rank', 'Register No', 'Student Name', 'Department', 'Semester', 'SGPA', 'CGPA', 'Total Credits', 'Earned Credits', 'Arrear Status'];
+        const thBaseStyle = {
+            font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '1E3A8A' } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+                top: { style: 'medium', color: { rgb: '0F2942' } },
+                bottom: { style: 'medium', color: { rgb: '0F2942' } },
+                left: { style: 'thin', color: { rgb: '93C5FD' } },
+                right: { style: 'thin', color: { rgb: '93C5FD' } }
+            }
+        };
+        tableHeaders.forEach((h, idx) => {
+            const style = Object.assign({}, thBaseStyle);
+            if (idx === 2) style.alignment = { horizontal: 'left', vertical: 'center' };
+            setCell(6, idx, h, style);
+        });
+
+        // Rows 7+: Student Rows
+        const dataRowBorder = {
+            top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+            bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+            left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+            right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+        };
+
+        allGradesCache.forEach((g, idx) => {
+            const r = 7 + idx;
+            const isOdd = idx % 2 === 1;
+            const rowBg = isOdd ? 'F8FAFC' : 'FFFFFF';
+
+            // Col 0: Rank
+            setCell(r, 0, idx + 1, {
+                font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '475569' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 'n');
+
+            // Col 1: Register Number
+            setCell(r, 1, String(g.reg_no || ''), {
+                font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '0F172A' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 2: Student Name
+            setCell(r, 2, String(g.name || ''), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '0F172A' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'left', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 3: Department
+            setCell(r, 3, String(g.department || ''), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 4: Semester
+            setCell(r, 4, String(g.semester || 'All'), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 5: SGPA
+            const hasSgpa = g.sgpa != null && g.sgpa !== '' && !isNaN(Number(g.sgpa));
+            setCell(r, 5, hasSgpa ? Number(g.sgpa) : '—', {
+                font: { name: 'Calibri', sz: 10.5, bold: true, color: { rgb: '1E293B' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder,
+                numFmt: hasSgpa ? '0.00' : undefined
+            }, hasSgpa ? 'n' : 's');
+
+            // Col 6: CGPA (Highlighted Royal Blue)
+            const hasCgpa = g.cgpa != null && g.cgpa !== '' && !isNaN(Number(g.cgpa));
+            setCell(r, 6, hasCgpa ? Number(g.cgpa) : '—', {
+                font: { name: 'Calibri', sz: 10.5, bold: true, color: { rgb: '1D4ED8' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder,
+                numFmt: hasCgpa ? '0.00' : undefined
+            }, hasCgpa ? 'n' : 's');
+
+            // Col 7: Total Credits
+            const totCr = Number(g.total_credits);
+            const hasTotCr = !isNaN(totCr);
+            setCell(r, 7, hasTotCr ? totCr : (g.total_credits ?? '—'), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, hasTotCr ? 'n' : 's');
+
+            // Col 8: Earned Credits
+            const earnCr = Number(g.earned_credits);
+            const hasEarnCr = !isNaN(earnCr);
+            setCell(r, 8, hasEarnCr ? earnCr : (g.earned_credits ?? '—'), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, hasEarnCr ? 'n' : 's');
+
+            // Col 9: Arrear Status Badge
+            const arr = Number(g.arrear_count) || 0;
+            let arrBg = 'DCFCE7';
+            let arrColor = '15803D';
+            let arrLabel = '0 (Clear)';
+            if (arr === 1) {
+                arrBg = 'FEF3C7';
+                arrColor = 'B45309';
+                arrLabel = '1 Arrear';
+            } else if (arr === 2) {
+                arrBg = 'FEF3C7';
+                arrColor = 'B45309';
+                arrLabel = '2 Arrears';
+            } else if (arr > 2) {
+                arrBg = 'FEE2E2';
+                arrColor = 'B91C1C';
+                arrLabel = `${arr} Arrears`;
+            }
+
+            setCell(r, 9, arrLabel, {
+                font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: arrColor } },
+                fill: { fgColor: { rgb: arrBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+        });
+
+        // Summary / Footer Row
+        const summaryRowIndex = 7 + totalStudents;
+        const footerStyle = {
+            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '0F172A' } },
+            fill: { fgColor: { rgb: 'F1F5F9' } },
+            alignment: { horizontal: 'right', vertical: 'center' },
+            border: {
+                top: { style: 'thin', color: { rgb: '94A3B8' } },
+                bottom: { style: 'double', color: { rgb: '475569' } },
+                left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+            }
+        };
+
+        setCell(summaryRowIndex, 0, `Class Average & Summary (${totalStudents} Students, Pass Rate: ${clearRate}):`, footerStyle);
+        for (let c = 1; c <= 4; c++) {
+            setCell(summaryRowIndex, c, '', footerStyle);
+        }
+
+        const footerValStyle = Object.assign({}, footerStyle, {
+            alignment: { horizontal: 'center', vertical: 'center' }
+        });
+
+        // SGPA Average
+        setCell(summaryRowIndex, 5, avgSgpa !== null ? Number(avgSgpa) : '—', Object.assign({}, footerValStyle, {
+            numFmt: avgSgpa !== null ? '0.00' : undefined
+        }), avgSgpa !== null ? 'n' : 's');
+
+        // CGPA Average
+        setCell(summaryRowIndex, 6, avgCgpa !== null ? Number(avgCgpa) : '—', Object.assign({}, footerValStyle, {
+            font: Object.assign({}, footerValStyle.font, { color: { rgb: '1D4ED8' } }),
+            numFmt: avgCgpa !== null ? '0.00' : undefined
+        }), avgCgpa !== null ? 'n' : 's');
+
+        // Total Credits Average
+        setCell(summaryRowIndex, 7, avgTotCredits !== null ? avgTotCredits : '—', footerValStyle, avgTotCredits !== null ? 'n' : 's');
+
+        // Earned Credits Average
+        setCell(summaryRowIndex, 8, avgEarnCredits !== null ? avgEarnCredits : '—', footerValStyle, avgEarnCredits !== null ? 'n' : 's');
+
+        // Arrear Summary Breakdown
+        setCell(summaryRowIndex, 9, `${clearCount} Clear / ${arrearStudentsCount} Arrear`, Object.assign({}, footerValStyle, {
+            font: Object.assign({}, footerValStyle.font, { sz: 9 })
+        }), 's');
+
+        // ── 4. Set Merges, Heights, Widths & Autofilter ──
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, // Univ Title
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }, // Subtitle
+            { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } }, // Filter Section Header
+            { s: { r: 3, c: 1 }, e: { r: 3, c: 2 } }, // Dept Value
+            { s: { r: 3, c: 4 }, e: { r: 3, c: 5 } }, // Semester Value
+            { s: { r: 4, c: 1 }, e: { r: 4, c: 2 } }, // Arrear Filter Value
+            { s: { r: 4, c: 4 }, e: { r: 4, c: 5 } }, // Sort By Value
+            { s: { r: summaryRowIndex, c: 0 }, e: { r: summaryRowIndex, c: 4 } } // Summary Label
+        ];
+
+        const rowHeights = [
+            { hpt: 32 }, // 0: University Title
+            { hpt: 22 }, // 1: Subtitle
+            { hpt: 20 }, // 2: Filter Section Header
+            { hpt: 22 }, // 3: Filter Details 1
+            { hpt: 22 }, // 4: Filter Details 2
+            { hpt: 9 },  // 5: Blank Spacer
+            { hpt: 26 }  // 6: Table Header
+        ];
+        for (let i = 0; i < totalStudents; i++) {
+            rowHeights.push({ hpt: 21 }); // Data rows
+        }
+        rowHeights.push({ hpt: 24 }); // Summary row
+        ws['!rows'] = rowHeights;
+
+        ws['!cols'] = [
+            { wch: 8 },  // Rank
+            { wch: 17 }, // Register No
+            { wch: 32 }, // Student Name
+            { wch: 15 }, // Department
+            { wch: 12 }, // Semester
+            { wch: 12 }, // SGPA
+            { wch: 12 }, // CGPA
+            { wch: 14 }, // Total Credits
+            { wch: 14 }, // Earned Credits
+            { wch: 17 }  // Arrear Status
+        ];
+
+        ws['!autofilter'] = { ref: `A7:J${7 + totalStudents}` };
+        ws['!ref'] = `A1:J${summaryRowIndex + 1}`;
+
+        // ── 5. Export Workbook ──
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'SGPA_CGPA_Summary');
+
+        const fileDept = (deptVal || 'All').replace(/[^a-zA-Z0-9_-]/g, '');
+        const fileSem = semVal ? `Sem${semVal}` : 'Overall';
+        const fileDate = now.toISOString().slice(0, 10);
+        const fileName = `PTU_SGPA_CGPA_${fileDept}_${fileSem}_${fileDate}.xlsx`;
+
+        XLSX.writeFile(wb, fileName);
+        showToast('Grades summary exported to Excel', 'success');
+    } catch (err) {
+        console.error('Error in styled Excel export, running fallback:', err);
+        // Fallback to standard export if any unexpected environment failure occurs
+        try {
+            const fallbackData = allGradesCache.map((g, i) => ({
+                'Rank': i + 1,
+                'Reg No': g.reg_no,
+                'Name': g.name,
+                'Department': g.department,
+                'Semester': g.semester,
+                'SGPA': g.sgpa ?? '',
+                'CGPA': g.cgpa ?? '',
+                'Total Credits': g.total_credits,
+                'Earned Credits': g.earned_credits,
+                'Arrears': g.arrear_count || 0
+            }));
+            const wsFallback = XLSX.utils.json_to_sheet(fallbackData);
+            const wbFallback = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wbFallback, wsFallback, 'SGPA_CGPA_Summary');
+            XLSX.writeFile(wbFallback, `PTU_Grades_Summary_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('Grades exported (basic mode)', 'info');
+        } catch (innerErr) {
+            showToast('Failed to export grades to Excel: ' + innerErr.message, 'error');
+        }
+    }
 }
 
 // ─── 16. Student Self-Service Report Card (OTP Flow) ──────────
@@ -2311,26 +2731,15 @@ function renderReportCard(data, targetId = 'report-card-paper') {
         <div class="rc-pdf-header">
             <div class="rc-pdf-header-top">
                 <div class="rc-pdf-emblem" aria-hidden="true">
-                    <svg width="46" height="46" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="48" height="48" rx="12" fill="url(#rcEmblemBg)" />
-                        <path d="M24 10L38 18L24 26L10 18L24 10Z" fill="#ffffff" />
-                        <path d="M15 21.5V29C15 33.5 19 37 24 37C29 37 33 33.5 33 29V21.5L24 26.5L15 21.5Z" fill="#ffffff" fill-opacity="0.92" />
-                        <path d="M38 18V28" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
-                        <circle cx="38" cy="29" r="1.5" fill="#ffffff" />
-                        <defs>
-                            <linearGradient id="rcEmblemBg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-                                <stop stop-color="#DC2626" />
-                                <stop offset="0.5" stop-color="#7C3AED" />
-                                <stop offset="1" stop-color="#2563EB" />
-                            </linearGradient>
-                        </defs>
-                    </svg>
+                    <img src="ptu_logo.png" alt="PTU Logo" class="rc-pdf-logo-img" />
                 </div>
                 <div class="rc-pdf-uni-block">
                     <h1 class="rc-pdf-uni-title">Puducherry Technological University</h1>
-                    <div class="rc-pdf-doc-sub">OFFICIAL GRADE TRANSCRIPT &amp; CUMULATIVE PERFORMANCE</div>
+                    <div class="rc-pdf-uni-desc">Kalapet, Puducherry – 605 014 | Established under Act No. 9 of 2012</div>
+                    <div class="rc-pdf-uni-accred">Approved by AICTE &amp; UGC &nbsp;|&nbsp; NBA Accredited &nbsp;|&nbsp; www.ptuniv.edu.in</div>
                 </div>
             </div>
+            <div class="rc-pdf-header-divider"></div>
         </div>
 
         <!-- Student Info Card -->
@@ -2387,6 +2796,24 @@ function renderReportCard(data, targetId = 'report-card-paper') {
                     <span class="rc-cgpa-stat-lbl">Total Earned Credits:</span>
                     <strong class="rc-cgpa-stat-val rc-val-earned">${earnedCr}</strong>
                     ${pendingCr <= 0 ? '<span class="rc-status-chip cleared">✓ All Cleared</span>' : `<span class="rc-status-chip pending">⚠️ ${pendingCr.toFixed(1)} Pending</span>`}
+                </div>
+            </div>
+        </div>
+
+        <!-- Official Footer: Issue Info & Authentication -->
+        <div class="rc-pdf-footer">
+            <div class="rc-pdf-footer-left">
+                <div class="rc-foot-note">This is a computer-generated academic record and does not require a physical signature.</div>
+                <div class="rc-foot-note rc-foot-note-muted">Date of Issue: <strong>${issueDate}</strong> &nbsp;|&nbsp; Document Ref: <strong>PTU/RC/${escapeHtml(data.reg_no || '—')}</strong></div>
+            </div>
+            <div class="rc-pdf-footer-right">
+                <div class="rc-seal-badge" aria-hidden="true">
+                    <img src="ptu_logo.png" alt="" class="rc-seal-img" />
+                    <span class="rc-seal-ring"></span>
+                </div>
+                <div class="rc-signature-block">
+                    <div class="rc-signature-line"></div>
+                    <div class="rc-signature-label">Controller of Examinations</div>
                 </div>
             </div>
         </div>
