@@ -3996,10 +3996,17 @@ def get_direct_report_card(
         batch_db.close()
 
 # ==========================================
-# STATIC FRONTEND SERVING (Cloud & Public Hosting)
+# STATIC FRONTEND & ASSET SERVING (Cloud & Public Hosting)
 # ==========================================
 FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
-if os.path.exists(FRONTEND_DIR):
+if not os.path.isdir(FRONTEND_DIR):
+    candidate = os.path.join(os.getcwd(), "frontend")
+    if os.path.isdir(candidate):
+        FRONTEND_DIR = candidate
+    elif os.path.isdir(os.path.join(BASE_DIR, "frontend")):
+        FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+
+if os.path.isdir(FRONTEND_DIR):
     @app.get("/", include_in_schema=False)
     def serve_frontend_root():
         index_file = os.path.join(FRONTEND_DIR, "Result.html")
@@ -4007,21 +4014,35 @@ if os.path.exists(FRONTEND_DIR):
             return FileResponse(index_file)
         return {"status": "running", "message": "PTU Grade Portal API"}
 
-    @app.get("/Result.html", include_in_schema=False)
-    def serve_frontend_html():
+    @app.get("/index.html", include_in_schema=False)
+    def serve_frontend_index():
         return FileResponse(os.path.join(FRONTEND_DIR, "Result.html"))
 
-    @app.get("/Result.css", include_in_schema=False)
-    def serve_frontend_css():
-        return FileResponse(os.path.join(FRONTEND_DIR, "Result.css"))
+    @app.get("/favicon.ico", include_in_schema=False)
+    def serve_favicon():
+        favicon_file = os.path.join(FRONTEND_DIR, "ptu_logo.png")
+        if os.path.exists(favicon_file):
+            return FileResponse(favicon_file, media_type="image/png")
+        raise HTTPException(status_code=404, detail="Favicon not found")
 
-    @app.get("/Result.js", include_in_schema=False)
-    def serve_frontend_js():
-        return FileResponse(os.path.join(FRONTEND_DIR, "Result.js"))
+    # Explicit high-priority asset routes
+    @app.get("/ptu_logo.png", include_in_schema=False)
+    def serve_ptu_logo():
+        img = os.path.join(FRONTEND_DIR, "ptu_logo.png")
+        if os.path.exists(img):
+            return FileResponse(img, media_type="image/png")
+        raise HTTPException(status_code=404, detail="ptu_logo.png not found")
 
-    @app.get("/Result-motion.js", include_in_schema=False)
-    def serve_frontend_motion_js():
-        return FileResponse(os.path.join(FRONTEND_DIR, "Result-motion.js"))
+    @app.get("/ptu_campus.jpg", include_in_schema=False)
+    def serve_ptu_campus():
+        img = os.path.join(FRONTEND_DIR, "ptu_campus.jpg")
+        if os.path.exists(img):
+            return FileResponse(img, media_type="image/jpeg")
+        raise HTTPException(status_code=404, detail="ptu_campus.jpg not found")
+
+    # Mount static files to serve any remaining assets (CSS, JS, XLSX bundle, fonts, etc.)
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
+
 
 # ==========================================
 # LIFESPAN & INIT
