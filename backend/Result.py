@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, UniqueConstraint, func, event, text, inspect
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, UniqueConstraint, func, event, text, inspect, or_
 from sqlalchemy.orm import sessionmaker, Session, declarative_base, relationship
 from sqlalchemy.exc import IntegrityError
 import bcrypt
@@ -698,7 +698,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-ACCOUNT_TYPES = ["Admin", "TNP", "Faculty", "Exam Wing"]
+ACCOUNT_TYPES = ["Developer", "TNP", "Faculty", "Exam Wing"]
 
 def validate_password_strength(password: str):
     if len(password) < 8:
@@ -720,10 +720,10 @@ def role_checker(allowed_roles: List[str]):
         return user
     return checker
 
-allow_all = role_checker(["Admin", "TNP", "Faculty", "Exam Wing", "manager", "viewer"])
-allow_write = role_checker(["Admin", "Exam Wing", "manager"])
-allow_admin = role_checker(["Admin"])
-allow_batch_delete = role_checker(["Admin", "Exam Wing"])  # batch purge: Admin + Exam Wing
+allow_all = role_checker(["Developer", "TNP", "Faculty", "Exam Wing", "manager", "viewer"])
+allow_write = role_checker(["Developer", "Exam Wing", "manager"])
+allow_developer = role_checker(["Developer"])
+allow_batch_delete = role_checker(["Developer", "Exam Wing"])  # batch purge: Developer + Exam Wing
 
 # ==========================================
 # REPORT CARD OTP HELPERS
@@ -1327,39 +1327,81 @@ def reset_staff_password(data: StaffResetPasswordBody, db: Session = Depends(get
 
 
 @app.post("/auth/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_system_db)):
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    account_type: Optional[str] = Form(None),
+    db: Session = Depends(get_system_db)
+):
     ident = form_data.username.strip()
-    user = db.query(User).filter(
+    clean_acc_type = account_type.strip() if account_type else None
+
+    # Filter user query by ident and account_type (if provided)
+    user_query = db.query(User).filter(
         (func.lower(User.username) == ident.lower()) |
         (func.lower(User.email) == ident.lower())
-    ).first()
+    )
+    if clean_acc_type:
+        user_query = user_query.filter(func.lower(User.role) == clean_acc_type.lower())
+    user = user_query.first()
 
     # If not found directly, check if ident matches a Resource name
     if not user:
-        res = db.query(Resource).filter(
+        res_query = db.query(Resource).filter(
             func.lower(Resource.name) == ident.lower()
-        ).first()
+        )
+        if clean_acc_type:
+            res_query = res_query.filter(func.lower(Resource.account_type) == clean_acc_type.lower())
+        res = res_query.first()
         if res:
-            user = db.query(User).filter(
+            user_query2 = db.query(User).filter(
                 func.lower(User.email) == func.lower(res.email)
-            ).first()
+            )
+            if clean_acc_type:
+                user_query2 = user_query2.filter(func.lower(User.role) == clean_acc_type.lower())
+            user = user_query2.first()
             if user:
                 user.username = res.name.strip()
                 db.commit()
 
+    # Helpful diagnostic: if not found with specified role, check if user exists under another role
+    if not user and clean_acc_type:
+        fallback_user = db.query(User).filter(
+            (func.lower(User.username) == ident.lower()) |
+            (func.lower(User.email) == ident.lower())
+        ).first()
+        if fallback_user and verify_password(form_data.password, fallback_user.hashed_password):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Account type mismatch. '{ident}' is registered as '{fallback_user.role}', not '{clean_acc_type}'."
+            )
+
     if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+        raise HTTPException(status_code=400, detail="Invalid credentials or account type")
 
     # Verify that the matching resource record pre-exists!
-    resource = db.query(Resource).filter(
+    res_check = db.query(Resource).filter(
         (func.lower(Resource.email) == func.lower(user.email or "")) |
         (func.lower(Resource.name) == func.lower(user.username))
-    ).first()
+    )
+    if clean_acc_type:
+        res_check = res_check.filter(func.lower(Resource.account_type) == clean_acc_type.lower())
+    resource = res_check.first()
+
     if not resource:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your associated resource record no longer exists. Access denied."
-        )
+        fallback_res = db.query(Resource).filter(
+            (func.lower(Resource.email) == func.lower(user.email or "")) |
+            (func.lower(Resource.name) == func.lower(user.username))
+        ).first()
+        if not fallback_res:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your associated resource record no longer exists. Access denied."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Account type mismatch. Profile is registered as '{fallback_res.account_type}'."
+            )
 
     # Sync role with resource account_type and ensure username matches resource.name
     updated = False
@@ -1401,9 +1443,9 @@ def get_me(current_user: User = Depends(get_current_user)):
 def get_allowed_account_types(current_user: User = Depends(allow_all)):
     """Return account types the current user is allowed to assign when creating resources."""
     role = (current_user.role or "").strip()
-    if role.lower() == "admin":
+    if role.lower() == "developer":
         return {"allowed": ACCOUNT_TYPES}
-    # Non-admin: can only create resources of their own type
+    # Non-developer: can only create resources of their own type
     if role in ACCOUNT_TYPES:
         return {"allowed": [role]}
     return {"allowed": []}
@@ -1470,8 +1512,8 @@ def create_resource(data: ResourceCreate, db: Session = Depends(get_system_db), 
     requester_role = (user.role or "").strip()
 
     # --- Role-based type enforcement ---
-    if requester_role.lower() != "admin":
-        # Non-admin: must only create resources of their own account type
+    if requester_role.lower() != "developer":
+        # Non-developer: must only create resources of their own account type
         if data.account_type.lower() != requester_role.lower():
             raise HTTPException(
                 status_code=403,
@@ -1503,7 +1545,7 @@ def create_resource(data: ResourceCreate, db: Session = Depends(get_system_db), 
     )
 
 @app.put("/resources/{resource_id}", response_model=ResourceResponse)
-def update_resource(resource_id: int, data: ResourceUpdate, db: Session = Depends(get_system_db), user: User = Depends(allow_admin)):
+def update_resource(resource_id: int, data: ResourceUpdate, db: Session = Depends(get_system_db), user: User = Depends(allow_developer)):
     res = db.query(Resource).filter(Resource.id == resource_id).first()
     if not res:
         raise HTTPException(status_code=404, detail="Resource not found.")
@@ -1525,7 +1567,7 @@ def update_resource(resource_id: int, data: ResourceUpdate, db: Session = Depend
         res.email = clean_email
 
     if data.account_type is not None and data.account_type.strip():
-        # Admin cannot change their OWN account type
+        # Developer cannot change their OWN account type
         own_res = db.query(Resource).filter(
             func.lower(Resource.email) == func.lower(user.email or ""),
             Resource.id == resource_id
@@ -1536,11 +1578,11 @@ def update_resource(resource_id: int, data: ResourceUpdate, db: Session = Depend
                 detail="You cannot change your own account type."
             )
 
-        # Remove Admin choice in change account type
-        if data.account_type.strip().lower() == "admin":
+        # Remove Developer choice in change account type
+        if data.account_type.strip().lower() == "developer":
             raise HTTPException(
                 status_code=400,
-                detail="Account type cannot be changed to Admin."
+                detail="Account type cannot be changed to Developer."
             )
 
         valid_type = None
@@ -1578,7 +1620,7 @@ def update_resource(resource_id: int, data: ResourceUpdate, db: Session = Depend
     )
 
 @app.delete("/resources/{resource_id}")
-def delete_resource(resource_id: int, db: Session = Depends(get_system_db), user: User = Depends(allow_admin)):
+def delete_resource(resource_id: int, db: Session = Depends(get_system_db), user: User = Depends(allow_developer)):
     res = db.query(Resource).filter(Resource.id == resource_id).first()
     if not res:
         raise HTTPException(status_code=404, detail="Resource not found.")
@@ -2257,6 +2299,105 @@ def parse_students_excel(file_content: bytes) -> List[Dict[str, Any]]:
     parse_students_excel.last_warnings = warnings
     return students
 
+
+# ==========================================
+# RESOURCE EXCEL PARSER
+# ==========================================
+ACCOUNT_TYPES = ["Developer", "TNP", "Faculty", "Exam Wing"]
+
+def _clean_cell(value) -> str:
+    if value is None:
+        return ""
+    try:
+        if isinstance(value, float) and pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _find_resource_header_row(rows: List[List[Any]]) -> Optional[int]:
+    for i, row in enumerate(rows[:15]):
+        has_name = any(re.search(r'(?:Name\s*of\s*(?:the)?\s*[Ss]taff|Staff\s*Name|Name\s*of\s*(?:the)?\s*[Ee]mployee|Employee\s*Name|Full\s*Name|\bName\b)', _clean_cell(c), re.I) for c in row)
+        has_email = any(re.search(r'(?:Email|E-?mail|Email\s*ID)', _clean_cell(c), re.I) for c in row)
+        has_type = any(re.search(r'(?:Account\s*Type|Role|Type|Designation)', _clean_cell(c), re.I) for c in row)
+        if has_name and has_email:
+            return i
+    return None
+
+
+def _normalize_account_type(raw: str) -> str:
+    """Normalize account type string to match ACCOUNT_TYPES."""
+    if not raw:
+        return ""
+    cleaned = raw.strip()
+    for at in ACCOUNT_TYPES:
+        if at.lower() == cleaned.lower():
+            return at
+    return ""
+
+
+def parse_resources_excel(file_content: bytes) -> List[Dict[str, Any]]:
+    wb = openpyxl.load_workbook(io.BytesIO(file_content), data_only=True, read_only=True)
+    resources = []
+    warnings: List[str] = []
+
+    for sheet_name in wb.sheetnames:
+        if sheet_name.strip().lower() == "index":
+            continue
+        ws = wb[sheet_name]
+        all_rows = [list(r) for r in ws.iter_rows(values_only=True)]
+        if not all_rows:
+            continue
+
+        header_idx = _find_resource_header_row(all_rows)
+        if header_idx is None:
+            warnings.append(f"Sheet '{sheet_name}': No valid header row found with Name and Email columns")
+            continue
+        header_row = all_rows[header_idx]
+
+        name_col = email_col = type_col = None
+        for col_idx, raw in enumerate(header_row):
+            col_str = _clean_cell(raw)
+            if not col_str:
+                continue
+            if re.search(r'(?:Name\s*of\s*(?:the)?\s*[Ss]taff|Staff\s*Name|Name\s*of\s*(?:the)?\s*[Ee]mployee|Employee\s*Name|Full\s*Name|\bName\b)', col_str, re.I):
+                name_col = col_idx
+            elif re.search(r'(?:Email|E-?mail|Email\s*ID)', col_str, re.I):
+                email_col = col_idx
+            elif re.search(r'(?:Account\s*Type|Role|Type|Designation)', col_str, re.I):
+                type_col = col_idx
+
+        if name_col is None or email_col is None:
+            warnings.append(f"Sheet '{sheet_name}': Required columns (Name, Email) not found")
+            continue
+
+        data_rows = all_rows[header_idx + 1:]
+
+        def cell(row, idx):
+            return _clean_cell(row[idx]) if idx is not None and idx < len(row) else ""
+
+        for row in data_rows:
+            name = cell(row, name_col)
+            email = cell(row, email_col)
+            if not name or not email or not re.search(r'@', email):
+                continue
+
+            account_type = ""
+            if type_col is not None:
+                account_type = _normalize_account_type(cell(row, type_col))
+
+            resources.append({
+                "name": name,
+                "email": email.lower().strip(),
+                "account_type": account_type
+            })
+
+    parse_resources_excel.last_warnings = warnings
+    return resources
+
 # ==========================================
 # RESULT PARSER (PDF)
 # ==========================================
@@ -2300,12 +2441,52 @@ def match_programme_header(text: str) -> Optional[str]:
         prog = "BTECH"
     return prog
 
-def extract_semester_year_department(text: str) -> Dict[str, Optional[str]]:
+_NUM_TO_ROMAN = {
+    1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X"
+}
+
+_ROMAN_SEM_ORDER = {r: i for i, r in enumerate(
+    ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+)}
+
+def _semester_sort_key(sem: str):
+    s = (sem or "").strip().upper()
+    if s.isdigit():
+        return (int(s), s)
+    if s in _ROMAN_SEM_ORDER:
+        return (_ROMAN_SEM_ORDER[s] + 1, s)
+    return (99, s)
+
+def extract_semester_year_department(text: str, filename: Optional[str] = None) -> Dict[str, Optional[str]]:
     semester = None
     year = None
     sem_match = re.search(r'([IVXLCDM]+)\s*Semester', text, re.I)
     if sem_match:
-        semester = sem_match.group(1).strip()
+        semester = sem_match.group(1).strip().upper()
+    else:
+        ord_match = re.search(r'\b([0-9]+)(?:st|nd|rd|th)?\s*Semester', text, re.I)
+        if ord_match:
+            val = int(ord_match.group(1))
+            semester = _NUM_TO_ROMAN.get(val, str(val))
+        else:
+            sem_pre_match = re.search(r'Semester\s*([0-9]+|[IVXLCDM]+)', text, re.I)
+            if sem_pre_match:
+                val_str = sem_pre_match.group(1)
+                if val_str.isdigit():
+                    semester = _NUM_TO_ROMAN.get(int(val_str), val_str)
+                else:
+                    semester = val_str.upper()
+
+    # Fallback to filename if semester is still None
+    if not semester and filename:
+        fn_match = re.search(r'(?:sem(?:ester)?[\s_.-]*([0-9]+|[ivxlcdm]+)|([0-9]+)(?:st|nd|rd|th)?[\s_.-]*sem(?:ester)?)', filename, re.I)
+        if fn_match:
+            val = fn_match.group(1) or fn_match.group(2)
+            if val.isdigit():
+                semester = _NUM_TO_ROMAN.get(int(val), val)
+            else:
+                semester = val.upper()
+
     year_match = re.search(r'Year\s*:\s*([A-Za-z]+\s*[-–]\s*\d{4})', text)
     if year_match:
         year = year_match.group(1).strip()
@@ -2313,7 +2494,7 @@ def extract_semester_year_department(text: str) -> Dict[str, Optional[str]]:
     programme = match_programme_header(text)
     return {"semester": semester, "year": year, "department": department, "programme": programme}
 
-def extract_table_from_pdf(file_content: bytes) -> Dict[str, Any]:
+def extract_table_from_pdf(file_content: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
     rows = []
     semester = None
     year = None
@@ -2329,7 +2510,7 @@ def extract_table_from_pdf(file_content: bytes) -> Dict[str, Any]:
             if not text:
                 continue
             saw_any_text = True
-            meta = extract_semester_year_department(text)
+            meta = extract_semester_year_department(text, filename=filename)
             if meta["semester"] and semester is None:
                 semester = meta["semester"]
             if meta["year"] and year is None:
@@ -2467,6 +2648,189 @@ def extract_reevaluation_table_from_pdf(file_content: bytes) -> Dict[str, Any]:
         "skipped_non_btech": skipped_non_btech,
     }
 
+# ─── Arrear Results Parser ───────────────────────────────────────────────────
+# Arrear PDFs use the same row layout as regular results PDFs:
+#   Sl.No  Reg.No  Name  SUBCODE - GRADE  [SUBCODE - GRADE ...]
+# The only difference is the page header says "Semester Provisional Results"
+# without a leading roman numeral, so extract_semester_year_department() won't
+# extract a semester.  We therefore reuse extract_table_from_pdf() for the
+# heavy lifting and let the caller supply the semester explicitly.
+
+def extract_arrear_table_from_pdf(file_content: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Parse an arrear results PDF.
+
+    The format is identical to a regular results PDF; this function is a thin
+    wrapper around extract_table_from_pdf() that also sniffs the exam year from
+    the 'Year : Mon - YYYY' header line and detects semester from filename/header.
+    """
+    parsed = extract_table_from_pdf(file_content, filename=filename)
+    return parsed
+
+def resequence_student_subject_attempts(batch_db: Session, student_id: int, subject_id: int):
+    """
+    Ensure attempts for a student and subject are sequentially numbered (1, 2, 3...)
+    in strict chronological order based on _semester_sort_key(semester) and year.
+    Also sets had_arrear = True for all attempts after the first, or if any attempt was a fail.
+    """
+    records = (
+        batch_db.query(Result)
+        .filter(Result.student_id == student_id, Result.subject_id == subject_id)
+        .all()
+    )
+    if not records:
+        return
+
+    sorted_recs = sorted(records, key=lambda r: (_semester_sort_key(r.semester), r.year or '', r.id or 0))
+    had_any_fail = any(
+        r.grade_point == 0 or (r.grade or "").strip().upper() in ("F", "AB", "ABSENT", "NC", "E", "Z")
+        for r in sorted_recs
+    ) or len(sorted_recs) > 1
+
+    # Phase 1: Set temporary negative attempt numbers to prevent SQLite UNIQUE constraint collision
+    for idx, r in enumerate(sorted_recs, start=1):
+        r.attempt = -(1000 + idx)
+    batch_db.flush()
+
+    # Phase 2: Set final sequential positive attempt numbers
+    for idx, r in enumerate(sorted_recs, start=1):
+        r.attempt = idx
+        if idx > 1 or had_any_fail or r.grade_point == 0:
+            r.had_arrear = True
+    batch_db.flush()
+
+def parse_and_update_sem3_arrear(pdf_path: Optional[str] = None, batch: str = "2024-2028") -> Dict[str, Any]:
+    """
+    Parse sem3_arrear.pdf (or 3rd_sem_arrear.pdf) located in Needs/Batch 2024-2028/ (or given path)
+    and update the results properly in the batch database.
+
+    - Auto-locates the file if pdf_path is omitted.
+    - Extracts all 10 student rows and grades (MAUC102, CYUC101, CSUC101, HSUA102).
+    - Resolves subjects in subjects.db.
+    - Adds or updates the Semester III arrear attempt record with had_arrear=True.
+    - Resequences all attempt numbers for affected students chronologically so Sem II (Attempt 1),
+      Sem III (Attempt 2), and Sem IV (Attempt 3) are ordered correctly.
+    """
+    if not pdf_path or not os.path.exists(pdf_path):
+        candidates = [
+            os.path.join(os.getcwd(), "Needs", "Batch 2024-2028", "sem3_arrear.pdf"),
+            os.path.join(os.getcwd(), "Needs", "Batch 2024-2028", "3rd_sem_arrear.pdf"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Needs", "Batch 2024-2028", "sem3_arrear.pdf"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Needs", "Batch 2024-2028", "3rd_sem_arrear.pdf"),
+            os.path.join("Needs", "Batch 2024-2028", "sem3_arrear.pdf"),
+            os.path.join("Needs", "Batch 2024-2028", "3rd_sem_arrear.pdf"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                pdf_path = os.path.abspath(c)
+                break
+
+    if not pdf_path or not os.path.exists(pdf_path):
+        raise FileNotFoundError("Could not find sem3_arrear.pdf or 3rd_sem_arrear.pdf in Needs/Batch 2024-2028/")
+
+    with open(pdf_path, "rb") as f:
+        content = f.read()
+
+    filename = os.path.basename(pdf_path)
+    parsed = extract_arrear_table_from_pdf(content, filename=filename)
+    if not parsed.get("rows"):
+        raise ValueError(f"No student rows found in {pdf_path}")
+
+    semester = parsed.get("semester") or "III"
+    year = parsed.get("year") or "May - 2026"
+
+    subjects_db = SubjectsSessionLocal()
+    batch_db = get_batch_session(batch)
+
+    updated_count = 0
+    added_count = 0
+    errors = []
+    processed_students = []
+
+    try:
+        all_subjects = subjects_db.query(Subject).all()
+        subjects_by_code: Dict[str, List[Subject]] = {}
+        for s in all_subjects:
+            subjects_by_code.setdefault(s.code, []).append(s)
+
+        for row in parsed["rows"]:
+            reg_no = row["reg_no"]
+            grades = row["grades"]
+
+            student = batch_db.query(Student).filter(Student.reg_no == reg_no).first()
+            if not student:
+                errors.append(f"Student {reg_no} not found in batch {batch} database.")
+                continue
+
+            stu_results = {}
+            for code, grade_str in grades.items():
+                candidates = subjects_by_code.get(code, [])
+                if not candidates:
+                    errors.append(f"Subject {code} not found in subjects.db")
+                    continue
+                subject = candidates[0]
+
+                gp = parse_grade(grade_str)
+                stored_grade = normalize_grade(grade_str)
+
+                # Check if a record already exists for this exact semester (III)
+                existing_sem = batch_db.query(Result).filter(
+                    Result.student_id == student.id,
+                    Result.subject_id == subject.id,
+                    Result.semester == semester
+                ).first()
+
+                if existing_sem:
+                    existing_sem.grade = stored_grade
+                    existing_sem.grade_point = gp
+                    existing_sem.year = year
+                    existing_sem.had_arrear = True
+                    updated_count += 1
+                else:
+                    new_res = Result(
+                        student_id=student.id,
+                        subject_id=subject.id,
+                        semester=semester,
+                        year=year,
+                        grade=stored_grade,
+                        grade_point=gp,
+                        batch=batch,
+                        attempt=2,
+                        had_arrear=True
+                    )
+                    batch_db.add(new_res)
+                    batch_db.flush()
+                    added_count += 1
+
+                # Re-sequence all attempts for this subject chronologically
+                resequence_student_subject_attempts(batch_db, student.id, subject.id)
+                stu_results[code] = stored_grade
+
+            processed_students.append({
+                "reg_no": reg_no,
+                "name": row.get("name") or student.name,
+                "grades": stu_results
+            })
+
+        batch_db.commit()
+    finally:
+        subjects_db.close()
+        batch_db.close()
+
+    return {
+        "message": f"Successfully parsed {filename} and updated results properly.",
+        "file": pdf_path,
+        "semester": semester,
+        "year": year,
+        "batch": batch,
+        "added": added_count,
+        "updated": updated_count,
+        "students_processed": len(processed_students),
+        "details": processed_students,
+        "errors": errors
+    }
+
+
 # ==========================================
 # UPLOAD ENDPOINTS
 # ==========================================
@@ -2596,7 +2960,7 @@ async def upload_results(
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files accepted for results.")
 
-    parsed = extract_table_from_pdf(content)
+    parsed = extract_table_from_pdf(content, filename=file.filename)
     if semester:
         parsed['semester'] = semester
 
@@ -2720,7 +3084,10 @@ async def upload_results(
                         had_arrear=had_arr
                     )
                     batch_db.add(result)
+                    batch_db.flush()
                     results_added += 1
+
+                resequence_student_subject_attempts(batch_db, student.id, subject.id)
 
         # Commit all modified batch DB sessions
         for s in active_sessions.values():
@@ -2829,6 +3196,299 @@ async def upload_reevaluation(
         message="Re-evaluation processed",
         students_added=0,
         results_added=results_updated,
+        errors=errors
+    )
+
+
+# ─── 5a. Arrear Results Upload ────────────────────────────────────────────────
+# Handles "Semester Provisional Results" arrear PDFs where students re-appear
+# for subjects they previously failed.  Each PDF row becomes a NEW attempt
+# record (attempt = previous_max + 1) with had_arrear = True.
+# Requires: the original semester result must already be uploaded.
+@app.post("/upload/arrear", response_model=UploadResponse)
+async def upload_arrear(
+    file: UploadFile = File(...),
+    semester: Optional[str] = Form(None),    # e.g. "III" — original semester of the subject
+    batch: Optional[str] = Form(None),        # e.g. "2024-2028" — leave blank to auto-detect
+    subjects_db: Session = Depends(get_subjects_db),
+    user: User = Depends(allow_write)
+):
+    """
+    Upload an arrear results PDF.
+
+    PDF row format (same as regular results):
+        Sl.No  Reg.No  Name  SUBCODE - GRADE  [SUBCODE - GRADE ...]
+
+    For every (reg_no, subject_code, grade) triple:
+      - Student and subject must already exist in the DB.
+      - A new Result row is inserted: attempt = max_previous_attempt + 1,
+        had_arrear = True.
+      - On idempotent re-upload (same semester + attempt > 1 already exists):
+        the grade is updated in-place.
+      - If no prior record exists the row is skipped with an error message.
+    """
+    content = await file.read()
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files accepted for arrear results.")
+
+    parsed = extract_arrear_table_from_pdf(content)
+
+    # Let the caller override / supply the semester (arrear PDFs usually lack it).
+    if semester:
+        parsed["semester"] = semester
+
+    errors: List[str] = []
+    results_added   = 0
+    results_updated = 0
+    skipped_unknown_students = 0
+    skipped_unknown_subjects: List[str] = []
+
+    if not parsed.get("rows"):
+        raise HTTPException(status_code=400, detail="No student rows found in the arrear PDF.")
+
+    sem = parsed.get("semester")   # may still be None
+    yr  = parsed.get("year")       # e.g. "May - 2026"
+
+    # Build subjects lookup from subjects.db
+    all_subjects = subjects_db.query(Subject).all()
+    subjects_by_code: Dict[str, List[Subject]] = {}
+    for s in all_subjects:
+        subjects_by_code.setdefault(s.code, []).append(s)
+
+    active_sessions: Dict[str, Session] = {}
+
+    try:
+        for row in parsed["rows"]:
+            reg_no: str       = row["reg_no"]
+            grades: Dict[str, str] = row["grades"]   # {subject_code: grade_str}
+
+            # ── Resolve target batch ──────────────────────────────────────
+            target_batch = batch
+            if not target_batch:
+                found = find_student_batch(reg_no)
+                if found:
+                    target_batch = found[0]
+
+            if not target_batch:
+                skipped_unknown_students += 1
+                continue
+
+            sanitized_key = sanitize_batch_name(target_batch)
+            if sanitized_key not in active_sessions:
+                active_sessions[sanitized_key] = get_batch_session(sanitized_key)
+            batch_db = active_sessions[sanitized_key]
+
+            # ── Resolve student ───────────────────────────────────────────
+            student = batch_db.query(Student).filter(Student.reg_no == reg_no).first()
+            if not student:
+                alt = find_student_batch(reg_no)
+                if alt and alt[1] != sanitized_key:
+                    alt_key = alt[1]
+                    if alt_key not in active_sessions:
+                        active_sessions[alt_key] = get_batch_session(alt_key)
+                    batch_db = active_sessions[alt_key]
+                    student = batch_db.query(Student).filter(Student.reg_no == reg_no).first()
+
+            if not student:
+                skipped_unknown_students += 1
+                continue
+
+            # ── Process each subject/grade ────────────────────────────────
+            for code, grade_str in grades.items():
+                candidates = subjects_by_code.get(code, [])
+                if not candidates:
+                    msg = f"Subject {code} not found in Subjects DB."
+                    if msg not in skipped_unknown_subjects:
+                        skipped_unknown_subjects.append(msg)
+                    continue
+
+                # Pick subject — prefer one already linked to this student
+                if len(candidates) == 1:
+                    subject = candidates[0]
+                else:
+                    candidate_ids = [s.id for s in candidates]
+                    prior = batch_db.query(Result).filter(
+                        Result.student_id == student.id,
+                        Result.subject_id.in_(candidate_ids),
+                    ).first()
+                    subject = (
+                        next((s for s in candidates if s.id == prior.subject_id), candidates[0])
+                        if prior else candidates[0]
+                    )
+
+                gp           = parse_grade(grade_str)
+                stored_grade = normalize_grade(grade_str)
+
+                # Determine semester for the arrear result row
+                result_sem = (sem or subject.semester or "I").strip()
+
+                # Fetch all prior attempts for this student + subject
+                existing_attempts = (
+                    batch_db.query(Result)
+                    .filter(
+                        Result.student_id == student.id,
+                        Result.subject_id  == subject.id,
+                    )
+                    .order_by(Result.attempt.asc())
+                    .all()
+                )
+
+                # Idempotency: update in-place if an arrear record for this
+                # semester already exists (attempt > 1 distinguishes it from
+                # the original first-time result in the same semester).
+                existing_arrear_sem = next(
+                    (r for r in existing_attempts
+                     if r.semester == result_sem and r.attempt > 1),
+                    None,
+                )
+
+                if existing_arrear_sem:
+                    existing_arrear_sem.grade       = stored_grade
+                    existing_arrear_sem.grade_point = gp
+                    existing_arrear_sem.year        = yr or existing_arrear_sem.year
+                    existing_arrear_sem.had_arrear  = True
+                    results_updated += 1
+
+                elif existing_attempts:
+                    # Normal path: create a brand-new attempt row
+                    max_attempt = max(r.attempt for r in existing_attempts)
+                    result = Result(
+                        student_id  = student.id,
+                        subject_id  = subject.id,
+                        semester    = result_sem,
+                        year        = yr,
+                        grade       = stored_grade,
+                        grade_point = gp,
+                        batch       = target_batch or student.batch,
+                        attempt     = max_attempt + 1,
+                        had_arrear  = True,
+                    )
+                    batch_db.add(result)
+                    results_added += 1
+
+                else:
+                    # No base record yet — skip and report
+                    errors.append(
+                        f"No base result for {reg_no}/{code}. "
+                        "Upload the original semester results first."
+                    )
+
+        for s in active_sessions.values():
+            s.commit()
+
+    finally:
+        for s in active_sessions.values():
+            s.close()
+
+    if skipped_unknown_students:
+        errors.append(
+            f"Skipped {skipped_unknown_students} student(s) not found in any batch database."
+        )
+    errors.extend(skipped_unknown_subjects)
+
+    total = results_added + results_updated
+    return UploadResponse(
+        message=(
+            f"Arrear results processed. "
+            f"New attempts added: {results_added}, "
+            f"Existing updated: {results_updated}."
+        ),
+        students_added=0,
+        results_added=total,
+        errors=errors,
+    )
+
+
+@app.post("/developer/parse-sem3-arrear", response_model=UploadResponse)
+async def api_parse_sem3_arrear(
+    batch: str = "2024-2028",
+    user: User = Depends(allow_developer)
+):
+    """
+    Parse sem3_arrear.pdf in Needs/Batch 2024-2028/ and properly update results in the batch database.
+    """
+    try:
+        res = parse_and_update_sem3_arrear(batch=batch)
+        return UploadResponse(
+            message=res.get("message", "Sem3 arrear processed successfully"),
+            students_added=0,
+            results_added=res.get("added", 0) + res.get("updated", 0),
+            errors=res.get("errors", [])
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# 5. Resources Upload -> System DB (Resources table)
+@app.post("/upload/resources", response_model=UploadResponse)
+async def upload_resources(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_system_db),
+    user: User = Depends(allow_developer)
+):
+    content = await file.read()
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Only Excel files accepted for resources.")
+
+    resources_data = parse_resources_excel(content)
+    if not resources_data:
+        errors = list(getattr(parse_resources_excel, "last_warnings", []) or [])
+        errors.append("No valid resource records found in Excel.")
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+
+    errors = list(getattr(parse_resources_excel, "last_warnings", []) or [])
+    total_added = 0
+    total_updated = 0
+
+    requester_role = (user.role or "").strip()
+
+    for res in resources_data:
+        try:
+            name = res["name"]
+            email = res["email"]
+            account_type = res["account_type"]
+
+            # If no account_type in Excel, default to requester's role (non-developer) or Faculty
+            if not account_type:
+                if requester_role.lower() != "developer":
+                    account_type = requester_role
+                else:
+                    account_type = "Faculty"
+
+            # Role-based enforcement
+            if requester_role.lower() != "developer":
+                if account_type.lower() != requester_role.lower():
+                    errors.append(f"Row {name}: You can only create resources of your own account type ({requester_role}).")
+                    continue
+
+            # Check if email already exists
+            existing = db.query(Resource).filter(
+                func.lower(Resource.email) == email
+            ).first()
+
+            if existing:
+                # Update existing resource
+                existing.name = name
+                existing.account_type = account_type
+                total_updated += 1
+            else:
+                # Create new resource
+                new_res = Resource(
+                    name=name,
+                    email=email,
+                    account_type=account_type
+                )
+                db.add(new_res)
+                total_added += 1
+            db.commit()
+        except Exception as e:
+            errors.append(f"Error adding resource {res.get('name', '')}: {str(e)}")
+            db.rollback()
+
+    return UploadResponse(
+        message=f"Resources processed. Added {total_added}, updated {total_updated}.",
+        students_added=total_added,
+        results_added=total_updated,
         errors=errors
     )
 
@@ -3014,7 +3674,7 @@ def update_student_by_reg(reg_no: str, student: StudentCreate, user: User = Depe
         batch_db.close()
 
 @app.delete("/students/by-reg/{reg_no}")
-def delete_student_by_reg(reg_no: str, user: User = Depends(allow_admin)):
+def delete_student_by_reg(reg_no: str, user: User = Depends(allow_developer)):
     cleaned_reg = (reg_no or "").strip().lower()
     found_info = find_student_batch(cleaned_reg)
     if not found_info:
@@ -3069,7 +3729,7 @@ def update_student(student_id: int, student: StudentCreate, batch: Optional[str]
     raise HTTPException(status_code=404, detail="Student not found")
 
 @app.delete("/students/{student_id}")
-def delete_student(student_id: int, batch: Optional[str] = None, reg_no: Optional[str] = None, user: User = Depends(allow_admin)):
+def delete_student(student_id: int, batch: Optional[str] = None, reg_no: Optional[str] = None, user: User = Depends(allow_developer)):
     if reg_no:
         return delete_student_by_reg(reg_no, user=user)
 
@@ -3136,7 +3796,7 @@ def update_subject(subject_id: int, subject: SubjectCreate, db: Session = Depend
     return db_subject
 
 @app.delete("/subjects/{subject_id}")
-def delete_subject(subject_id: int, db: Session = Depends(get_subjects_db), user: User = Depends(allow_admin)):
+def delete_subject(subject_id: int, db: Session = Depends(get_subjects_db), user: User = Depends(allow_developer)):
     db_subject = db.query(Subject).filter(Subject.id == subject_id).first()
     if not db_subject:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -3161,94 +3821,104 @@ def get_results(
     subjects_map = get_subjects_map(subjects_db)
     target_subject_ids = None
     if subject_code and subject_code.strip():
-        sc = subject_code.strip().upper()
-        exact_ids = [sid for sid, sub in subjects_map.items() if sub.code and sub.code.strip().upper() == sc]
+        sc_raw = subject_code.strip().upper()
+        sc_clean = re.sub(r'[^A-Z0-9]', '', sc_raw)
+
+        # 1. Exact match by normalized subject code (ignores spaces/hyphens/case)
+        exact_ids = [
+            sid for sid, sub in subjects_map.items()
+            if sub.code and re.sub(r'[^A-Z0-9]', '', sub.code.upper()) == sc_clean
+        ]
         if exact_ids:
             target_subject_ids = set(exact_ids)
         else:
-            partial_ids = [sid for sid, sub in subjects_map.items() if sub.code and sc in sub.code.strip().upper()]
-            target_subject_ids = set(partial_ids)
+            # 2. Partial match by normalized subject code, raw code, or subject name
+            matched_ids = [
+                sid for sid, sub in subjects_map.items()
+                if (sub.code and sc_clean and sc_clean in re.sub(r'[^A-Z0-9]', '', sub.code.upper()))
+                or (sub.code and sc_raw in sub.code.upper())
+                or (sub.name and sc_raw in sub.name.upper())
+            ]
+            target_subject_ids = set(matched_ids)
 
         if not target_subject_ids:
             return []
 
+    clean_reg_no = reg_no.strip() if reg_no and reg_no.strip() else None
+
+    def _query_batch(batch_name_val: str, batch_session: Session) -> List[ResultWithDetails]:
+        query = batch_session.query(Result).join(Student)
+        if student_id:
+            query = query.filter(Result.student_id == student_id)
+        if clean_reg_no:
+            clean_reg_compact = re.sub(r'\s+', '', clean_reg_no.upper())
+            query = query.filter(
+                or_(
+                    Student.reg_no.ilike(f"%{clean_reg_no}%"),
+                    func.replace(func.upper(Student.reg_no), ' ', '').like(f"%{clean_reg_compact}%")
+                )
+            )
+        if department:
+            query = query.filter(Student.department == department)
+        if semester:
+            query = query.filter(Result.semester == semester)
+        if target_subject_ids is not None:
+            query = query.filter(Result.subject_id.in_(target_subject_ids))
+
+        batch_results = []
+        for r in query.all():
+            sub = subjects_map.get(r.subject_id)
+            batch_results.append(ResultWithDetails(
+                id=r.id,
+                student_id=r.student_id,
+                subject_id=r.subject_id,
+                semester=r.semester,
+                year=r.year,
+                grade=r.grade,
+                grade_point=r.grade_point,
+                batch=r.batch or batch_name_val,
+                attempt=getattr(r, 'attempt', 1) or 1,
+                had_arrear=bool(r.had_arrear),
+                student_name=r.student.name,
+                reg_no=r.student.reg_no,
+                department=r.student.department or "",
+                subject_code=sub.code if sub else f"SUB{r.subject_id}",
+                subject_name=sub.name if sub else "Unknown Subject",
+                credits=sub.credits if sub else 0.0
+            ))
+        return batch_results
+
     response: List[ResultWithDetails] = []
 
-    # If batch is specified (or deduced from reg_no), query only that batch DB
+    # If batch is specified:
     if batch and batch.strip().lower() != "all":
         batch_db = get_batch_session(batch)
         try:
-            query = batch_db.query(Result).join(Student)
-            if student_id:
-                query = query.filter(Result.student_id == student_id)
-            if reg_no:
-                query = query.filter(Student.reg_no == reg_no)
-            if department:
-                query = query.filter(Student.department == department)
-            if semester:
-                query = query.filter(Result.semester == semester)
-            if target_subject_ids is not None:
-                query = query.filter(Result.subject_id.in_(target_subject_ids))
-
-            for r in query.all():
-                sub = subjects_map.get(r.subject_id)
-                response.append(ResultWithDetails(
-                    id=r.id,
-                    student_id=r.student_id,
-                    subject_id=r.subject_id,
-                    semester=r.semester,
-                    year=r.year,
-                    grade=r.grade,
-                    grade_point=r.grade_point,
-                    batch=r.batch or batch,
-                    attempt=getattr(r, 'attempt', 1) or 1,
-                    had_arrear=bool(r.had_arrear),
-                    student_name=r.student.name,
-                    reg_no=r.student.reg_no,
-                    department=r.student.department or "",
-                    subject_code=sub.code if sub else f"SUB{r.subject_id}",
-                    subject_name=sub.name if sub else "Unknown Subject",
-                    credits=sub.credits if sub else 0.0
-                ))
-            return response
+            response = _query_batch(batch, batch_db)
         finally:
             batch_db.close()
+
+        # If a specific reg_no or subject_code filter produced 0 results in this batch,
+        # fallback to search other batches automatically so the user never gets false empty results.
+        if not response and (clean_reg_no or target_subject_ids is not None):
+            all_sessions = get_all_batch_sessions()
+            for b_name, b_db in all_sessions:
+                if b_name == batch or sanitize_batch_name(b_name) == sanitize_batch_name(batch):
+                    b_db.close()
+                    continue
+                try:
+                    fallback_res = _query_batch(b_name, b_db)
+                    if fallback_res:
+                        response.extend(fallback_res)
+                finally:
+                    b_db.close()
+
+        return response
 
     # Query across all batch databases
     for batch_name, batch_db in get_all_batch_sessions():
         try:
-            query = batch_db.query(Result).join(Student)
-            if student_id:
-                query = query.filter(Result.student_id == student_id)
-            if reg_no:
-                query = query.filter(Student.reg_no == reg_no)
-            if department:
-                query = query.filter(Student.department == department)
-            if semester:
-                query = query.filter(Result.semester == semester)
-            if target_subject_ids is not None:
-                query = query.filter(Result.subject_id.in_(target_subject_ids))
-
-            for r in query.all():
-                sub = subjects_map.get(r.subject_id)
-                response.append(ResultWithDetails(
-                    id=r.id,
-                    student_id=r.student_id,
-                    subject_id=r.subject_id,
-                    semester=r.semester,
-                    year=r.year,
-                    grade=r.grade,
-                    grade_point=r.grade_point,
-                    batch=r.batch or batch_name,
-                    attempt=getattr(r, 'attempt', 1) or 1,
-                    had_arrear=bool(r.had_arrear),
-                    student_name=r.student.name,
-                    reg_no=r.student.reg_no,
-                    department=r.student.department or "",
-                    subject_code=sub.code if sub else f"SUB{r.subject_id}",
-                    subject_name=sub.name if sub else "Unknown Subject",
-                    credits=sub.credits if sub else 0.0
-                ))
+            response.extend(_query_batch(batch_name, batch_db))
         finally:
             batch_db.close()
 
@@ -3351,7 +4021,7 @@ def update_result(result_id: int, result: ResultUpdate, batch: Optional[str] = N
     raise HTTPException(status_code=404, detail="Result not found")
 
 @app.delete("/results/{result_id}")
-def delete_result(result_id: int, batch: Optional[str] = None, user: User = Depends(allow_admin)):
+def delete_result(result_id: int, batch: Optional[str] = None, user: User = Depends(allow_developer)):
     if batch:
         batch_db = get_batch_session(batch)
         try:
@@ -3378,18 +4048,6 @@ def delete_result(result_id: int, batch: Optional[str] = None, user: User = Depe
 # ==========================================
 # SGPA / CGPA CALCULATION
 # ==========================================
-_ROMAN_SEM_ORDER = {r: i for i, r in enumerate(
-    ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
-)}
-
-def _semester_sort_key(sem: str):
-    s = (sem or "").strip().upper()
-    if s.isdigit():
-        return (int(s), s)
-    if s in _ROMAN_SEM_ORDER:
-        return (_ROMAN_SEM_ORDER[s] + 1, s)
-    return (99, s)
-
 def _arrear_bucket(count: int) -> str:
     if count <= 0:
         return "0"
@@ -3468,7 +4126,7 @@ def get_grade_summary(
                 earned_credits = 0.0
 
                 for sub_id, att_list in subj_dict.items():
-                    sorted_atts = sorted(att_list, key=lambda x: (x.attempt or 1, _semester_sort_key(x.semester), x.id or 0))
+                    sorted_atts = sorted(att_list, key=lambda x: (_semester_sort_key(x.semester), x.attempt or 1, x.id or 0))
                     orig_sem = sorted_atts[0].semester
 
                     if semester and str(orig_sem).strip().upper() != str(semester).strip().upper():
@@ -3588,7 +4246,7 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
         sub_cr = sub.credits if sub else 0.0
 
         # Sort attempts chronologically
-        sorted_atts = sorted(att_list, key=lambda x: (x.attempt or 1, _semester_sort_key(x.semester), x.id or 0))
+        sorted_atts = sorted(att_list, key=lambda x: (_semester_sort_key(x.semester), x.attempt or 1, x.id or 0))
         att_seq_map = {a.id: idx for idx, a in enumerate(sorted_atts, start=1)}
 
         # Identify failed attempts vs passed attempts
@@ -3972,7 +4630,7 @@ def get_report_card(
     finally:
         batch_db.close()
 
-@app.get("/admin/report-card/{reg_no}", response_model=ReportCardResponse)
+@app.get("/developer/report-card/{reg_no}", response_model=ReportCardResponse)
 def get_direct_report_card(
     reg_no: str,
     subjects_db: Session = Depends(get_subjects_db),
@@ -4069,38 +4727,38 @@ async def lifespan(app: FastAPI):
     SystemBase.metadata.create_all(bind=system_engine)
     SubjectsBase.metadata.create_all(bind=subjects_engine)
 
-    # Initialize default admin and admin resource in system.db
+    # Initialize default developer and developer resource in system.db
     sys_db = SystemSessionLocal()
     try:
-        admin = sys_db.query(User).filter(User.username == "shakthivel").first()
-        if not admin:
-            admin = User(
+        developer = sys_db.query(User).filter(User.username == "shakthivel").first()
+        if not developer:
+            developer = User(
                 username="shakthivel",
                 email="shakthivel@ptuniv.edu.in",
                 hashed_password=hash_password("mK9#vP2$xL8%rQ4!"),
-                role="Admin"
+                role="Developer"
             )
-            sys_db.add(admin)
+            sys_db.add(developer)
             sys_db.commit()
         else:
-            if not admin.email:
-                admin.email = "shakthivel@ptuniv.edu.in"
-            if admin.role.lower() == "admin":
-                admin.role = "Admin"
+            if not developer.email:
+                developer.email = "shakthivel@ptuniv.edu.in"
+            if developer.role.lower() == "developer":
+                developer.role = "Developer"
             sys_db.commit()
 
-        # Ensure corresponding Resource exists for admin so pre-existence validation passes
-        admin_res = sys_db.query(Resource).filter(
+        # Ensure corresponding Resource exists for developer so pre-existence validation passes
+        developer_res = sys_db.query(Resource).filter(
             (func.lower(Resource.name) == "shakthivel") |
             (func.lower(Resource.email) == "shakthivel@ptuniv.edu.in")
         ).first()
-        if not admin_res:
-            admin_res = Resource(
+        if not developer_res:
+            developer_res = Resource(
                 name="shakthivel",
                 email="shakthivel@ptuniv.edu.in",
-                account_type="Admin"
+                account_type="Developer"
             )
-            sys_db.add(admin_res)
+            sys_db.add(developer_res)
             sys_db.commit()
 
         # Synchronize all users with their resource name so usernames always match Resources
@@ -4129,6 +4787,17 @@ app.router.lifespan_context = lifespan
 # RUN
 # ==========================================
 if __name__ == "__main__":
+    import sys
+    if "--parse-sem3-arrear" in sys.argv:
+        custom_path = None
+        for arg in sys.argv[1:]:
+            if arg != "--parse-sem3-arrear" and not arg.startswith("--"):
+                custom_path = arg
+                break
+        res = parse_and_update_sem3_arrear(custom_path)
+        print("Done:", res)
+        sys.exit(0)
+
     import uvicorn
     uvicorn.run(
         "Result:app",

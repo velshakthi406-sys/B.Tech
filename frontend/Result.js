@@ -347,6 +347,8 @@ function openStaffPortalFromHome() {
     $('nav-btn-home')?.classList.remove('active');
     $('nav-btn-student')?.classList.remove('active');
     $('nav-btn-staff')?.classList.add('active');
+
+    initLoginRoleSelector();
 }
 
 function closeStaffPortalFromHome() {
@@ -486,11 +488,57 @@ function startForgotPasswordFlow() {
     $('otp-req-email')?.focus();
 }
 
+// ── Role Selector Helpers (Management Portal Login) ──
+function selectLoginRole(role) {
+    const select = $('auth-account-type');
+    if (select) {
+        select.value = role;
+    }
+    syncLoginRolePills(role);
+    $('auth-username')?.focus();
+}
+
+function onLoginRoleDropdownChange(role) {
+    syncLoginRolePills(role);
+}
+
+function syncLoginRolePills(selectedRole) {
+    document.querySelectorAll('.role-pill-btn').forEach(btn => {
+        const isMatch = btn.getAttribute('data-role') === selectedRole;
+        btn.classList.toggle('active', isMatch);
+        btn.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+    });
+}
+
+function initLoginRoleSelector() {
+    const saved = localStorage.getItem('last_account_type');
+    if (saved) {
+        const select = $('auth-account-type');
+        if (select) {
+            select.value = saved;
+            syncLoginRolePills(saved);
+        }
+    }
+}
+
 async function handleLoginSubmit(e) {
     e.preventDefault();
     const btn = $('auth-submit-btn');
     const username = $('auth-username').value.trim();
     const password = $('auth-password').value;
+    const accountType = $('auth-account-type')?.value || '';
+
+    if (!accountType) {
+        showToast('Please select your Account Type', 'warning');
+        const pills = $('auth-role-pills');
+        if (pills) {
+            pills.classList.remove('shake');
+            void pills.offsetWidth;
+            pills.classList.add('shake');
+            setTimeout(() => pills.classList.remove('shake'), 450);
+        }
+        return;
+    }
 
     if (!username || !password) {
         showToast('Please enter both username and password', 'warning');
@@ -498,7 +546,11 @@ async function handleLoginSubmit(e) {
     }
 
     btn.classList.add('loading');
-    const formData = new URLSearchParams({ username, password });
+    const formData = new URLSearchParams({
+        username,
+        password,
+        account_type: accountType
+    });
     try {
         const res = await fetch(API_URL + '/auth/login', {
             method: 'POST',
@@ -511,6 +563,7 @@ async function handleLoginSubmit(e) {
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('role', data.role);
         localStorage.setItem('username', data.username);
+        localStorage.setItem('last_account_type', accountType);
         authToken = data.access_token;
         userRole = data.role;
         currentUsername = data.username;
@@ -737,8 +790,8 @@ function evaluateSessionState() {
         if ($('user-avatar')) $('user-avatar').innerText = (currentUsername || 'U').charAt(0).toUpperCase();
 
         const roleNormalized = (userRole || '').toLowerCase();
-        const isAdmin = roleNormalized === 'admin';
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+        const isDeveloper = roleNormalized === 'developer';
+        document.querySelectorAll('.developer-only').forEach(el => el.style.display = isDeveloper ? '' : 'none');
 
         // Apply role-based nav immediately from cached role (smooth UX)
         applyRoleBasedNavigation(userRole);
@@ -754,8 +807,8 @@ function evaluateSessionState() {
                 }
                 if ($('user-display-name')) $('user-display-name').innerText = currentUsername || 'User';
                 if ($('user-role-badge')) $('user-role-badge').innerText = (userRole || 'STAFF').toUpperCase();
-                const isRealAdmin = (userRole || '').toLowerCase() === 'admin';
-                document.querySelectorAll('.admin-only').forEach(el => el.style.display = isRealAdmin ? '' : 'none');
+                const isRealDeveloper = (userRole || '').toLowerCase() === 'developer';
+                document.querySelectorAll('.developer-only').forEach(el => el.style.display = isRealDeveloper ? '' : 'none');
                 // Re-apply nav with authoritative server role
                 applyRoleBasedNavigation(userRole);
             }
@@ -787,12 +840,12 @@ function evaluateSessionState() {
  * Rules:
  *  Faculty   → hide Upload Data, SGPA/CGPA
  *  TNP       → hide Upload Data
- *  Exam Wing → hide SGPA/CGPA; can delete batches (along with Admin)
- *  Admin     → sees everything (including direct report card generator)
+ *  Exam Wing → hide SGPA/CGPA; can delete batches (along with Developer)
+ *  Developer     → sees everything (including direct report card generator)
  */
 function applyRoleBasedNavigation(role) {
     const r = (role || '').trim().toLowerCase();
-    const isAdmin    = r === 'admin';
+    const isDeveloper    = r === 'developer';
     const isExamWing = r === 'exam wing';
     const isFaculty  = r === 'faculty';
     const isTNP      = r === 'tnp';
@@ -800,8 +853,8 @@ function applyRoleBasedNavigation(role) {
     // Views that should be hidden per role
     const hiddenViews = new Set();
     if (isFaculty)  { hiddenViews.add('upload'); hiddenViews.add('grades'); }
-    if (isTNP)      { hiddenViews.add('upload'); }
-    if (isExamWing) { hiddenViews.add('grades'); }
+    if (isTNP)      { hiddenViews.add('upload'); hiddenViews.add('classreport'); }
+    if (isExamWing) { hiddenViews.add('grades'); hiddenViews.add('classreport'); }
 
     // Show/hide nav buttons
     document.querySelectorAll('.nav-item').forEach(btn => {
@@ -813,16 +866,22 @@ function applyRoleBasedNavigation(role) {
         }
     });
 
-    // Purge-batch section: Admin + Exam Wing only
-    const purgeSection = $('admin-purge-batch-section');
+    // Purge-batch section: Developer + Exam Wing only
+    const purgeSection = $('developer-purge-batch-section');
     if (purgeSection) {
-        purgeSection.style.display = (isAdmin || isExamWing) ? '' : 'none';
+        purgeSection.style.display = (isDeveloper || isExamWing) ? '' : 'none';
     }
 
-    // Direct report card generator: Admin only
-    const rcSection = $('admin-direct-rc-section');
+    // Direct report card generator: Developer only
+    const rcSection = $('developer-direct-rc-section');
     if (rcSection) {
-        rcSection.style.display = isAdmin ? '' : 'none';
+        rcSection.style.display = isDeveloper ? '' : 'none';
+    }
+
+    // Upload Resources (Staff Directory): Developer only
+    const uploadResourcesSection = $('developer-upload-resources-section');
+    if (uploadResourcesSection) {
+        uploadResourcesSection.style.display = isDeveloper ? '' : 'none';
     }
 
     // If currently on a hidden view, redirect to resources
@@ -848,6 +907,7 @@ function switchView(view) {
         students: 'Student Management',
         subjects: 'Subject Master',
         grades: 'SGPA / CGPA Summary',
+        classreport: 'Class Report',
         resources: 'Resources Management'
     };
     if ($('module-title')) {
@@ -859,7 +919,10 @@ function switchView(view) {
         populateBatchDropdown();
     }
     if (view === 'resources') loadResources();
-    if (view === 'results') loadResults();
+    if (view === 'results') {
+        buildResultsBatchTabs();
+        loadResults();
+    }
     if (view === 'students') loadStudents();
     if (view === 'subjects') {
         if (allSubjectsCache.length) {
@@ -873,9 +936,16 @@ function switchView(view) {
         loadGrades();
         populateGradeBatchDropdown();
     }
+    if (view === 'classreport') {
+        loadClassReport();
+        populateClassReportBatchDropdown();
+    }
     if (view === 'upload') {
         initUploadDropzones();
         populateBatchDropdown();
+    }
+    if (view === 'dashboard') {
+        initUploadDropzones();  // re-bind developer resources dropzone that was hidden at init
     }
 }
 
@@ -1161,6 +1231,53 @@ async function handleUploadReevaluation(e) {
     }
 }
 
+async function handleUploadResources(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = $('developer-upload-resources-btn') || form.querySelector('button[type="submit"]');
+    const formData = new FormData(form);
+
+    // Show result inside the Developer Dashboard card, not in the Upload Data view
+    const msgDiv = $('developer-upload-resources-msg');
+    if (msgDiv) {
+        msgDiv.style.display = '';
+        msgDiv.innerHTML = '<span class="text-muted">⏳ Processing resources Excel…</span>';
+    }
+
+    btn?.classList.add('loading');
+    try {
+        const res = await fetch(API_URL + '/upload/resources', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+            body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Resources upload failed');
+        if (msgDiv) {
+            msgDiv.style.display = '';
+            msgDiv.innerHTML = `
+                <div style="padding:12px 14px; background:var(--teal-glass); border-radius:var(--r-md); border:1px solid var(--teal); font-size:0.85rem; margin-top:10px;">
+                    <strong>✅ Resources processed!</strong><br>
+                    <span>Added: <strong>${data.students_added ?? 0}</strong> &nbsp;|&nbsp; Updated: <strong>${data.results_added ?? 0}</strong></span>
+                    ${data.errors && data.errors.length ? `<br><span style="color:var(--danger); margin-top:4px; display:block;">⚠️ Errors: ${data.errors.map(escapeHtml).join('; ')}</span>` : ''}
+                </div>
+            `;
+        }
+        showToast('Resources uploaded successfully', 'success');
+        resetUploadForm(form);
+        loadDashboardStats();
+        loadResources();
+    } catch (err) {
+        if (msgDiv) {
+            msgDiv.style.display = '';
+            msgDiv.innerHTML = `<div style="padding:12px 14px; background:var(--danger-light); color:var(--danger); border-radius:var(--r-md); font-size:0.85rem; margin-top:10px;">❌ ${escapeHtml(err.message)}</div>`;
+        }
+        showToast(err.message, 'error');
+    } finally {
+        btn?.classList.remove('loading');
+    }
+}
+
 // ─── 12. View Results ─────────────────────────────────────────
 async function buildResultsBatchTabs() {
     const container = $('results-batch-tabs-container');
@@ -1193,15 +1310,26 @@ function selectResultsBatchTab(batch) {
     loadResults();
 }
 
+let resultsAbortController = null;
+let currentResultsRequestId = 0;
+
 async function loadResults() {
     const tbody = $('results-tbody');
     if (!tbody) return;
+
+    if (resultsAbortController) {
+        try { resultsAbortController.abort(); } catch (_) {}
+    }
+    resultsAbortController = new AbortController();
+    const thisRequestId = ++currentResultsRequestId;
+
     tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">Loading results…</td></tr>';
 
     try {
         const dept = $('filter-department')?.value || '';
         const sem  = $('filter-semester')?.value || '';
         const subCode = $('filter-subject-code')?.value?.trim() || '';
+        const regNo = $('filter-reg-no')?.value?.trim() || '';
 
         let url = '/results?';
         if (currentResultsBatchFilter && currentResultsBatchFilter !== 'All') {
@@ -1210,14 +1338,23 @@ async function loadResults() {
         if (dept) url += `department=${encodeURIComponent(dept)}&`;
         if (sem)  url += `semester=${encodeURIComponent(sem)}&`;
         if (subCode) url += `subject_code=${encodeURIComponent(subCode)}&`;
+        if (regNo) url += `reg_no=${encodeURIComponent(regNo)}&`;
 
-        const data = await authFetch(url);
+        const data = await authFetch(url, { signal: resultsAbortController.signal });
+        if (thisRequestId !== currentResultsRequestId) return;
+
         allResultsCache = data || [];
 
-        // Build/update batch tabs
-        buildResultsBatchTabs();
+        // Build batch tabs only if not yet built
+        if (!resultsAvailableBatches || !resultsAvailableBatches.length) {
+            buildResultsBatchTabs();
+        }
         renderResultsTable();
     } catch (err) {
+        if (err.name === 'AbortError' || err.message?.toLowerCase().includes('abort')) {
+            return;
+        }
+        if (thisRequestId !== currentResultsRequestId) return;
         tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
         const countEl = $('results-showing-count');
         const fCountEl = $('results-f-showing-count');
@@ -1306,7 +1443,7 @@ function renderResultsTable() {
                 <td>
                     <div class="table-actions">
                         <button class="action-btn edit" onclick="editResult(${r.id}, '${escapeHtml(r.batch || '')}')" title="Modify Grade">✏️</button>
-                        <button class="action-btn delete admin-only" onclick="deleteResult(${r.id}, '${escapeHtml(r.batch || '')}')" title="Delete Result">🗑️</button>
+                        <button class="action-btn delete developer-only" onclick="deleteResult(${r.id}, '${escapeHtml(r.batch || '')}')" title="Delete Result">🗑️</button>
                     </div>
                 </td>
             </tr>
@@ -1314,8 +1451,8 @@ function renderResultsTable() {
     });
     tbody.innerHTML = html;
 
-    const isAdmin = (userRole || '').toLowerCase() === 'admin';
-    document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    const isDeveloper = (userRole || '').toLowerCase() === 'developer';
+    document.querySelectorAll('.developer-only').forEach(el => el.style.display = isDeveloper ? '' : 'none');
 }
 
 function prevResultsPage() {
@@ -1343,12 +1480,42 @@ function changeResultsPageSize(val) {
 }
 
 let filterDebounceTimer = null;
-function applyFilters() {
+function applyFilters(immediate = false) {
     if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    if (immediate) {
+        resultsCurrentPage = 1;
+        loadResults();
+        return;
+    }
     filterDebounceTimer = setTimeout(() => {
         resultsCurrentPage = 1;
         loadResults();
-    }, 250);
+    }, 200);
+}
+
+function clearResultsFilters() {
+    const btn = $('btn-results-reset');
+    if (btn) {
+        btn.classList.add('is-resetting');
+        setTimeout(() => btn.classList.remove('is-resetting'), 550);
+    }
+    currentResultsBatchFilter = 'All';
+    const container = $('results-batch-tabs-container');
+    if (container) {
+        container.querySelectorAll('.dept-tab').forEach(tab => {
+            if (tab.textContent.trim().toLowerCase().includes('all')) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+    }
+    buildResultsBatchTabs();
+    if ($('filter-department')) $('filter-department').value = '';
+    if ($('filter-semester')) $('filter-semester').value = '';
+    if ($('filter-subject-code')) $('filter-subject-code').value = '';
+    if ($('filter-reg-no')) $('filter-reg-no').value = '';
+    applyFilters(true);
 }
 
 function editResult(id, batch) {
@@ -1590,15 +1757,15 @@ function renderStudents() {
             <td>
                 <div class="table-actions">
                     <button class="action-btn edit" onclick="editStudent('${escapeHtml(s.reg_no)}')" title="Edit Student">✏️</button>
-                    <button class="action-btn delete admin-only" onclick="deleteStudent('${escapeHtml(s.reg_no)}')" title="Delete Student">🗑️</button>
+                    <button class="action-btn delete developer-only" onclick="deleteStudent('${escapeHtml(s.reg_no)}')" title="Delete Student">🗑️</button>
                 </div>
             </td>
         </tr>
     `).join('');
     tbody.innerHTML = html;
 
-    const isAdmin = (userRole || '').toLowerCase() === 'admin';
-    document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    const isDeveloper = (userRole || '').toLowerCase() === 'developer';
+    document.querySelectorAll('.developer-only').forEach(el => el.style.display = isDeveloper ? '' : 'none');
 }
 
 async function loadStudents() {
@@ -1798,15 +1965,15 @@ function renderSubjects() {
             <td>
                 <div class="table-actions">
                     <button class="action-btn edit" onclick="editSubject(${s.id})" title="Edit Subject">✏️</button>
-                    <button class="action-btn delete admin-only" onclick="deleteSubject(${s.id})" title="Delete Subject">🗑️</button>
+                    <button class="action-btn delete developer-only" onclick="deleteSubject(${s.id})" title="Delete Subject">🗑️</button>
                 </div>
             </td>
         </tr>
     `).join('');
     tbody.innerHTML = html;
 
-    const isAdmin = (userRole || '').toLowerCase() === 'admin';
-    document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    const isDeveloper = (userRole || '').toLowerCase() === 'developer';
+    document.querySelectorAll('.developer-only').forEach(el => el.style.display = isDeveloper ? '' : 'none');
 }
 
 async function loadSubjects(dept = 'All') {
@@ -2032,6 +2199,178 @@ async function loadGrades() {
         tbody.innerHTML = html;
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+// ─── 15b. Class Report ─────────────────────────────────────────
+let currentCrArrearFilter = ['all'];
+let allClassReportCache = [];
+
+async function populateClassReportBatchDropdown() {
+    const select = $('cr-filter-batch');
+    if (!select) return;
+    try {
+        const batches = await authFetch('/students/batches');
+        select.innerHTML = '<option value="">All</option>' + batches.map(b => `<option value="${b}">${b}</option>`).join('');
+    } catch (e) {
+        console.warn('Could not load batches for class report filter:', e);
+    }
+}
+
+function toggleCrArrearDropdown(event) {
+    if (event) event.stopPropagation();
+    const menu = $('cr-filter-arrears-menu');
+    if (menu) menu.classList.toggle('hidden');
+}
+
+function onCrArrearAllToggle(el) {
+    document.querySelectorAll('.cr-arrear-opt').forEach(cb => cb.checked = false);
+    currentCrArrearFilter = ['all'];
+    updateCrArrearButtonLabel();
+    loadClassReport();
+}
+
+function onCrArrearOptionToggle(el) {
+    const allCb = $('cr-arrear-opt-all');
+    const checkedOpts = Array.from(document.querySelectorAll('.cr-arrear-opt:checked')).map(cb => cb.value);
+    if (checkedOpts.length === 0) {
+        if (allCb) allCb.checked = true;
+        currentCrArrearFilter = ['all'];
+    } else {
+        if (allCb) allCb.checked = false;
+        currentCrArrearFilter = checkedOpts;
+    }
+    updateCrArrearButtonLabel();
+    loadClassReport();
+}
+
+function updateCrArrearButtonLabel() {
+    const label = $('cr-filter-arrears-label');
+    if (!label) return;
+    if (currentCrArrearFilter.includes('all') || currentCrArrearFilter.length === 0) {
+        label.innerText = 'ALL';
+    } else {
+        label.innerText = currentCrArrearFilter.join(', ') + ' Arr';
+    }
+}
+
+// Close cr arrear menu when clicking outside
+document.addEventListener('click', (e) => {
+    const wrap = $('cr-filter-arrears-wrap');
+    const menu = $('cr-filter-arrears-menu');
+    if (wrap && menu && !wrap.contains(e.target)) {
+        menu.classList.add('hidden');
+    }
+});
+
+async function loadClassReport() {
+    const tbody = $('classreport-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">Loading Class Report\u2026</td></tr>';
+
+    try {
+        const dept  = $('cr-filter-dept')?.value || '';
+        const batch = $('cr-filter-batch')?.value || '';
+        const creditsSort = $('cr-filter-credits-sort')?.value || 'none';
+
+        let url = '/grades/summary?';
+        if (dept)  url += `department=${encodeURIComponent(dept)}&`;
+        if (batch) url += `batch=${encodeURIComponent(batch)}&`;
+        currentCrArrearFilter.forEach(a => { url += `arrears=${encodeURIComponent(a)}&`; });
+
+        const data = await authFetch(url);
+
+        // Sort by Total Credits
+        if (creditsSort === 'asc') {
+            data.sort((a, b) => (Number(a.total_credits) || 0) - (Number(b.total_credits) || 0));
+        } else if (creditsSort === 'desc') {
+            data.sort((a, b) => (Number(b.total_credits) || 0) - (Number(a.total_credits) || 0));
+        }
+
+        allClassReportCache = data;
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">No students match current criteria.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map((g, idx) => {
+            const arrCount = g.arrear_count || 0;
+            const arrClass = arrCount === 0 ? 'arrear-0' : (arrCount === 1 ? 'arrear-1' : (arrCount === 2 ? 'arrear-2' : 'arrear-3'));
+            const arrText  = arrCount === 0 ? '0 Arrears' : `${arrCount} Arrear${arrCount > 1 ? 's' : ''}`;
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td><strong>${escapeHtml(g.reg_no)}</strong></td>
+                    <td>${escapeHtml(g.name)}</td>
+                    <td>${escapeHtml(g.department)}</td>
+                    <td>${g.total_credits}</td>
+                    <td>${g.earned_credits}</td>
+                    <td>
+                        <span class="arrear-badge ${arrClass}">
+                            <span class="arrear-dot"></span> ${arrText}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function exportClassReportToExcel() {
+    if (!allClassReportCache || !allClassReportCache.length) {
+        showToast('No data to export', 'warning');
+        return;
+    }
+
+    try {
+        const deptVal   = $('cr-filter-dept')?.value || '';
+        const batchVal  = $('cr-filter-batch')?.value || '';
+        const deptNames = {
+            'CE':'Civil Engineering (CE)','CHE':'Chemical Engineering (CHE)',
+            'CSE':'Computer Science & Engineering (CSE)','ECE':'Electronics & Communication Engineering (ECE)',
+            'EEE':'Electrical & Electronics Engineering (EEE)','EIE':'Electronics & Instrumentation Engineering (EIE)',
+            'IT':'Information Technology (IT)','ME':'Mechanical Engineering (ME)','MT':'Mechatronics Engineering (MT)'
+        };
+        const deptDisplay  = deptNames[deptVal] || (deptVal ? deptVal : 'All Departments');
+        const batchDisplay = (batchVal && batchVal.toLowerCase() !== 'all') ? batchVal : 'All Batches';
+        let arrearDisplay  = 'All Students';
+        if (!currentCrArrearFilter.includes('all') && currentCrArrearFilter.length > 0) {
+            arrearDisplay = currentCrArrearFilter.map(v => v === '0' ? 'No Arrears' : `${v} Arrear(s)`).join(', ');
+        }
+
+        const wb = XLSX.utils.book_new();
+        const wsData = [];
+
+        wsData.push(['PUDUCHERRY TECHNOLOGICAL UNIVERSITY']);
+        wsData.push(['CLASS REPORT']);
+        wsData.push([]);
+        wsData.push(['Department:', deptDisplay, '', 'Batch:', batchDisplay, '', 'Arrear Filter:', arrearDisplay]);
+        wsData.push([]);
+        wsData.push(['#', 'Register No', 'Student Name', 'Department', 'Total Credits', 'Earned Credits', 'Arrear Status']);
+
+        allClassReportCache.forEach((g, idx) => {
+            const arrCount = g.arrear_count || 0;
+            const arrText  = arrCount === 0 ? 'No Arrears' : `${arrCount} Arrear${arrCount > 1 ? 's' : ''}`;
+            wsData.push([idx + 1, g.reg_no, g.name, g.department, g.total_credits, g.earned_credits, arrText]);
+        });
+
+        wsData.push([]);
+        wsData.push([`Total Students: ${allClassReportCache.length}`]);
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws['!cols'] = [{wch:5},{wch:16},{wch:30},{wch:14},{wch:14},{wch:15},{wch:16}];
+        XLSX.utils.book_append_sheet(wb, ws, 'Class_Report');
+
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const fileDept  = deptVal  || 'All';
+        const fileBatch = batchVal || 'All';
+        XLSX.writeFile(wb, `PTU_Class_Report_${fileDept}_${fileBatch}_${today}.xlsx`);
+        showToast('Class Report exported!', 'success');
+    } catch (err) {
+        showToast('Export failed: ' + err.message, 'error');
     }
 }
 
@@ -2867,11 +3206,11 @@ function exportReportCardPDF() {
 // [TESTING ONLY] DIRECT REPORT CARD GENERATOR (START)
 // To remove: delete this entire block.
 // ============================================================
-async function handleAdminDirectReportCard(event) {
+async function handleDeveloperDirectReportCard(event) {
     if (event && event.preventDefault) event.preventDefault();
-    const btn = $('admin-rc-btn');
-    const msgEl = $('admin-rc-msg');
-    const regNoInput = $('admin-rc-regno');
+    const btn = $('developer-rc-btn');
+    const msgEl = $('developer-rc-msg');
+    const regNoInput = $('developer-rc-regno');
     const regNo = regNoInput?.value?.trim();
 
     if (msgEl) {
@@ -2888,13 +3227,13 @@ async function handleAdminDirectReportCard(event) {
 
     btn?.classList.add('loading');
     try {
-        const rcData = await authFetch(`/admin/report-card/${encodeURIComponent(regNo)}`);
+        const rcData = await authFetch(`/developer/report-card/${encodeURIComponent(regNo)}`);
         
-        // Render into the admin report card container
-        renderReportCard(rcData, 'admin-report-card-paper');
+        // Render into the developer report card container
+        renderReportCard(rcData, 'developer-report-card-paper');
         
-        // Open the admin report card modal
-        const modal = $('admin-rc-modal');
+        // Open the developer report card modal
+        const modal = $('developer-rc-modal');
         if (modal) {
             modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
@@ -2913,15 +3252,15 @@ async function handleAdminDirectReportCard(event) {
     }
 }
 
-function closeAdminRcModal() {
-    const modal = $('admin-rc-modal');
+function closeDeveloperRcModal() {
+    const modal = $('developer-rc-modal');
     if (modal) {
         modal.classList.add('hidden');
         document.body.style.overflow = '';
     }
 }
 
-function exportAdminReportCardPDF() {
+function exportDeveloperReportCardPDF() {
     exportReportCardPDF();
 }
 // ============================================================
@@ -2929,7 +3268,7 @@ function exportAdminReportCardPDF() {
 // ============================================================
 
 // ============================================================
-// RESOURCES MANAGEMENT (Admin Personnel Directory)
+// RESOURCES MANAGEMENT (Developer Personnel Directory)
 // ============================================================
 let allResourcesCache = [];
 
@@ -2956,7 +3295,7 @@ function renderResourcesTable(resources) {
         return;
     }
 
-    const isAdmin = (userRole || '').toLowerCase() === 'admin';
+    const isDeveloper = (userRole || '').toLowerCase() === 'developer';
 
     tbody.innerHTML = resources.map((r, idx) => {
         const accType = r.account_type || 'Faculty';
@@ -2965,7 +3304,7 @@ function renderResourcesTable(resources) {
             ? '<span class="badge badge-active" title="Registered User Account Active">✓ Registered</span>'
             : '<span class="badge badge-pending" title="Pre-registered. Waiting for user signup.">⏳ Pending Signup</span>';
 
-        const actions = isAdmin ? `
+        const actions = isDeveloper ? `
             <div class="table-actions" style="justify-content:center;">
               <button class="action-btn edit" onclick="editResource(${r.id})" title="Edit Resource">✏️</button>
               <button class="action-btn delete" onclick="deleteResource(${r.id}, '${escapeHtml(r.name)}')" title="Delete Resource">🗑️</button>
@@ -2979,15 +3318,15 @@ function renderResourcesTable(resources) {
               <td><code>${escapeHtml(r.email)}</code></td>
               <td><span class="badge ${typeClass}">${escapeHtml(accType)}</span></td>
               <td>${statusBadge}</td>
-              <td class="admin-only" style="text-align:center;">${actions}</td>
+              <td class="developer-only" style="text-align:center;">${actions}</td>
             </tr>
         `;
     }).join('');
 
     updateResourcesCount(resources.length, allResourcesCache.length);
 
-    // Sync admin-only visibility
-    document.querySelectorAll('#resources-table .admin-only').forEach(el => el.style.display = isAdmin ? '' : 'none');
+    // Sync developer-only visibility
+    document.querySelectorAll('#resources-table .developer-only').forEach(el => el.style.display = isDeveloper ? '' : 'none');
 }
 
 function updateResourcesCount(showing, total) {
@@ -3027,31 +3366,31 @@ async function populateAccountTypeOptions(isEdit = false, editingResource = null
     } catch (_) {}
 
     if (!allowed.length) {
-        if (currentRole.toLowerCase() === 'admin') {
-            allowed = ['Admin', 'TNP', 'Faculty', 'Exam Wing'];
+        if (currentRole.toLowerCase() === 'developer') {
+            allowed = ['Developer', 'TNP', 'Faculty', 'Exam Wing'];
         } else if (currentRole) {
             allowed = [currentRole];
         } else {
-            allowed = ['Admin', 'TNP', 'Faculty', 'Exam Wing'];
+            allowed = ['Developer', 'TNP', 'Faculty', 'Exam Wing'];
         }
     }
 
-    const isAdmin = (userRole || '').toLowerCase() === 'admin' || allowed.includes('Admin');
+    const isDeveloper = (userRole || '').toLowerCase() === 'developer' || allowed.includes('Developer');
 
     select.innerHTML = '';
     if (isEdit && editingResource) {
-        // "1) An admin can only create new accounts and cannot change his/her account type to anything else,
-        //     so remove admin choice in the change account type."
+        // "1) An developer can only create new accounts and cannot change his/her account type to anything else,
+        //     so remove developer choice in the change account type."
         const isEditingSelf = (editingResource.name && editingResource.name.toLowerCase() === (currentUsername || '').toLowerCase()) ||
                               (editingResource.email && editingResource.email.toLowerCase() === (currentUsername || '').toLowerCase()) ||
-                              (editingResource.account_type === 'Admin');
+                              (editingResource.account_type === 'Developer');
 
-        if (isEditingSelf && isAdmin) {
-            // Admin cannot change own account type
-            select.innerHTML = `<option value="Admin" selected>Admin (Locked)</option>`;
+        if (isEditingSelf && isDeveloper) {
+            // Developer cannot change own account type
+            select.innerHTML = `<option value="Developer" selected>Developer (Locked)</option>`;
             select.disabled = true;
         } else {
-            // "remove admin choice in the change account type"
+            // "remove developer choice in the change account type"
             select.disabled = false;
             const changeTypes = ['TNP', 'Faculty', 'Exam Wing'];
             select.innerHTML = changeTypes.map(t =>
@@ -3061,11 +3400,11 @@ async function populateAccountTypeOptions(isEdit = false, editingResource = null
     } else {
         // Create mode
         select.disabled = false;
-        if (isAdmin) {
-            // Admin can create accounts of all types
+        if (isDeveloper) {
+            // Developer can create accounts of all types
             select.innerHTML = `
                 <option value="" disabled selected>— Select Account Type —</option>
-                <option value="Admin">Admin</option>
+                <option value="Developer">Developer</option>
                 <option value="TNP">TNP</option>
                 <option value="Faculty">Faculty</option>
                 <option value="Exam Wing">Exam Wing</option>
@@ -3105,7 +3444,7 @@ async function handleResourceSubmit(e) {
     const id = $('resource-edit-id').value;
     const name = $('resource-name').value.trim();
     const email = $('resource-email').value.trim();
-    const account_type = $('resource-account-type').value || (id ? 'Admin' : '');
+    const account_type = $('resource-account-type').value || (id ? 'Developer' : '');
 
     if (!name || !email || !account_type) {
         showToast('Please fill in Name, Email address, and Account type', 'warning');
@@ -3176,6 +3515,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initParticleCanvas();
     loadPublicStats();
     evaluateSessionState();
+    initLoginRoleSelector();
+
+    // Results filters enter key immediate trigger
+    $('filter-subject-code')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applyFilters(true);
+        }
+    });
+    $('filter-reg-no')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applyFilters(true);
+        }
+    });
 
     // Bind OTP step listeners
     $('rc-lookup-btn')?.addEventListener('click', handleReportCardLookup);
@@ -3250,9 +3604,9 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             toggleTheme();
         }
-        // [TESTING ONLY] Escape closes admin report card modal
+        // [TESTING ONLY] Escape closes developer report card modal
         if (e.key === 'Escape') {
-            closeAdminRcModal();
+            closeDeveloperRcModal();
         }
     });
 });

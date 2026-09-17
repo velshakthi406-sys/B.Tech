@@ -241,7 +241,7 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
           </div>
           <div class="portal-card-title portal-title">Management Portal</div>
-          <div class="portal-card-desc portal-desc">Manage students, upload results, and administer grades seamlessly.</div>
+          <div class="portal-card-desc portal-desc">Manage students, upload results, and developerister grades seamlessly.</div>
           <div class="portal-card-arrow portal-arrow">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </div>
@@ -289,10 +289,32 @@
       <div id="auth-step-login">
         <form id="auth-form" onsubmit="handleLoginSubmit(event)" autocomplete="off" novalidate>
           <div class="form-group">
+            <label>Account Type</label>
+            <div class="role-pill-selector" id="auth-role-pills" role="radiogroup" aria-label="Select Account Type">
+              <button type="button" class="role-pill-btn" data-role="Developer" onclick="selectLoginRole('Developer')" aria-pressed="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <span>Developer</span>
+              </button>
+              <button type="button" class="role-pill-btn" data-role="Faculty" onclick="selectLoginRole('Faculty')" aria-pressed="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                <span>Faculty</span>
+              </button>
+              <button type="button" class="role-pill-btn" data-role="TNP" onclick="selectLoginRole('TNP')" aria-pressed="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                <span>TNP</span>
+              </button>
+              <button type="button" class="role-pill-btn" data-role="Exam Wing" onclick="selectLoginRole('Exam Wing')" aria-pressed="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span>Exam Wing</span>
+              </button>
+            </div>
+            <input type="hidden" id="auth-account-type" value="" />
+          </div>
+          <div class="form-group">
             <label for="auth-username">Username / Email</label>
             <div style="position:relative;">
               <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-              <input type="text" id="auth-username" required placeholder="admin or email" autocomplete="username" class="has-icon" />
+              <input type="text" id="auth-username" required placeholder="developer or email" autocomplete="username" class="has-icon" />
             </div>
           </div>
           <div class="form-group">
@@ -645,6 +667,12 @@
           </span>
           <span class="label">SGPA / CGPA</span>
         </button>
+        <button class="nav-item nav-classreport" onclick="switchView('classreport')" aria-label="Class Report">
+          <span class="nav-item-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+          </span>
+          <span class="label">Class Report</span>
+        </button>
       </nav>
 
       <!-- User Profile -->
@@ -762,7 +790,7 @@
           <!-- ============================================================
                BATCH LIFECYCLE & PURGE GRADUATED BATCH DATA
                ============================================================ -->
-          <div class="panel-section purge-batch-card" id="admin-purge-batch-section" style="display:none;">
+          <div class="panel-section purge-batch-card" id="developer-purge-batch-section" style="display:none;">
             <div class="purge-batch-header">
               <div class="purge-batch-title-wrap">
                 <span class="purge-batch-icon">🗑️</span>
@@ -771,9 +799,9 @@
                   <p class="purge-batch-desc">Permanently delete all student rosters and exam results for a graduated batch.</p>
                 </div>
               </div>
-              <span class="badge-danger">Admin / Exam Wing</span>
+              <span class="badge-danger">Developer / Exam Wing</span>
             </div>
-            <form id="admin-purge-batch-form" onsubmit="handlePurgeBatchSubmit(event)" class="purge-batch-form">
+            <form id="developer-purge-batch-form" onsubmit="handlePurgeBatchSubmit(event)" class="purge-batch-form">
               <div class="purge-batch-input-group">
                 <select id="dashboard-purge-batch-select" required>
                   <option value="">Select graduated batch to delete…</option>
@@ -788,9 +816,9 @@
           </div>
 
           <!-- ============================================================
-               GENERATE STUDENT REPORT CARD (Admin Only)
+               GENERATE STUDENT REPORT CARD (Developer Only)
                ============================================================ -->
-          <div class="panel-section testing-report-card-card" id="admin-direct-rc-section" style="display:none;">
+          <div class="panel-section testing-report-card-card" id="developer-direct-rc-section" style="display:none;">
             <div class="testing-rc-header">
               <div class="testing-rc-title-wrap">
                 <span class="testing-rc-icon">🎓</span>
@@ -799,20 +827,52 @@
                   <p class="testing-rc-desc">Direct student transcript lookup without OTP verification.</p>
                 </div>
               </div>
-              <span class="badge-testing">Admin Only · No OTP</span>
+              <span class="badge-testing">Developer Only · No OTP</span>
             </div>
-            <form id="admin-direct-rc-form" onsubmit="handleAdminDirectReportCard(event)" class="testing-rc-form">
+            <form id="developer-direct-rc-form" onsubmit="handleDeveloperDirectReportCard(event)" class="testing-rc-form">
               <div class="testing-rc-input-group">
                 <span class="input-icon">🆔</span>
-                <input type="text" id="admin-rc-regno" class="has-icon" placeholder="Enter student Reg No (e.g. 2301104045)" required autocomplete="off" />
+                <input type="text" id="developer-rc-regno" class="has-icon" placeholder="Enter student Reg No (e.g. 2301104045)" required autocomplete="off" />
               </div>
-              <button type="submit" id="admin-rc-btn" class="btn-primary testing-rc-btn">
+              <button type="submit" id="developer-rc-btn" class="btn-primary testing-rc-btn">
                 <span class="btn-spinner"></span>
                 <span class="btn-label">Generate Report Card</span>
               </button>
             </form>
-            <div id="admin-rc-msg" class="testing-rc-msg" style="display:none;"></div>
+            <div id="developer-rc-msg" class="testing-rc-msg" style="display:none;"></div>
           </div>
+
+          <!-- ============================================================
+               UPLOAD RESOURCES (STAFF DIRECTORY) - Developer Only
+               ============================================================ -->
+          <div class="panel-section testing-report-card-card" id="developer-upload-resources-section" style="display:none;">
+            <div class="testing-rc-header">
+              <div class="testing-rc-title-wrap">
+                <span class="testing-rc-icon">📤</span>
+                <div>
+                  <h4 class="testing-rc-title">Upload Resources (Staff Directory)</h4>
+                  <p class="testing-rc-desc">Bulk upload staff directory from Excel (.xlsx/.xls) with Name, Email, and Account Type.</p>
+                </div>
+              </div>
+              <span class="badge-testing">Developer Only</span>
+            </div>
+            <form id="developer-upload-resources-form" onsubmit="handleUploadResources(event)" enctype="multipart/form-data" class="testing-rc-form">
+              <label class="file-dropzone" for="developer-resources-file-input" tabindex="0">
+                <input type="file" id="developer-resources-file-input" name="file" accept=".xlsx,.xls" required />
+                <div class="file-dropzone-body">
+                  <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14a2 2 0 0 0 2-2v-4H3v4a2 2 0 0 0 2 2z"/></svg>
+                  <span class="file-dropzone-text">Drag & drop, or <em>browse</em></span>
+                  <span class="file-dropzone-filename"></span>
+                </div>
+              </label>
+              <button type="submit" id="developer-upload-resources-btn" class="btn-primary testing-rc-btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-label">Upload Resources</span>
+              </button>
+            </form>
+            <div id="developer-upload-resources-msg" class="testing-rc-msg" style="display:none;"></div>
+          </div>
+
         </div>
 
         <!-- ╔═══════════════════════════════╗ -->
@@ -1028,6 +1088,20 @@
             <div class="form-group">
               <label for="filter-subject-code">Subject Code</label>
               <input type="text" id="filter-subject-code" placeholder="e.g. MAUC101" oninput="applyFilters()" />
+            </div>
+            <div class="form-group">
+              <label for="filter-reg-no">Reg No</label>
+              <input type="text" id="filter-reg-no" placeholder="e.g. 2401112050" oninput="applyFilters()" />
+            </div>
+            <div class="form-group filter-action-group">
+              <label class="filter-action-label" aria-hidden="true">&nbsp;</label>
+              <button id="btn-results-reset" class="btn-filter-reset" type="button" onclick="clearResultsFilters()" title="Reset all filters" aria-label="Reset all filters">
+                <svg class="reset-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                </svg>
+                <span>Reset</span>
+              </button>
             </div>
           </div>
 
@@ -1356,6 +1430,98 @@
         </div>
 
         <!-- ╔═══════════════════════════════╗ -->
+        <!-- ║  VIEW: CLASS REPORT           ║ -->
+        <!-- ╚═══════════════════════════════╝ -->
+        <div id="view-classreport" class="panel hidden" role="region" aria-label="Class Report">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon" style="background:var(--teal-glass,rgba(20,184,166,.15));color:var(--teal,#14b8a6);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+              </span>
+              Class Report
+            </h3>
+            <button class="btn-export" onclick="exportClassReportToExcel()" style="font-size:0.80rem; padding:7px 14px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Export Excel
+            </button>
+          </div>
+
+          <!-- Filters -->
+          <div class="filter-row grades-filter-row" role="search" aria-label="Filter class report">
+            <div class="form-group">
+              <label for="cr-filter-batch">Batch</label>
+              <select class="compact-select" id="cr-filter-batch" onchange="loadClassReport()">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="cr-filter-dept">Department</label>
+              <select class="compact-select" id="cr-filter-dept" onchange="loadClassReport()">
+                <option value="">All</option>
+                <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
+                <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
+                <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="cr-filter-credits-sort">Sort by Total Credits</label>
+              <select class="compact-select" id="cr-filter-credits-sort" onchange="loadClassReport()">
+                <option value="none">None</option>
+                <option value="asc">↑ Ascending</option>
+                <option value="desc">↓ Descending</option>
+              </select>
+            </div>
+            <!-- Arrear multi-select -->
+            <div class="form-group">
+              <label>Arrear Status</label>
+              <div class="multi-select" id="cr-filter-arrears-wrap">
+                <button type="button" class="multi-select-btn compact-select" id="cr-filter-arrears-btn" onclick="toggleCrArrearDropdown(event)">
+                  <span id="cr-filter-arrears-label">ALL</span>
+                  <span class="multi-select-caret">▾</span>
+                </button>
+                <div class="multi-select-menu hidden" id="cr-filter-arrears-menu">
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="all" id="cr-arrear-opt-all" checked onchange="onCrArrearAllToggle(this)" /> ALL
+                  </label>
+                  <div class="multi-select-divider"></div>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="0" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                    <span class="arrear-dot-0"></span> No Arrears
+                  </label>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="1" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                    <span class="arrear-dot-1"></span> 1 Arrear
+                  </label>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="2" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                    <span class="arrear-dot-2"></span> 2 Arrears
+                  </label>
+                  <label class="multi-select-option">
+                    <input type="checkbox" value="3+" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                    <span class="arrear-dot-3"></span> 3+ Arrears
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Class Report Table -->
+          <div id="classreport-table-container" class="table-scroll-region">
+            <table class="data-table" id="classreport-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Reg No</th><th>Name</th><th>Department</th>
+                  <th>Total Credits</th><th>Earned Credits</th><th>Arrear Status</th>
+                </tr>
+              </thead>
+              <tbody id="classreport-tbody">
+                <tr><td colspan="7" class="loading-cell">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ╔═══════════════════════════════╗ -->
         <!-- ║  VIEW: RESOURCES              ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-resources" class="panel" role="region" aria-label="Resources management">
@@ -1381,7 +1547,7 @@
               <div class="form-group" style="margin:0; min-width:180px;">
                 <select class="compact-select" id="resources-type-filter" onchange="filterResourcesSearch()">
                   <option value="">All Account Types</option>
-                  <option value="Admin">Admin</option>
+                  <option value="Developer">Developer</option>
                   <option value="TNP">TNP</option>
                   <option value="Faculty">Faculty</option>
                   <option value="Exam Wing">Exam Wing</option>
@@ -1407,7 +1573,7 @@
                   <input type="email" id="resource-email" placeholder="Email Address (e.g. ramesh@ptuniv.edu.in)" required style="flex:2; min-width:220px;" />
                   <select id="resource-account-type" required class="compact-select" style="flex:1.2; min-width:140px;">
                     <option value="" disabled selected>— Select Account Type —</option>
-                    <option value="Admin">Admin</option>
+                    <option value="Developer">Developer</option>
                     <option value="TNP">TNP</option>
                     <option value="Faculty">Faculty</option>
                     <option value="Exam Wing">Exam Wing</option>
@@ -1432,7 +1598,7 @@
                     <th>Email Address</th>
                     <th>Account Type</th>
                     <th>Portal Status</th>
-                    <th class="admin-only" style="width:120px; text-align:center;">Actions</th>
+                    <th class="developer-only" style="width:120px; text-align:center;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="resources-tbody">
@@ -1449,29 +1615,31 @@
   </div><!-- /#dashboard-section -->
 
   <!-- ============================================================
-       [TESTING ONLY] ADMIN REPORT CARD MODAL (START)
+       [TESTING ONLY] DEVELOPER REPORT CARD MODAL (START)
        To remove: delete this modal container.
        ============================================================ -->
-  <div id="admin-rc-modal" class="admin-modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Student Report Card Transcript" onclick="if(event.target===this) closeAdminRcModal()">
-    <div class="admin-modal-content report-card-doc">
+  <div id="developer-rc-modal" class="developer-modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Student Report Card Transcript" onclick="if(event.target===this) closeDeveloperRcModal()">
+    <div class="developer-modal-content report-card-doc">
       <div class="report-card-actions no-print">
-        <button type="button" class="btn-secondary" onclick="closeAdminRcModal()">
+        <button type="button" class="btn-secondary" onclick="closeDeveloperRcModal()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 12H5M12 5l-7 7 7 7"/></svg>
           Back to Dashboard
         </button>
-        <button type="button" class="btn-primary" onclick="exportAdminReportCardPDF()">
+        <button type="button" class="btn-primary" onclick="exportDeveloperReportCardPDF()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print / Save as PDF
         </button>
       </div>
-      <div class="report-card-paper" id="admin-report-card-paper">
-        <!-- populated by renderReportCard(data, 'admin-report-card-paper') -->
+      <div class="report-card-paper" id="developer-report-card-paper">
+        <!-- populated by renderReportCard(data, 'developer-report-card-paper') -->
       </div>
-    </div>
-  </div>
+    </div><!-- /.developer-modal-content -->
+  </div><!-- /#developer-rc-modal -->
+
   <!-- ============================================================
-       [TESTING ONLY] ADMIN REPORT CARD MODAL (END)
+       [TESTING ONLY] DEVELOPER REPORT CARD MODAL (END)
        ============================================================ -->
+
 
   <!-- App scripts -->
   <script src="Result.js"></script>
