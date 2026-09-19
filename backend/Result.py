@@ -558,6 +558,15 @@ class ResultWithDetails(ResultResponse):
     subject_name: str
     credits: float
 
+class ArrearSubjectDetail(BaseModel):
+    subject_id: int
+    subject_code: str
+    subject_name: str
+    credits: float
+    semester: str
+    last_grade: str
+    attempts_count: int = 1
+
 class GradeSummary(BaseModel):
     student_id: int
     reg_no: str
@@ -570,6 +579,7 @@ class GradeSummary(BaseModel):
     earned_credits: float
     grade_points_sum: float
     arrear_count: int = 0
+    arrear_subjects: List[ArrearSubjectDetail] = []
 
 class UploadResponse(BaseModel):
     message: str
@@ -729,7 +739,8 @@ allow_batch_delete = role_checker(["Developer", "Exam Wing"])  # batch purge: De
 # REPORT CARD OTP HELPERS
 # ==========================================
 def _generate_otp() -> str:
-    return f"{secrets.randbelow(10 ** OTP_LENGTH):0{OTP_LENGTH}d}"
+    _OTP_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return "".join(secrets.choice(_OTP_ALPHABET) for _ in range(OTP_LENGTH))
 
 def _hash_otp(otp: str) -> str:
     return bcrypt.hashpw(otp.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -1204,7 +1215,7 @@ def verify_staff_otp(data: StaffOtpVerifyBody, db: Session = Depends(get_system_
     record.attempts += 1
     db.commit()
 
-    if not _verify_otp_hash(data.otp.strip(), record.otp_hash):
+    if not _verify_otp_hash(data.otp.strip().upper(), record.otp_hash):
         remaining = STAFF_OTP_MAX_ATTEMPTS - record.attempts
         raise HTTPException(
             status_code=400,
@@ -2671,7 +2682,15 @@ def resequence_student_subject_attempts(batch_db: Session, student_id: int, subj
     """
     Ensure attempts for a student and subject are sequentially numbered (1, 2, 3...)
     in strict chronological order based on _semester_sort_key(semester) and year.
-    Also sets had_arrear = True for all attempts after the first, or if any attempt was a fail.
+    
+    ARREAR LOGIC (Real-life accurate):
+      - had_arrear = True: Student had AT LEAST ONE failed attempt in this subject ever
+      - had_arrear = False: Student has NEVER failed this subject (all attempts passed from start)
+    
+    This ensures:
+      1. Upgrading an F to passing via re-evaluation does NOT remove arrear history
+      2. Clearing an arrear subject keeps the student marked as having had an arrear
+      3. A student who never failed has had_arrear = False
     """
     records = (
         batch_db.query(Result)
@@ -2682,21 +2701,25 @@ def resequence_student_subject_attempts(batch_db: Session, student_id: int, subj
         return
 
     sorted_recs = sorted(records, key=lambda r: (_semester_sort_key(r.semester), r.year or '', r.id or 0))
-    had_any_fail = any(
-        r.grade_point == 0 or (r.grade or "").strip().upper() in ("F", "AB", "ABSENT", "NC", "E", "Z")
-        for r in sorted_recs
-    ) or len(sorted_recs) > 1
+    
+    FAIL_GRADES = {"F", "AB", "ABSENT", "NC", "E", "Z", "S", "P"}
+    
+    def is_fail(r):
+        return r.grade_point == 0 or (r.grade or "").strip().upper() in FAIL_GRADES
+    
+    had_any_fail_in_history = any(is_fail(r) for r in sorted_recs)
 
     # Phase 1: Set temporary negative attempt numbers to prevent SQLite UNIQUE constraint collision
     for idx, r in enumerate(sorted_recs, start=1):
         r.attempt = -(1000 + idx)
     batch_db.flush()
 
-    # Phase 2: Set final sequential positive attempt numbers
+    # Phase 2: Set final sequential positive attempt numbers and accurate had_arrear
+    # had_arrear = True if the student EVER failed this subject (arrear history)
+    # had_arrear = False only if ALL attempts were passing from the start
     for idx, r in enumerate(sorted_recs, start=1):
         r.attempt = idx
-        if idx > 1 or had_any_fail or r.grade_point == 0:
-            r.had_arrear = True
+        r.had_arrear = had_any_fail_in_history
     batch_db.flush()
 
 def parse_and_update_sem3_arrear(pdf_path: Optional[str] = None, batch: str = "2024-2028") -> Dict[str, Any]:
@@ -3179,12 +3202,22 @@ async def upload_reevaluation(
                     continue
 
                 new_gp = parse_grade(grade_str)
-                if new_gp <= existing.grade_point and existing.grade_point > 0:
+                old_gp = existing.grade_point
+                old_grade = (existing.grade or "").strip().upper()
+                FAIL_GRADES = {"F", "AB", "ABSENT", "NC", "E", "Z", "S", "P"}
+                is_old_fail = old_gp == 0 or old_grade in FAIL_GRADES
+                
+                # Update if: new grade is better OR old was F and new is passing
+                if new_gp <= old_gp and not (is_old_fail and new_gp > 0):
                     continue
 
                 existing.grade = normalize_grade(grade_str)
                 existing.grade_point = new_gp
                 results_updated += 1
+
+                # Re-sequence attempts and update arrear status accurately
+                # This preserves arrear history even when F is upgraded to passing
+                resequence_student_subject_attempts(batch_db, student.id, subject.id)
 
         for s in active_sessions.values():
             s.commit()
@@ -3595,6 +3628,23 @@ def create_student(student: StudentCreate, user: User = Depends(allow_write)):
     finally:
         batch_db.close()
 
+@app.get("/students/by-reg/{reg_no}", response_model=StudentResponse)
+def get_student_by_reg(reg_no: str, user: User = Depends(allow_all)):
+    cleaned_reg = (reg_no or "").strip().lower()
+    found_info = find_student_batch(cleaned_reg)
+    if not found_info:
+        raise HTTPException(status_code=404, detail=f"Student with Reg No '{reg_no}' not found")
+    
+    batch_name, sanitized_key = found_info
+    batch_db = get_batch_session(sanitized_key)
+    try:
+        student = batch_db.query(Student).filter(func.lower(Student.reg_no) == cleaned_reg).first()
+        if not student:
+            raise HTTPException(status_code=404, detail=f"Student with Reg No '{reg_no}' not found")
+        return student
+    finally:
+        batch_db.close()
+
 @app.put("/students/by-reg/{reg_no}", response_model=StudentResponse)
 def update_student_by_reg(reg_no: str, student: StudentCreate, user: User = Depends(allow_write)):
     cleaned_reg = (reg_no or "").strip().lower()
@@ -3992,7 +4042,7 @@ def update_result(result_id: int, result: ResultUpdate, batch: Optional[str] = N
                     db_result.batch = result.batch
                 if result.attempt is not None:
                     db_result.attempt = result.attempt
-                db_result.had_arrear = (new_gp == 0.0) or (db_result.attempt > 1)
+                resequence_student_subject_attempts(batch_db, db_result.student_id, db_result.subject_id)
                 batch_db.commit()
                 batch_db.refresh(db_result)
                 return db_result
@@ -4011,7 +4061,7 @@ def update_result(result_id: int, result: ResultUpdate, batch: Optional[str] = N
                     db_result.batch = result.batch
                 if result.attempt is not None:
                     db_result.attempt = result.attempt
-                db_result.had_arrear = (new_gp == 0.0) or (db_result.attempt > 1)
+                resequence_student_subject_attempts(batch_db, db_result.student_id, db_result.subject_id)
                 batch_db.commit()
                 batch_db.refresh(db_result)
                 return db_result
@@ -4110,24 +4160,60 @@ def get_grade_summary(
             for row in res_rows:
                 student_subject_map.setdefault(row.student_id, {}).setdefault(row.subject_id, []).append(row)
 
-            # Arrear counts (across all semesters for each student in this batch DB)
-            arr_rows = (
-                batch_db.query(Result.student_id, func.count(func.distinct(Result.subject_id)))
-                .filter(Result.student_id.in_(stu_ids), Result.had_arrear.is_(True))
-                .group_by(Result.student_id)
-                .all()
-            )
-            arr_map = {s_id: cnt for s_id, cnt in arr_rows}
-
             for stu_id, stu_reg, stu_name, stu_dept in students:
                 subj_dict = student_subject_map.get(stu_id, {})
                 total_credits = 0.0
                 grade_points_sum = 0.0
                 earned_credits = 0.0
+                active_arrear_count = 0
+                active_arrear_subjects: List[ArrearSubjectDetail] = []
 
                 for sub_id, att_list in subj_dict.items():
                     sorted_atts = sorted(att_list, key=lambda x: (_semester_sort_key(x.semester), x.attempt or 1, x.id or 0))
                     orig_sem = sorted_atts[0].semester
+
+                    passed_atts = [
+                        a for a in sorted_atts
+                        if a.grade_point > 0 and (a.grade or "").strip().upper() not in ("F", "AB", "ABSENT", "NC", "E", "Z")
+                    ]
+                    failed_atts = [
+                        a for a in sorted_atts
+                        if a.grade_point == 0 or (a.grade or "").strip().upper() in ("F", "AB", "ABSENT", "NC", "E", "Z")
+                    ]
+
+                    # Real-life active arrear definition: student has failed this subject and hasn't cleared it yet
+                    sub_obj = subjects_map.get(sub_id)
+                    sub_cd = sub_obj.code if sub_obj else f"SUB{sub_id}"
+                    sub_nm = sub_obj.name if sub_obj else "Unknown Subject"
+                    sub_cr = sub_obj.credits if sub_obj else 0.0
+
+                    if semester:
+                        if str(orig_sem).strip().upper() == str(semester).strip().upper():
+                            if failed_atts and not passed_atts:
+                                active_arrear_count += 1
+                                last_failed_att = failed_atts[-1]
+                                active_arrear_subjects.append(ArrearSubjectDetail(
+                                    subject_id=sub_id,
+                                    subject_code=sub_cd,
+                                    subject_name=sub_nm,
+                                    credits=sub_cr,
+                                    semester=last_failed_att.semester or orig_sem,
+                                    last_grade=last_failed_att.grade or "F",
+                                    attempts_count=len(sorted_atts)
+                                ))
+                    else:
+                        if failed_atts and not passed_atts:
+                            active_arrear_count += 1
+                            last_failed_att = failed_atts[-1]
+                            active_arrear_subjects.append(ArrearSubjectDetail(
+                                subject_id=sub_id,
+                                subject_code=sub_cd,
+                                subject_name=sub_nm,
+                                credits=sub_cr,
+                                semester=last_failed_att.semester or orig_sem,
+                                last_grade=last_failed_att.grade or "F",
+                                attempts_count=len(sorted_atts)
+                            ))
 
                     if semester and str(orig_sem).strip().upper() != str(semester).strip().upper():
                         # When filtering by semester, only subjects whose first attempt belongs to that semester are counted
@@ -4137,10 +4223,6 @@ def get_grade_summary(
                     if cr <= 0:
                         continue
 
-                    passed_atts = [
-                        a for a in sorted_atts
-                        if a.grade_point > 0 and (a.grade or "").strip().upper() not in ("F", "AB", "ABSENT", "NC", "E", "Z")
-                    ]
                     if passed_atts:
                         best_gp = max(a.grade_point for a in passed_atts)
                         total_credits += cr
@@ -4151,7 +4233,7 @@ def get_grade_summary(
                         # failed / uncleared: 0 grade point
 
                 gpa = round(grade_points_sum / total_credits, 2) if total_credits > 0 else None
-                arrear_count = arr_map.get(stu_id, 0)
+                arrear_count = active_arrear_count
 
                 # Filter by arrears
                 if arrears and isinstance(arrears, (list, tuple, set)):
@@ -4184,7 +4266,8 @@ def get_grade_summary(
                     total_credits=total_credits,
                     earned_credits=earned_credits,
                     grade_points_sum=grade_points_sum,
-                    arrear_count=arrear_count
+                    arrear_count=arrear_count,
+                    arrear_subjects=active_arrear_subjects
                 ))
         finally:
             batch_db.close()
@@ -4259,11 +4342,12 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
             if a.grade_point > 0 and (a.grade or "").strip().upper() not in ("F", "AB", "ABSENT", "NC", "E", "Z")
         ]
 
-        had_fail = len(failed_atts) > 0 or any(a.had_arrear for a in sorted_atts) or len(sorted_atts) > 1
+        # A subject constitutes an arrear history if it had any failing attempt
+        had_fail = len(failed_atts) > 0
         is_cleared = len(passed_atts) > 0
         cleared_att = max(passed_atts, key=lambda a: a.grade_point) if is_cleared else None
         cleared_gp = cleared_att.grade_point if cleared_att else 0.0
-        first_fail = failed_atts[0] if failed_atts else (sorted_atts[0] if had_fail else None)
+        first_fail = failed_atts[0] if failed_atts else None
 
         failed_sem = first_fail.semester if first_fail else (sorted_atts[0].semester if had_fail else None)
         failed_grd = first_fail.grade if first_fail else ("F" if had_fail else None)
@@ -4273,7 +4357,8 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
         total_atts_count = len(sorted_atts)
 
         if had_fail:
-            has_any_arrears = True
+            if not is_cleared:
+                has_any_arrears = True
             status_text = (
                 f"Cleared in Sem {cleared_sem} (Attempt {cleared_att_num} · Grade {cleared_grd})"
                 if is_cleared else
@@ -4556,10 +4641,10 @@ def request_report_card_otp(data: OTPRequestRequest, db: Session = Depends(get_s
 def verify_report_card_otp(data: OTPVerifyRequest, db: Session = Depends(get_system_db)):
     reg_no = (data.reg_no or "").strip()
     email = (data.email or "").strip().lower()
-    otp = (data.otp or "").strip()
+    otp = (data.otp or "").strip().upper()
     if not reg_no or not email or not otp:
         raise HTTPException(status_code=400, detail="Reg No, Email and OTP are required")
-    if not re.fullmatch(r"\d{6}", otp):
+    if not re.fullmatch(r"[0-9A-Z]{6}", otp.upper()):
         raise HTTPException(status_code=400, detail="Enter the 6-digit OTP sent to your email")
 
     otp_row = (

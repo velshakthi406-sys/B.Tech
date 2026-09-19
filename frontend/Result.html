@@ -2,7 +2,11 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0A0E17" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#CBD5E1" media="(prefers-color-scheme: light)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="color-scheme" content="light dark" />
   <title>PTU Grade Portal — Puducherry Technological University</title>
   <meta name="description" content="University Grade Processing, CGPA Computation & Examination Platform — Puducherry Technological University" />
@@ -35,10 +39,39 @@
 </head>
 <body>
 
+  <!-- Skip to Content (WCAG 2.4.1 — keyboard navigation) -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
   <!-- ╔═══════════════════════════════════════╗ -->
   <!-- ║  TOAST CONTAINER                      ║ -->
   <!-- ╚═══════════════════════════════════════╝ -->
   <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ╔═══════════════════════════════════════╗ -->
+  <!-- ║  SIDEBAR MOBILE OVERLAY               ║ -->
+  <!-- ╚═══════════════════════════════════════╝ -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeMobileSidebar()" aria-hidden="true"></div>
+
+  <!-- ARREAR DETAILS MODAL -->
+  <div id="arrear-details-modal" class="modal hidden" onclick="if(event.target.id==='arrear-details-modal') closeArrearModal()">
+    <div class="modal-content arrear-modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 id="arrear-modal-title">Arrear Details</h2>
+          <p id="arrear-modal-subtitle" class="text-muted" style="font-size:0.9rem;margin-top:4px;"></p>
+        </div>
+        <button class="arrear-close-btn" onclick="closeArrearModal()" aria-label="Close modal" title="Close (Esc)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" id="arrear-modal-body" style="max-height:60vh;overflow-y:auto;">
+        <div class="text-muted" style="text-align:center;padding:20px;">Loading arrear information...</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Particle canvas (homepage hero) -->
   <canvas id="cyber-network-canvas" aria-hidden="true"></canvas>
@@ -49,7 +82,7 @@
   <header id="public-navbar" class="public-nav no-print" aria-label="Public portal navigation">
     <button class="public-nav-brand nav-brand" onclick="navigateToHome()" title="Back to Homepage">
       <div class="public-nav-logo nav-logo">
-        <img src="ptu_logo.png" alt="Puducherry Technological University Logo" class="public-nav-logo-img" />
+        <img src="ptu_logo.webp" alt="Puducherry Technological University Logo" class="public-nav-logo-img" />
       </div>
       <div class="public-nav-title">
         <span class="public-nav-name">PTU Grade Hub</span>
@@ -57,7 +90,14 @@
       </div>
     </button>
 
-    <div class="public-nav-links nav-links">
+    <!-- Mobile Hamburger Toggle (hidden on desktop) -->
+    <button class="mobile-nav-toggle" id="mobile-nav-toggle" onclick="toggleMobileNav()" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="public-nav-links-panel">
+      <span class="hamburger-bar"></span>
+      <span class="hamburger-bar"></span>
+      <span class="hamburger-bar"></span>
+    </button>
+
+    <div class="public-nav-links nav-links" id="public-nav-links-panel">
       <button class="public-nav-btn nav-link" id="nav-btn-home" onclick="navigateToHome()">
         <span>Home</span>
       </button>
@@ -387,8 +427,8 @@
         <form id="otp-verify-form" onsubmit="handleOtpVerify(event)" autocomplete="off" novalidate>
           <div class="form-group">
             <label for="otp-code-input">6-Digit OTP</label>
-            <input type="text" id="otp-code-input" required placeholder="• • • • • •" maxlength="6" pattern="\d{6}"
-                   inputmode="numeric" class="otp-digit-input" autocomplete="one-time-code" />
+            <input type="text" id="otp-code-input" required placeholder="• • • • • •" maxlength="6" pattern="[0-9A-Za-z]{6}"
+                   class="otp-digit-input" autocomplete="one-time-code" style="text-transform:uppercase;letter-spacing:0.3em;" />
           </div>
           <button type="submit" id="otp-verify-btn" class="btn-primary">
             <span class="btn-spinner"></span>
@@ -547,10 +587,10 @@
         <div class="form-group">
           <label for="rc-otp-input">One-Time Passcode</label>
           <div style="position:relative;">
-            <span class="input-icon">🔢</span>
+            <span class="input-icon">🔐</span>
             <input type="text" id="rc-otp-input" class="otp-input has-icon" required
-                   inputmode="numeric" pattern="\d{6}" maxlength="6"
-                   autocomplete="one-time-code" placeholder="• • • • • •" />
+                   pattern="[0-9A-Za-z]{6}" maxlength="6"
+                   autocomplete="one-time-code" placeholder="• • • • • •" style="text-transform:uppercase;letter-spacing:0.3em;" />
           </div>
         </div>
         <div id="rc-otp-msg" class="rc-otp-msg" aria-live="polite"></div>
@@ -689,12 +729,12 @@
     </aside>
 
     <!-- ── MAIN CONTENT ── -->
-    <main class="main-content">
+    <main class="main-content" id="main-content" tabindex="-1">
 
       <!-- Top Header -->
       <header class="top-header">
         <div class="header-title-group">
-          <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" onclick="toggleSidebarView()" aria-label="Toggle sidebar">
+          <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" onclick="toggleSidebarOrDrawer()" aria-label="Toggle sidebar" title="Toggle sidebar">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <h1 id="module-title">Resources Management</h1>
@@ -1050,15 +1090,16 @@
                   <span class="counter-label">Results</span>
                 </span>
               </div>
-              <div class="counter-indicator-pill indicator-f-grades" id="results-f-count-display" title="Total F grades in results">
-                <span class="counter-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <button class="counter-indicator-pill indicator-f-grades filter-toggle-btn" id="results-f-filter-btn" type="button" onclick="toggleFGradesFilter()" aria-pressed="false" aria-label="Filter results to show F grades only" title="Show only F grades">
+                <span class="counter-icon" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 </span>
                 <span class="counter-text">
                   <strong id="results-f-showing-count" class="counter-number">0</strong>
                   <span class="counter-label">F Grades</span>
                 </span>
-              </div>
+                <span class="filter-state-badge" id="f-filter-badge" aria-live="polite"></span>
+              </button>
             </div>
           </div>
 
@@ -1066,42 +1107,62 @@
           <div class="dept-tabs" id="results-batch-tabs-container"></div>
 
           <!-- Filters -->
-          <div class="filter-row" role="search" aria-label="Filter results">
-            <div class="form-group">
-              <label for="filter-department">Department</label>
-              <select id="filter-department" onchange="applyFilters()">
-                <option value="">All Depts</option>
-                <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
-                <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
-                <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="filter-semester">Semester</label>
-              <select id="filter-semester" onchange="applyFilters()">
-                <option value="">All Sems</option>
-                <option value="I">I</option><option value="II">II</option><option value="III">III</option>
-                <option value="IV">IV</option><option value="V">V</option><option value="VI">VI</option>
-                <option value="VII">VII</option><option value="VIII">VIII</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="filter-subject-code">Subject Code</label>
-              <input type="text" id="filter-subject-code" placeholder="e.g. MAUC101" oninput="applyFilters()" />
-            </div>
-            <div class="form-group">
-              <label for="filter-reg-no">Reg No</label>
-              <input type="text" id="filter-reg-no" placeholder="e.g. 2401112050" oninput="applyFilters()" />
-            </div>
-            <div class="form-group filter-action-group">
-              <label class="filter-action-label" aria-hidden="true">&nbsp;</label>
-              <button id="btn-results-reset" class="btn-filter-reset" type="button" onclick="clearResultsFilters()" title="Reset all filters" aria-label="Reset all filters">
-                <svg class="reset-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                  <path d="M3 3v5h5"/>
-                </svg>
-                <span>Reset</span>
-              </button>
+          <div class="sgpa-filters-container" role="search" aria-label="Filter results">
+            <div class="filter-bar">
+              <!-- Department Filter -->
+              <div class="filter-item filter-dept">
+                <label for="filter-department">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  Department
+                </label>
+                <select class="filter-select" id="filter-department" onchange="applyFilters()">
+                  <option value="">All Depts</option>
+                  <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
+                  <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
+                  <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
+                </select>
+              </div>
+
+              <!-- Semester Filter -->
+              <div class="filter-item filter-sem">
+                <label for="filter-semester">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Semester
+                </label>
+                <select class="filter-select" id="filter-semester" onchange="applyFilters()">
+                  <option value="">All Sems</option>
+                  <option value="I">I</option><option value="II">II</option><option value="III">III</option>
+                  <option value="IV">IV</option><option value="V">V</option><option value="VI">VI</option>
+                  <option value="VII">VII</option><option value="VIII">VIII</option>
+                </select>
+              </div>
+
+              <!-- Subject Code Filter -->
+              <div class="filter-item filter-subject">
+                <label for="filter-subject-code">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                  Subject Code
+                </label>
+                <input type="text" class="filter-select" id="filter-subject-code" placeholder="e.g. MAUC101" oninput="applyFilters()" />
+              </div>
+
+              <!-- Reg No Filter -->
+              <div class="filter-item filter-regno">
+                <label for="filter-reg-no">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Reg No
+                </label>
+                <input type="text" class="filter-select" id="filter-reg-no" placeholder="e.g. 2401112050" oninput="applyFilters()" />
+              </div>
+
+              <!-- Reset Button -->
+              <div class="filter-item filter-action-group">
+                <label class="filter-action-label" aria-hidden="true">&nbsp;</label>
+                <button class="btn-filter-reset" type="button" onclick="clearResultsFilters()" title="Reset all filters" aria-label="Reset all filters">
+                  <svg class="reset-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                  Reset
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1337,76 +1398,119 @@
           </div>
 
           <!-- Filters -->
-          <div class="filter-row grades-filter-row" role="search" aria-label="Filter grades">
-            <div class="form-group">
-              <label for="grade-filter-dept">Department</label>
-              <select class="compact-select" id="grade-filter-dept" onchange="loadGrades()">
-                <option value="">All</option>
-                <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
-                <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
-                <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
-              </select>
+          <div class="sgpa-filters-container" role="search" aria-label="Filter grades">
+            <div class="filter-bar">
+              <!-- Batch Filter -->
+              <div class="filter-item filter-batch">
+                <label for="grade-filter-batch">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  Batch
+                </label>
+                <select class="filter-select" id="grade-filter-batch" onchange="loadGrades()">
+                  <option value="">All Batches</option>
+                </select>
+              </div>
+
+              <!-- Department Filter -->
+              <div class="filter-item filter-dept">
+                <label for="grade-filter-dept">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  Department
+                </label>
+                <select class="filter-select" id="grade-filter-dept" onchange="loadGrades()">
+                  <option value="">All</option>
+                  <option value="CE">CE</option>
+                  <option value="CHE">CHE</option>
+                  <option value="CSE">CSE</option>
+                  <option value="ECE">ECE</option>
+                  <option value="EEE">EEE</option>
+                  <option value="EIE">EIE</option>
+                  <option value="IT">IT</option>
+                  <option value="ME">ME</option>
+                  <option value="MT">MT</option>
+                </select>
+              </div>
+
+              <!-- Semester Filter (SGPA) -->
+              <div class="filter-item filter-sem">
+                <label for="grade-filter-sem">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Semester
+                </label>
+                <select class="filter-select" id="grade-filter-sem" onchange="loadGrades()">
+                  <option value="">CGPA (Overall)</option>
+                  <option value="I">Sem I</option>
+                  <option value="II">Sem II</option>
+                  <option value="III">Sem III</option>
+                  <option value="IV">Sem IV</option>
+                  <option value="V">Sem V</option>
+                  <option value="VI">Sem VI</option>
+                  <option value="VII">Sem VII</option>
+                  <option value="VIII">Sem VIII</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="grade-filter-sem">Semester (SGPA)</label>
-              <select class="compact-select" id="grade-filter-sem" onchange="loadGrades()">
-                <option value="">Overall CGPA</option>
-                <option value="I">I</option><option value="II">II</option><option value="III">III</option>
-                <option value="IV">IV</option><option value="V">V</option><option value="VI">VI</option>
-                <option value="VII">VII</option><option value="VIII">VIII</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="grade-filter-batch">Batch</label>
-              <select class="compact-select" id="grade-filter-batch" onchange="loadGrades()">
-                <option value="">All</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="grade-filter-sort">Sort by CGPA</label>
-              <select class="compact-select" id="grade-filter-sort" onchange="loadGrades()">
-                <option value="desc">↓ Descending</option>
-                <option value="asc">↑ Ascending</option>
-                <option value="none">None</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="grade-filter-credits-sort">Sort by Credits (Total Cr.)</label>
-              <select class="compact-select" id="grade-filter-credits-sort" onchange="loadGrades()">
-                <option value="none">None</option>
-                <option value="asc">↑ Ascending</option>
-                <option value="desc">↓ Descending</option>
-              </select>
-            </div>
-            <!-- Arrear multi-select -->
-            <div class="form-group">
-              <label>Arrear Status</label>
-              <div class="multi-select" id="grade-filter-arrears-wrap">
-                <button type="button" class="multi-select-btn compact-select" id="grade-filter-arrears-btn" onclick="toggleArrearDropdown(event)">
-                  <span id="grade-filter-arrears-label">ALL</span>
-                  <span class="multi-select-caret">▾</span>
-                </button>
-                <div class="multi-select-menu hidden" id="grade-filter-arrears-menu">
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="all" id="arrear-opt-all" checked onchange="onArrearAllToggle(this)" /> ALL
-                  </label>
-                  <div class="multi-select-divider"></div>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="0" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
-                    <span class="arrear-dot-0"></span> No Arrears
-                  </label>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="1" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
-                    <span class="arrear-dot-1"></span> 1 Arrear
-                  </label>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="2" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
-                    <span class="arrear-dot-2"></span> 2 Arrears
-                  </label>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="3+" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
-                    <span class="arrear-dot-3"></span> 3+ Arrears
-                  </label>
+
+            <div class="filter-bar filter-bar-row-2">
+              <!-- Sort by CGPA -->
+              <div class="filter-item filter-sort-cgpa">
+                <label for="grade-filter-sort">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                  Sort by CGPA
+                </label>
+                <select class="filter-select" id="grade-filter-sort" onchange="loadGrades()">
+                  <option value="none">None</option>
+                  <option value="desc">Descending (↓)</option>
+                  <option value="asc">Ascending (↑)</option>
+                </select>
+              </div>
+
+              <!-- Sort by Credits -->
+              <div class="filter-item filter-sort-credits">
+                <label for="grade-filter-credits-sort">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Sort by Credits
+                </label>
+                <select class="filter-select" id="grade-filter-credits-sort" onchange="loadGrades()">
+                  <option value="none">None</option>
+                  <option value="desc">Descending (↓)</option>
+                  <option value="asc">Ascending (↑)</option>
+                </select>
+              </div>
+
+              <!-- Arrear Status Multi-select -->
+              <div class="filter-item filter-arrear">
+                <label>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Arrear Status
+                </label>
+                <div class="multi-select" id="grade-filter-arrears-wrap">
+                  <button type="button" class="multi-select-btn filter-select" id="grade-filter-arrears-btn" onclick="toggleArrearDropdown(event)">
+                    <span id="grade-filter-arrears-label">ALL</span>
+                    <span class="multi-select-caret">▾</span>
+                  </button>
+                  <div class="multi-select-menu hidden" id="grade-filter-arrears-menu">
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="all" id="arrear-opt-all" checked onchange="onArrearAllToggle(this)" /> ALL
+                    </label>
+                    <div class="multi-select-divider"></div>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="0" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                      <span class="arrear-dot-0"></span> No Arrears
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="1" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                      <span class="arrear-dot-1"></span> 1 Arrear
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="2" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                      <span class="arrear-dot-2"></span> 2 Arrears
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="3+" class="arrear-opt" onchange="onArrearOptionToggle(this)" />
+                      <span class="arrear-dot-3"></span> 3+ Arrears
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1447,59 +1551,85 @@
           </div>
 
           <!-- Filters -->
-          <div class="filter-row grades-filter-row" role="search" aria-label="Filter class report">
-            <div class="form-group">
-              <label for="cr-filter-batch">Batch</label>
-              <select class="compact-select" id="cr-filter-batch" onchange="loadClassReport()">
-                <option value="">All</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="cr-filter-dept">Department</label>
-              <select class="compact-select" id="cr-filter-dept" onchange="loadClassReport()">
-                <option value="">All</option>
-                <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
-                <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
-                <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="cr-filter-credits-sort">Sort by Total Credits</label>
-              <select class="compact-select" id="cr-filter-credits-sort" onchange="loadClassReport()">
-                <option value="none">None</option>
-                <option value="asc">↑ Ascending</option>
-                <option value="desc">↓ Descending</option>
-              </select>
-            </div>
-            <!-- Arrear multi-select -->
-            <div class="form-group">
-              <label>Arrear Status</label>
-              <div class="multi-select" id="cr-filter-arrears-wrap">
-                <button type="button" class="multi-select-btn compact-select" id="cr-filter-arrears-btn" onclick="toggleCrArrearDropdown(event)">
-                  <span id="cr-filter-arrears-label">ALL</span>
-                  <span class="multi-select-caret">▾</span>
-                </button>
-                <div class="multi-select-menu hidden" id="cr-filter-arrears-menu">
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="all" id="cr-arrear-opt-all" checked onchange="onCrArrearAllToggle(this)" /> ALL
-                  </label>
-                  <div class="multi-select-divider"></div>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="0" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
-                    <span class="arrear-dot-0"></span> No Arrears
-                  </label>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="1" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
-                    <span class="arrear-dot-1"></span> 1 Arrear
-                  </label>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="2" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
-                    <span class="arrear-dot-2"></span> 2 Arrears
-                  </label>
-                  <label class="multi-select-option">
-                    <input type="checkbox" value="3+" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
-                    <span class="arrear-dot-3"></span> 3+ Arrears
-                  </label>
+          <div class="sgpa-filters-container" role="search" aria-label="Filter class report">
+            <div class="filter-bar">
+              <!-- Batch Filter -->
+              <div class="filter-item filter-batch">
+                <label for="cr-filter-batch">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  Batch
+                </label>
+                <select class="filter-select" id="cr-filter-batch" onchange="loadClassReport()">
+                  <option value="">All Batches</option>
+                </select>
+              </div>
+
+              <!-- Department Filter -->
+              <div class="filter-item filter-dept">
+                <label for="cr-filter-dept">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  Department
+                </label>
+                <select class="filter-select" id="cr-filter-dept" onchange="loadClassReport()">
+                  <option value="">All</option>
+                  <option value="CE">CE</option>
+                  <option value="CHE">CHE</option>
+                  <option value="CSE">CSE</option>
+                  <option value="ECE">ECE</option>
+                  <option value="EEE">EEE</option>
+                  <option value="EIE">EIE</option>
+                  <option value="IT">IT</option>
+                  <option value="ME">ME</option>
+                  <option value="MT">MT</option>
+                </select>
+              </div>
+
+              <!-- Sort by Credits -->
+              <div class="filter-item filter-sort-credits">
+                <label for="cr-filter-credits-sort">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Sort by Credits
+                </label>
+                <select class="filter-select" id="cr-filter-credits-sort" onchange="loadClassReport()">
+                  <option value="none">None</option>
+                  <option value="desc">Descending (↓)</option>
+                  <option value="asc">Ascending (↑)</option>
+                </select>
+              </div>
+
+              <!-- Arrear Status Multi-select -->
+              <div class="filter-item filter-arrear">
+                <label>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Arrear Status
+                </label>
+                <div class="multi-select" id="cr-filter-arrears-wrap">
+                  <button type="button" class="multi-select-btn filter-select" id="cr-filter-arrears-btn" onclick="toggleCrArrearDropdown(event)">
+                    <span id="cr-filter-arrears-label">ALL</span>
+                    <span class="multi-select-caret">▾</span>
+                  </button>
+                  <div class="multi-select-menu hidden" id="cr-filter-arrears-menu">
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="all" id="cr-arrear-opt-all" checked onchange="onCrArrearAllToggle(this)" /> ALL
+                    </label>
+                    <div class="multi-select-divider"></div>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="0" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                      <span class="arrear-dot-0"></span> No Arrears
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="1" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                      <span class="arrear-dot-1"></span> 1 Arrear
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="2" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                      <span class="arrear-dot-2"></span> 2 Arrears
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="3+" class="cr-arrear-opt" onchange="onCrArrearOptionToggle(this)" />
+                      <span class="arrear-dot-3"></span> 3+ Arrears
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1637,9 +1767,61 @@
   </div><!-- /#developer-rc-modal -->
 
   <!-- ============================================================
-       [TESTING ONLY] DEVELOPER REPORT CARD MODAL (END)
+       STUDENT ARREAR SUBJECTS DETAIL MODAL
        ============================================================ -->
+  <div id="arrear-details-modal" class="developer-modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Student Arrear Breakdown" onclick="if(event.target===this) closeArrearDetailsModal()">
+    <div class="developer-modal-content arrear-modal-card">
+      <div class="arrear-modal-header">
+        <div class="arrear-modal-title-wrap">
+          <div class="arrear-modal-icon-badge">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div>
+            <div class="arrear-modal-title">Active Arrear Breakdown</div>
+            <div class="arrear-modal-subtitle" id="arrear-modal-student-info">Student details and uncleared courses</div>
+          </div>
+        </div>
+        <button type="button" class="arrear-modal-close-btn" onclick="closeArrearDetailsModal()" aria-label="Close modal">✕</button>
+      </div>
 
+      <div class="arrear-modal-body">
+        <div class="arrear-modal-summary-banner" id="arrear-modal-summary-banner">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="arrear-modal-table-container">
+          <table class="data-table arrear-detail-table">
+            <thead>
+              <tr>
+                <th style="width:40px;">#</th>
+                <th style="width:110px;">Code</th>
+                <th>Course Name</th>
+                <th style="width:75px; text-align:center;">Credits</th>
+                <th style="width:90px; text-align:center;">Semester</th>
+                <th style="width:80px; text-align:center;">Grade</th>
+                <th style="width:90px; text-align:center;">Attempts</th>
+              </tr>
+            </thead>
+            <tbody id="arrear-modal-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="arrear-modal-footer">
+        <div class="arrear-modal-footer-note">
+          <span class="info-dot">ℹ️</span> Only courses where the student currently holds an uncleared F grade are listed.
+        </div>
+        <div class="arrear-modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeArrearDetailsModal()">Close</button>
+          <button type="button" class="btn-primary" id="arrear-modal-rc-btn" onclick="viewReportCardFromArrearModal()">
+            View Full Report Card
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- App scripts -->
   <script src="Result.js"></script>

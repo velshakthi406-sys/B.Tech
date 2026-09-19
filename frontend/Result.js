@@ -55,6 +55,7 @@ let currentResultsBatchFilter = 'All';
 let resultsCurrentPage = 1;
 let resultsPageSize = 50;
 let resultsAvailableBatches = [];
+let fGradesFilterActive = false;
 
 // Report Card OTP State
 let rcRegNo = '';
@@ -132,6 +133,16 @@ function initTheme() {
 
 function setTheme(theme, notify = true) {
     const valid = theme === 'light' ? 'light' : 'dark';
+    
+    // Disable transitions temporarily for instant theme switch
+    const style = document.createElement('style');
+    style.textContent = '*, *::before, *::after { transition: none !important; }';
+    document.head.appendChild(style);
+    
+    // Force a reflow to apply the no-transition style
+    document.documentElement.offsetHeight;
+    
+    // Apply theme
     document.documentElement.setAttribute('data-theme', valid);
     document.documentElement.style.colorScheme = valid;
     localStorage.setItem('ptu_theme', valid);
@@ -159,6 +170,11 @@ function setTheme(theme, notify = true) {
     if (dashToggle) {
         dashToggle.setAttribute('title', `Switch to ${valid === 'dark' ? 'Light' : 'Dark'} Mode (Alt + T)`);
     }
+    
+    // Remove the no-transition style and restore smooth transitions
+    requestAnimationFrame(() => {
+        document.head.removeChild(style);
+    });
 
     if (notify) {
         showToast(`Theme changed to ${valid === 'dark' ? 'Dark Mode 🌙' : 'Light Mode ☀️'}`, 'info', 2000);
@@ -168,7 +184,7 @@ function setTheme(theme, notify = true) {
 function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
-    setTheme(next, true);
+    setTheme(next, false);
 }
 
 // ─── 4. Particle Canvas (Hero Network) ────────────────────────
@@ -611,7 +627,7 @@ async function handleOtpRequest(e) {
 
         showToast(data.message || 'OTP sent successfully!', 'success');
         if ($('otp-code-input')) $('otp-code-input').value = '';
-        if ($('otp-verify-hint')) $('otp-verify-hint').innerText = `A 6-digit OTP has been sent to ${email}. Valid for 10 minutes.`;
+        if ($('otp-verify-hint')) $('otp-verify-hint').innerText = `A 6-character OTP (numbers & letters) has been sent to ${email}. Valid for 10 minutes.`;
         showAuthStep('otp-verify');
         $('otp-code-input')?.focus();
     } catch (err) {
@@ -645,8 +661,8 @@ async function handleOtpVerify(e) {
     const btn = $('otp-verify-btn');
     const otp = ($('otp-code-input')?.value || '').replace(/\s+/g, '').trim();
 
-    if (!otp || otp.length !== 6) {
-        showToast('Please enter a valid 6-digit OTP code', 'warning');
+    if (!otp || otp.length !== 6 || !/^[0-9A-Za-z]{6}$/.test(otp)) {
+        showToast('Please enter the valid 6-character OTP code', 'warning');
         return;
     }
 
@@ -955,6 +971,73 @@ function toggleSidebarView() {
     if (sidebar) sidebar.classList.toggle('collapsed');
     if (layout) layout.classList.toggle('sidebar-collapsed');
 }
+
+// ─── Mobile Sidebar Drawer ─────────────────────────────────────
+function isMobileViewport() {
+    return window.innerWidth <= 768;
+}
+
+function toggleSidebarOrDrawer() {
+    if (isMobileViewport()) {
+        const sidebar = $('main-sidebar');
+        if (sidebar && sidebar.classList.contains('mobile-open')) {
+            closeMobileSidebar();
+        } else {
+            openMobileSidebar();
+        }
+    } else {
+        toggleSidebarView();
+    }
+}
+
+function openMobileSidebar() {
+    const sidebar = $('main-sidebar');
+    const overlay = $('sidebar-overlay');
+    if (sidebar) sidebar.classList.add('mobile-open');
+    if (overlay) overlay.classList.add('active');
+    document.body.classList.add('sidebar-drawer-open');
+}
+
+function closeMobileSidebar() {
+    const sidebar = $('main-sidebar');
+    const overlay = $('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (overlay) overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-drawer-open');
+}
+
+// Auto-close mobile sidebar when a nav item is clicked
+document.addEventListener('click', function(e) {
+    if (!isMobileViewport()) return;
+    const navItem = e.target.closest('.nav-item');
+    if (navItem) closeMobileSidebar();
+});
+
+// Close sidebar on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeMobileSidebar();
+});
+
+// ─── Public Nav Mobile Hamburger ───────────────────────────────
+function toggleMobileNav() {
+    const panel = document.getElementById('public-nav-links-panel');
+    const toggle = document.getElementById('mobile-nav-toggle');
+    if (!panel || !toggle) return;
+    const isOpen = panel.classList.toggle('mobile-nav-open');
+    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    toggle.classList.toggle('is-open', isOpen);
+}
+
+// Close mobile nav when a link is clicked
+document.addEventListener('click', function(e) {
+    const panel = document.getElementById('public-nav-links-panel');
+    if (!panel) return;
+    if (e.target.closest('.public-nav-btn')) {
+        panel.classList.remove('mobile-nav-open');
+        const toggle = document.getElementById('mobile-nav-toggle');
+        if (toggle) { toggle.setAttribute('aria-expanded', 'false'); toggle.classList.remove('is-open'); }
+    }
+});
 
 async function loadDashboardStats() {
     try {
@@ -1313,6 +1396,50 @@ function selectResultsBatchTab(batch) {
 let resultsAbortController = null;
 let currentResultsRequestId = 0;
 
+function isFGradeResult(result) {
+    return (result.grade || '').trim().toUpperCase() === 'F';
+}
+
+function getResultsForDisplay() {
+    return fGradesFilterActive ? allResultsCache.filter(isFGradeResult) : allResultsCache;
+}
+
+function getResultsPageSize() {
+    const displayResults = getResultsForDisplay();
+    return resultsPageSize === 'all'
+        ? displayResults.length
+        : parseInt(resultsPageSize, 10);
+}
+
+function updateFGradesFilterButton() {
+    const btn = $('results-f-filter-btn');
+    if (!btn) return;
+
+    btn.classList.toggle('is-active', fGradesFilterActive);
+    btn.setAttribute('aria-pressed', String(fGradesFilterActive));
+    btn.title = fGradesFilterActive
+        ? 'F grades filter active — click to show all results'
+        : 'Show only F grades';
+    btn.setAttribute(
+        'aria-label',
+        fGradesFilterActive
+            ? 'Show all results'
+            : 'Filter results to show F grades only'
+    );
+
+    const badge = $('f-filter-badge');
+    if (badge) {
+        badge.classList.toggle('is-active', fGradesFilterActive);
+    }
+}
+
+function toggleFGradesFilter() {
+    fGradesFilterActive = !fGradesFilterActive;
+    resultsCurrentPage = 1;
+    updateFGradesFilterButton();
+    renderResultsTable();
+}
+
 async function loadResults() {
     const tbody = $('results-tbody');
     if (!tbody) return;
@@ -1368,8 +1495,10 @@ function renderResultsTable() {
     if (!tbody) return;
 
     const total = allResultsCache.length;
-    const pageSize = resultsPageSize === 'all' ? total : parseInt(resultsPageSize, 10);
-    const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+    const displayResults = getResultsForDisplay();
+    const displayTotal = displayResults.length;
+    const pageSize = resultsPageSize === 'all' ? displayTotal : parseInt(resultsPageSize, 10);
+    const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(displayTotal / pageSize)) : 1;
 
     if (resultsCurrentPage > totalPages) {
         resultsCurrentPage = totalPages;
@@ -1379,35 +1508,40 @@ function renderResultsTable() {
     }
 
     const startIdx = resultsPageSize === 'all' ? 0 : (resultsCurrentPage - 1) * pageSize;
-    const endIdx = resultsPageSize === 'all' ? total : Math.min(startIdx + pageSize, total);
-    const visibleData = allResultsCache.slice(startIdx, endIdx);
+    const endIdx = resultsPageSize === 'all' ? displayTotal : Math.min(startIdx + pageSize, displayTotal);
+    const visibleData = displayResults.slice(startIdx, endIdx);
 
     // Update Counter indicator pill
     const countEl = $('results-showing-count');
     const totalWrap = $('results-total-count-wrap');
     const pill = $('results-count-display');
-    if (countEl) countEl.innerText = total;
-    if (totalWrap) totalWrap.innerText = '';
+    if (countEl) countEl.innerText = displayTotal;
+    if (totalWrap) totalWrap.innerText = fGradesFilterActive ? `of ${total}` : '';
     if (pill) {
-        pill.title = `Total loaded results: ${total}`;
+        pill.title = fGradesFilterActive
+            ? `F grades only: ${displayTotal} of ${total} loaded results`
+            : `Total loaded results: ${total}`;
     }
 
     // Update F-Grade indicator pill
-    const fCount = allResultsCache.filter(r => (r.grade || '').trim().toUpperCase() === 'F').length;
+    const fCount = allResultsCache.filter(isFGradeResult).length;
     const fCountEl = $('results-f-showing-count');
-    const fPill = $('results-f-count-display');
+    const fPill = $('results-f-filter-btn');
     if (fCountEl) fCountEl.innerText = fCount;
     if (fPill) {
-        fPill.title = `Total F grades in results: ${fCount}`;
+        fPill.title = fGradesFilterActive
+            ? `F grades filter active: ${fCount} matching result(s)`
+            : `Total F grades in results: ${fCount}. Click to show only F grades.`;
     }
+    updateFGradesFilterButton();
 
     // Update Pagination info
     const pageInfo = $('results-page-info');
     if (pageInfo) {
-        if (total === 0) {
+        if (displayTotal === 0) {
             pageInfo.innerText = 'Showing 0 results';
         } else {
-            pageInfo.innerText = `Showing ${startIdx + 1}–${endIdx} of ${total}`;
+            pageInfo.innerText = `Showing ${startIdx + 1}–${endIdx} of ${displayTotal}`;
         }
     }
 
@@ -1421,8 +1555,10 @@ function renderResultsTable() {
     if (prevBtn) prevBtn.disabled = resultsCurrentPage <= 1;
     if (nextBtn) nextBtn.disabled = resultsCurrentPage >= totalPages;
 
-    if (!total) {
-        tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">No results found matching filters.</td></tr>';
+    if (!displayTotal) {
+        tbody.innerHTML = fGradesFilterActive
+            ? '<tr><td colspan="10" class="loading-cell">No F-grade results found matching filters.</td></tr>'
+            : '<tr><td colspan="10" class="loading-cell">No results found matching filters.</td></tr>';
         return;
     }
 
@@ -1464,8 +1600,9 @@ function prevResultsPage() {
 }
 
 function nextResultsPage() {
-    const pageSize = resultsPageSize === 'all' ? allResultsCache.length : parseInt(resultsPageSize, 10);
-    const totalPages = pageSize > 0 ? Math.ceil(allResultsCache.length / pageSize) : 1;
+    const displayResults = getResultsForDisplay();
+    const pageSize = getResultsPageSize();
+    const totalPages = pageSize > 0 ? Math.ceil(displayResults.length / pageSize) : 1;
     if (resultsCurrentPage < totalPages) {
         resultsCurrentPage += 1;
         renderResultsTable();
@@ -1515,6 +1652,8 @@ function clearResultsFilters() {
     if ($('filter-semester')) $('filter-semester').value = '';
     if ($('filter-subject-code')) $('filter-subject-code').value = '';
     if ($('filter-reg-no')) $('filter-reg-no').value = '';
+    fGradesFilterActive = false;
+    updateFGradesFilterButton();
     applyFilters(true);
 }
 
@@ -2062,6 +2201,162 @@ async function deleteSubject(id) {
     }
 }
 
+// ─── 16. Arrear Details Modal ─────────────────────────────────
+async function showArrearDetails(regNo, studentName) {
+    const modal = $('arrear-details-modal');
+    const title = $('arrear-modal-title');
+    const subtitle = $('arrear-modal-subtitle');
+    const body = $('arrear-modal-body');
+    
+    if (!modal) return;
+    
+    title.innerText = 'F-Grade Subjects';
+    subtitle.innerText = `${escapeHtml(studentName)} · ${escapeHtml(regNo)}`;
+    body.innerHTML = '<div class="arrear-loading"><div class="spinner"></div><span>Fetching arrear information...</span></div>';
+    modal.classList.remove('hidden');
+    
+    try {
+        const response = await authFetch(`/students/by-reg/${encodeURIComponent(regNo)}`);
+        if (!response) throw new Error('Student not found');
+        
+        const studentId = response.id;
+        const resultsRes = await authFetch(`/results?reg_no=${encodeURIComponent(regNo)}`);
+        const results = resultsRes || [];
+        
+        const fGradeResults = results.filter(r => (r.grade || '').trim().toUpperCase() === 'F');
+        
+        if (fGradeResults.length === 0) {
+            body.innerHTML = `
+                <div class="arrear-empty">
+                    <div class="arrear-empty-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                    </div>
+                    <h4>All Cleared!</h4>
+                    <p>This student has no pending F-grade subjects.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const groupedBySemester = {};
+        fGradeResults.forEach(r => {
+            const sem = r.semester || 'Unknown';
+            if (!groupedBySemester[sem]) {
+                groupedBySemester[sem] = [];
+            }
+            groupedBySemester[sem].push(r);
+        });
+        
+        const semesters = Object.keys(groupedBySemester).sort((a, b) => romanCompare(a, b));
+        
+        const totalArrears = fGradeResults.length;
+        const totalCredits = fGradeResults.reduce((sum, r) => sum + (r.credits || 0), 0);
+        
+        let html = `
+            <div class="arrear-summary">
+                <div class="arrear-stat">
+                    <span class="arrear-stat-value">${totalArrears}</span>
+                    <span class="arrear-stat-label">Total Arrears</span>
+                </div>
+                <div class="arrear-stat">
+                    <span class="arrear-stat-value">${totalCredits}</span>
+                    <span class="arrear-stat-label">Credits Affected</span>
+                </div>
+                <div class="arrear-stat">
+                    <span class="arrear-stat-value">${semesters.length}</span>
+                    <span class="arrear-stat-label">Semesters</span>
+                </div>
+            </div>
+            <div class="arrear-subjects-list">
+        `;
+        
+        semesters.forEach((sem, semIndex) => {
+            const subjects = groupedBySemester[sem];
+            const semCredits = subjects.reduce((sum, r) => sum + (r.credits || 0), 0);
+            
+            html += `
+                <div class="arrear-semester-card" style="animation-delay: ${semIndex * 0.08}s">
+                    <div class="arrear-semester-header">
+                        <div class="arrear-semester-info">
+                            <span class="arrear-semester-badge">Semester ${escapeHtml(sem)}</span>
+                            <span class="arrear-semester-count">${subjects.length} subject${subjects.length > 1 ? 's' : ''}</span>
+                        </div>
+                        <span class="arrear-semester-credits">${semCredits} credits</span>
+                    </div>
+                    <table class="arrear-table">
+                        <thead>
+                            <tr>
+                                <th>Subject Code</th>
+                                <th>Subject Name</th>
+                                <th class="text-center">Credits</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-center">Attempts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            subjects.forEach((r, idx) => {
+                const attemptCount = results.filter(res => res.subject_code === r.subject_code && res.reg_no === regNo).length;
+                const isFirstAttempt = attemptCount === 1;
+                const isRetake = attemptCount > 1;
+                
+                html += `
+                    <tr style="animation-delay: ${(semIndex * 0.08) + (idx * 0.04)}s">
+                        <td><code class="subject-code">${escapeHtml(r.subject_code)}</code></td>
+                        <td class="subject-name">${escapeHtml(r.subject_name)}</td>
+                        <td class="text-center"><span class="credit-badge">${r.credits}</span></td>
+                        <td class="text-center">
+                            <span class="grade-badge grade-f ${isRetake ? 'grade-retake' : ''}">
+                                ${isRetake ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>' : ''}
+                                F
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="attempt-badge ${isRetake ? 'attempt-retake' : ''}">${attemptCount}${isRetake ? '+' : ''}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        body.innerHTML = html;
+    } catch (err) {
+        body.innerHTML = `
+            <div class="arrear-error">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <p>Unable to load arrear details</p>
+                <span class="error-detail">${escapeHtml(err.message)}</span>
+            </div>
+        `;
+    }
+}
+
+function closeArrearModal() {
+    const modal = $('arrear-details-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeArrearModal();
+    }
+});
+
 // ─── 15. SGPA / CGPA Summary & Arrear Filter ──────────────────
 async function populateGradeBatchDropdown() {
     const select = $('grade-filter-batch');
@@ -2175,10 +2470,12 @@ async function loadGrades() {
         const html = data.map((g, idx) => {
             const arrCount = g.arrear_count || 0;
             const arrClass = arrCount === 0 ? 'arrear-0' : (arrCount === 1 ? 'arrear-1' : (arrCount === 2 ? 'arrear-2' : 'arrear-3'));
-            const arrText = arrCount === 0 ? '0 Arrears' : `${arrCount} Arrear${arrCount > 1 ? 's' : ''}`;
+            const arrText = arrCount === 0 ? '0 Arrears' : `${arrCount} Active Arr${arrCount > 1 ? 's' : ''}`;
+            const arrTooltip = arrCount === 0 ? 'All cleared / No pending arrears' : `${arrCount} active uncleared arrear subject${arrCount > 1 ? 's' : ''}`;
+            const isClickable = arrCount > 0 ? ' style="cursor:pointer;" onclick="showArrearDetails(\'' + escapeHtml(g.reg_no) + '\', \'' + escapeHtml(g.name) + '\')"' : '';
 
             return `
-                <tr>
+                <tr${isClickable}>
                     <td>${idx + 1}</td>
                     <td><strong>${escapeHtml(g.reg_no)}</strong></td>
                     <td>${escapeHtml(g.name)}</td>
@@ -2189,7 +2486,7 @@ async function loadGrades() {
                     <td>${g.total_credits}</td>
                     <td>${g.earned_credits}</td>
                     <td>
-                        <span class="arrear-badge ${arrClass}">
+                        <span class="arrear-badge ${arrClass}" title="${escapeHtml(arrTooltip)}${arrCount > 0 ? '\n\nClick to view F-grade subjects' : ''}">
                             <span class="arrear-dot"></span> ${arrText}
                         </span>
                     </td>
@@ -2297,9 +2594,11 @@ async function loadClassReport() {
         tbody.innerHTML = data.map((g, idx) => {
             const arrCount = g.arrear_count || 0;
             const arrClass = arrCount === 0 ? 'arrear-0' : (arrCount === 1 ? 'arrear-1' : (arrCount === 2 ? 'arrear-2' : 'arrear-3'));
-            const arrText  = arrCount === 0 ? '0 Arrears' : `${arrCount} Arrear${arrCount > 1 ? 's' : ''}`;
+            const arrText  = arrCount === 0 ? '0 Arrears' : `${arrCount} Active Arr${arrCount > 1 ? 's' : ''}`;
+            const arrTooltip = arrCount === 0 ? 'All cleared / No pending arrears' : `${arrCount} active uncleared arrear subject${arrCount > 1 ? 's' : ''}`;
+            const isClickable = arrCount > 0 ? ' style="cursor:pointer;" onclick="showArrearDetails(\'' + escapeHtml(g.reg_no) + '\', \'' + escapeHtml(g.name) + '\')"' : '';
             return `
-                <tr>
+                <tr${isClickable}>
                     <td>${idx + 1}</td>
                     <td><strong>${escapeHtml(g.reg_no)}</strong></td>
                     <td>${escapeHtml(g.name)}</td>
@@ -2307,7 +2606,7 @@ async function loadClassReport() {
                     <td>${g.total_credits}</td>
                     <td>${g.earned_credits}</td>
                     <td>
-                        <span class="arrear-badge ${arrClass}">
+                        <span class="arrear-badge ${arrClass}" title="${escapeHtml(arrTooltip)}${arrCount > 0 ? '\n\nClick to view F-grade subjects' : ''}">
                             <span class="arrear-dot"></span> ${arrText}
                         </span>
                     </td>
@@ -2903,9 +3202,9 @@ async function handleRcOtpVerify(event) {
         msg.style.color = '';
     }
 
-    if (!otp || !/^\d{6}$/.test(otp)) {
+    if (!otp || !/^[0-9A-Za-z]{6}$/.test(otp)) {
         if (msg) {
-            msg.textContent = 'Please enter the valid 6-digit OTP sent to your email.';
+            msg.textContent = 'Please enter the valid 6-character OTP sent to your email.';
             msg.style.color = 'var(--danger)';
         }
         return;
@@ -3070,7 +3369,7 @@ function renderReportCard(data, targetId = 'report-card-paper') {
         <div class="rc-pdf-header">
             <div class="rc-pdf-header-top">
                 <div class="rc-pdf-emblem" aria-hidden="true">
-                    <img src="ptu_logo.png" alt="PTU Logo" class="rc-pdf-logo-img" />
+                    <img src="ptu_logo.webp" alt="PTU Logo" class="rc-pdf-logo-img" />
                 </div>
                 <div class="rc-pdf-uni-block">
                     <h1 class="rc-pdf-uni-title">Puducherry Technological University</h1>
@@ -3147,7 +3446,7 @@ function renderReportCard(data, targetId = 'report-card-paper') {
             </div>
             <div class="rc-pdf-footer-right">
                 <div class="rc-seal-badge" aria-hidden="true">
-                    <img src="ptu_logo.png" alt="" class="rc-seal-img" />
+                    <img src="ptu_logo.webp" alt="" class="rc-seal-img" />
                     <span class="rc-seal-ring"></span>
                 </div>
                 <div class="rc-signature-block">
