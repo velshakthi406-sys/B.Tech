@@ -36,11 +36,16 @@ let editSubjectId = null;
 let editResultId = null;
 let editResultBatch = '';
 
-// Caches
+// Caches with expiration timestamps for performance optimization
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 let allStudentsCache = [];
+let allStudentsCacheTime = 0;
 let allSubjectsCache = [];
+let allSubjectsCacheTime = 0;
 let allResultsCache = [];
+let allResultsCacheTime = 0;
 let allGradesCache = [];
+let allGradesCacheTime = 0;
 
 // Filters
 let currentBatchFilter = 'All';
@@ -56,6 +61,10 @@ let resultsCurrentPage = 1;
 let resultsPageSize = 50;
 let resultsAvailableBatches = [];
 let fGradesFilterActive = false;
+
+// Grades/SGPA-CGPA Filter State
+let currentGradeBatchFilter = 'All';
+let currentGradeDeptFilter = 'All';
 
 // Report Card OTP State
 let rcRegNo = '';
@@ -148,7 +157,13 @@ function setTheme(theme, notify = true) {
     localStorage.setItem('ptu_theme', valid);
     localStorage.setItem('theme', valid);
 
-    // Sync public navbar segmented switch
+    // Sync animated theme toggle checkbox
+    const checkbox = document.getElementById('theme-toggle-checkbox');
+    if (checkbox) {
+        checkbox.checked = (valid === 'dark');
+    }
+
+    // Sync public navbar segmented switch (if it exists on other pages)
     const lightBtn = $('theme-btn-light');
     const darkBtn = $('theme-btn-dark');
     if (lightBtn && darkBtn) {
@@ -177,14 +192,101 @@ function setTheme(theme, notify = true) {
     });
 
     if (notify) {
-        showToast(`Theme changed to ${valid === 'dark' ? 'Dark Mode 🌙' : 'Light Mode ☀️'}`, 'info', 2000);
+        showToast(`Theme changed to ${valid === 'dark' ? 'Dark Mode' : 'Light Mode'}`, 'info', 2000);
     }
 }
 
-function toggleTheme() {
+function toggleTheme(event) {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
+    
+    // Create ripple effect from toggle button position
+    if (event && event.target) {
+        createThemeRipple(event);
+    }
+    
+    // Add transitioning class to body for smooth animations
+    document.body.classList.add('theme-transitioning');
+    
+    // Set the new theme
     setTheme(next, false);
+    
+    // Remove transitioning class after animation completes
+    setTimeout(() => {
+        document.body.classList.remove('theme-transitioning');
+    }, 600);
+}
+
+// Create ripple effect for theme transition
+function createThemeRipple(event) {
+    // Get click position
+    let x, y;
+    if (event.clientX && event.clientY) {
+        x = event.clientX;
+        y = event.clientY;
+    } else {
+        // If no event coordinates, use button position
+        const btn = event.target.closest('.theme-toggle');
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            x = rect.left + rect.width / 2;
+            y = rect.top + rect.height / 2;
+        } else {
+            // Fallback to center
+            x = window.innerWidth / 2;
+            y = window.innerHeight / 2;
+        }
+    }
+    
+    // Create ripple element
+    const ripple = document.createElement('div');
+    ripple.className = 'theme-transition-ripple';
+    ripple.style.width = '100px';
+    ripple.style.height = '100px';
+    ripple.style.left = (x - 50) + 'px';
+    ripple.style.top = (y - 50) + 'px';
+    
+    // Add to body
+    document.body.appendChild(ripple);
+    
+    // Remove after animation
+    setTimeout(() => {
+        if (ripple.parentNode) {
+            ripple.parentNode.removeChild(ripple);
+        }
+    }, 800);
+}
+
+// ─── Animated Theme Toggle Handler ────────────────────────
+function toggleThemeAnimated() {
+    const checkbox = document.getElementById('theme-toggle-checkbox');
+    if (!checkbox) return;
+    
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    
+    // DON'T disable transitions - let the animated toggle play smoothly
+    // Apply theme change directly without setTheme() to preserve animations
+    document.documentElement.setAttribute('data-theme', next);
+    document.documentElement.style.colorScheme = next;
+    localStorage.setItem('ptu_theme', next);
+    localStorage.setItem('theme', next);
+    
+    // Sync other theme toggles if they exist
+    const dashToggle = document.getElementById('theme-toggle');
+    if (dashToggle) {
+        dashToggle.setAttribute('title', `Switch to ${next === 'dark' ? 'Light' : 'Dark'} Mode (Alt + T)`);
+    }
+}
+
+// Sync checkbox state with current theme on page load
+function syncThemeCheckbox() {
+    const checkbox = document.getElementById('theme-toggle-checkbox');
+    if (!checkbox) return;
+    
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    // Checkbox checked = dark mode, unchecked = light mode
+    checkbox.checked = (currentTheme === 'dark');
 }
 
 // ─── 4. Particle Canvas (Hero Network) ────────────────────────
@@ -938,6 +1040,7 @@ function switchView(view) {
     if (view === 'results') {
         buildResultsBatchTabs();
         loadResults();
+        populateDeptFilters();
     }
     if (view === 'students') loadStudents();
     if (view === 'subjects') {
@@ -949,12 +1052,14 @@ function switchView(view) {
         }
     }
     if (view === 'grades') {
+        buildGradeBatchTabs();
+        buildGradeDeptTabs();
         loadGrades();
-        populateGradeBatchDropdown();
     }
     if (view === 'classreport') {
+        buildCrBatchTabs();
+        buildCrDeptTabs();
         loadClassReport();
-        populateClassReportBatchDropdown();
     }
     if (view === 'upload') {
         initUploadDropzones();
@@ -1074,7 +1179,7 @@ function initUploadDropzones() {
         input.onchange = () => {
             if (input.files && input.files[0]) {
                 zone.classList.add('has-file');
-                if (nameLabel) nameLabel.textContent = `📄 ${input.files[0].name}`;
+                if (nameLabel) nameLabel.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ${input.files[0].name}`;
             } else {
                 zone.classList.remove('has-file');
                 if (nameLabel) nameLabel.textContent = '';
@@ -1094,7 +1199,7 @@ function initUploadDropzones() {
             if (e.dataTransfer.files && e.dataTransfer.files[0]) {
                 input.files = e.dataTransfer.files;
                 zone.classList.add('has-file');
-                if (nameLabel) nameLabel.textContent = `📄 ${e.dataTransfer.files[0].name}`;
+                if (nameLabel) nameLabel.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> ${e.dataTransfer.files[0].name}`;
             }
         };
     });
@@ -1453,7 +1558,8 @@ async function loadResults() {
     tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">Loading results…</td></tr>';
 
     try {
-        const dept = $('filter-department')?.value || '';
+        const deptVal = $('filter-department')?.value || '';
+        const { dept, section } = parseDeptSection(deptVal);
         const sem  = $('filter-semester')?.value || '';
         const subCode = $('filter-subject-code')?.value?.trim() || '';
         const regNo = $('filter-reg-no')?.value?.trim() || '';
@@ -1463,6 +1569,7 @@ async function loadResults() {
             url += `batch=${encodeURIComponent(currentResultsBatchFilter)}&`;
         }
         if (dept) url += `department=${encodeURIComponent(dept)}&`;
+        if (section) url += `section=${encodeURIComponent(section)}&`;
         if (sem)  url += `semester=${encodeURIComponent(sem)}&`;
         if (subCode) url += `subject_code=${encodeURIComponent(subCode)}&`;
         if (regNo) url += `reg_no=${encodeURIComponent(regNo)}&`;
@@ -1578,8 +1685,8 @@ function renderResultsTable() {
                 <td>${r.grade_point}</td>
                 <td>
                     <div class="table-actions">
-                        <button class="action-btn edit" onclick="editResult(${r.id}, '${escapeHtml(r.batch || '')}')" title="Modify Grade">✏️</button>
-                        <button class="action-btn delete developer-only" onclick="deleteResult(${r.id}, '${escapeHtml(r.batch || '')}')" title="Delete Result">🗑️</button>
+                        <button class="action-btn edit" onclick="editResult(${r.id}, '${escapeHtml(r.batch || '')}')" title="Modify Grade"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                        <button class="action-btn delete developer-only" onclick="deleteResult(${r.id}, '${escapeHtml(r.batch || '')}')" title="Delete Result"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                     </div>
                 </td>
             </tr>
@@ -1754,6 +1861,19 @@ function deptToCode(department) {
     return (department || 'Other').trim();
 }
 
+async function ensureStudentsCache() {
+    if (!allStudentsCache || !allStudentsCache.length) {
+        try {
+            const data = await authFetch('/students');
+            allStudentsCache = data || [];
+        } catch (err) {
+            console.warn('Could not load students cache:', err);
+            allStudentsCache = [];
+        }
+    }
+    return allStudentsCache;
+}
+
 function studentSectionTab(s) {
     const code = deptToCode(s.department);
     return s.section ? `${code}-${s.section}` : code;
@@ -1895,8 +2015,8 @@ function renderStudents() {
             <td><code>${escapeHtml(s.email || (s.reg_no + '@ptuniv.edu.in'))}</code></td>
             <td>
                 <div class="table-actions">
-                    <button class="action-btn edit" onclick="editStudent('${escapeHtml(s.reg_no)}')" title="Edit Student">✏️</button>
-                    <button class="action-btn delete developer-only" onclick="deleteStudent('${escapeHtml(s.reg_no)}')" title="Delete Student">🗑️</button>
+                    <button class="action-btn edit" onclick="editStudent('${escapeHtml(s.reg_no)}')" title="Edit Student"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    <button class="action-btn delete developer-only" onclick="deleteStudent('${escapeHtml(s.reg_no)}')" title="Delete Student"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                 </div>
             </td>
         </tr>
@@ -2103,8 +2223,8 @@ function renderSubjects() {
             <td>${escapeHtml(s.department || '—')}</td>
             <td>
                 <div class="table-actions">
-                    <button class="action-btn edit" onclick="editSubject(${s.id})" title="Edit Subject">✏️</button>
-                    <button class="action-btn delete developer-only" onclick="deleteSubject(${s.id})" title="Delete Subject">🗑️</button>
+                    <button class="action-btn edit" onclick="editSubject(${s.id})" title="Edit Subject"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    <button class="action-btn delete developer-only" onclick="deleteSubject(${s.id})" title="Delete Subject"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                 </div>
             </td>
         </tr>
@@ -2207,26 +2327,73 @@ async function showArrearDetails(regNo, studentName) {
     const title = $('arrear-modal-title');
     const subtitle = $('arrear-modal-subtitle');
     const body = $('arrear-modal-body');
-    
+
     if (!modal) return;
-    
-    title.innerText = 'F-Grade Subjects';
+
+    title.innerText = 'Active Arrear Subjects';
     subtitle.innerText = `${escapeHtml(studentName)} · ${escapeHtml(regNo)}`;
     body.innerHTML = '<div class="arrear-loading"><div class="spinner"></div><span>Fetching arrear information...</span></div>';
     modal.classList.remove('hidden');
-    
+
+    // Grades that count as a failure — mirrors backend logic exactly
+    const FAIL_GRADES = new Set(['F', 'AB', 'ABSENT', 'NC', 'E', 'Z', '']);
+
+    function isFail(r) {
+        return FAIL_GRADES.has((r.grade || '').trim().toUpperCase()) || Number(r.grade_point) === 0;
+    }
+    function isPass(r) {
+        return !FAIL_GRADES.has((r.grade || '').trim().toUpperCase()) && Number(r.grade_point) > 0;
+    }
+
     try {
-        const response = await authFetch(`/students/by-reg/${encodeURIComponent(regNo)}`);
-        if (!response) throw new Error('Student not found');
-        
-        const studentId = response.id;
+        const studentRes = await authFetch(`/students/by-reg/${encodeURIComponent(regNo)}`);
+        if (!studentRes) throw new Error('Student not found');
+
         const resultsRes = await authFetch(`/results?reg_no=${encodeURIComponent(regNo)}`);
         const results = resultsRes || [];
-        
-        const fGradeResults = results.filter(r => (r.grade || '').trim().toUpperCase() === 'F');
-        
-        if (fGradeResults.length === 0) {
-            body.innerHTML = `
+
+        // ── Group all attempts by subject_code ──────────────────────────
+        const subjectMap = {};
+        results.forEach(r => {
+            const key = (r.subject_code || r.subject_id || '').trim();
+            if (!key) return;
+            if (!subjectMap[key]) subjectMap[key] = [];
+            subjectMap[key].push(r);
+        });
+
+        // ── Classify each subject as active arrear or cleared history ───
+        const activeArrears = [];   // uncleared: has F, no passing attempt
+        const clearedHistory = [];  // cleared:   had F, later passed
+
+        for (const [code, attempts] of Object.entries(subjectMap)) {
+            const hasFail = attempts.some(isFail);
+            const hasPass = attempts.some(isPass);
+
+            if (!hasFail) continue; // never failed → irrelevant
+
+            if (hasPass) {
+                // Cleared: find the best (latest / highest) passing attempt to represent
+                const bestPass = attempts
+                    .filter(isPass)
+                    .sort((a, b) => Number(b.grade_point) - Number(a.grade_point))[0];
+                clearedHistory.push({ ...bestPass, _allAttempts: attempts });
+            } else {
+                // Active arrear: represent with the most-recent failing attempt
+                const latestFail = attempts
+                    .filter(isFail)
+                    .sort((a, b) => {
+                        // sort by semester descending (roman numerals)
+                        const sd = romanCompare(b.semester || '', a.semester || '');
+                        if (sd !== 0) return sd;
+                        return Number(b.attempt || 0) - Number(a.attempt || 0);
+                    })[0];
+                activeArrears.push({ ...latestFail, _allAttempts: attempts });
+            }
+        }
+
+        // ── Empty state ─────────────────────────────────────────────────
+        if (activeArrears.length === 0) {
+            let emptyHtml = `
                 <div class="arrear-empty">
                     <div class="arrear-empty-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2235,35 +2402,42 @@ async function showArrearDetails(regNo, studentName) {
                         </svg>
                     </div>
                     <h4>All Cleared!</h4>
-                    <p>This student has no pending F-grade subjects.</p>
-                </div>
-            `;
+                    <p>This student has no active arrear subjects.</p>
+                </div>`;
+            if (clearedHistory.length > 0) {
+                emptyHtml += buildClearedSection(clearedHistory, results, regNo);
+            }
+            body.innerHTML = emptyHtml;
             return;
         }
-        
+
+        // ── Summary stats ───────────────────────────────────────────────
+        const totalArrears = activeArrears.length;
+        const totalCredits = activeArrears.reduce((sum, r) => sum + (Number(r.credits) || 0), 0);
+
+        // Group active arrears by the semester of their ORIGINAL failure
         const groupedBySemester = {};
-        fGradeResults.forEach(r => {
-            const sem = r.semester || 'Unknown';
-            if (!groupedBySemester[sem]) {
-                groupedBySemester[sem] = [];
-            }
+        activeArrears.forEach(r => {
+            // Use the earliest failing semester as the "origin" semester
+            const earliestFail = r._allAttempts
+                .filter(isFail)
+                .sort((a, b) => romanCompare(a.semester || '', b.semester || ''))[0];
+            const sem = (earliestFail || r).semester || 'Unknown';
+            if (!groupedBySemester[sem]) groupedBySemester[sem] = [];
             groupedBySemester[sem].push(r);
         });
-        
+
         const semesters = Object.keys(groupedBySemester).sort((a, b) => romanCompare(a, b));
-        
-        const totalArrears = fGradeResults.length;
-        const totalCredits = fGradeResults.reduce((sum, r) => sum + (r.credits || 0), 0);
-        
+
         let html = `
             <div class="arrear-summary">
                 <div class="arrear-stat">
                     <span class="arrear-stat-value">${totalArrears}</span>
-                    <span class="arrear-stat-label">Total Arrears</span>
+                    <span class="arrear-stat-label">Active Arrears</span>
                 </div>
                 <div class="arrear-stat">
                     <span class="arrear-stat-value">${totalCredits}</span>
-                    <span class="arrear-stat-label">Credits Affected</span>
+                    <span class="arrear-stat-label">Credits Pending</span>
                 </div>
                 <div class="arrear-stat">
                     <span class="arrear-stat-value">${semesters.length}</span>
@@ -2272,16 +2446,16 @@ async function showArrearDetails(regNo, studentName) {
             </div>
             <div class="arrear-subjects-list">
         `;
-        
+
         semesters.forEach((sem, semIndex) => {
             const subjects = groupedBySemester[sem];
-            const semCredits = subjects.reduce((sum, r) => sum + (r.credits || 0), 0);
-            
+            const semCredits = subjects.reduce((sum, r) => sum + (Number(r.credits) || 0), 0);
+
             html += `
                 <div class="arrear-semester-card" style="animation-delay: ${semIndex * 0.08}s">
                     <div class="arrear-semester-header">
                         <div class="arrear-semester-info">
-                            <span class="arrear-semester-badge">Semester ${escapeHtml(sem)}</span>
+                            <span class="arrear-semester-badge">Semester ${escapeHtml(String(sem))}</span>
                             <span class="arrear-semester-count">${subjects.length} subject${subjects.length > 1 ? 's' : ''}</span>
                         </div>
                         <span class="arrear-semester-credits">${semCredits} credits</span>
@@ -2292,23 +2466,22 @@ async function showArrearDetails(regNo, studentName) {
                                 <th>Subject Code</th>
                                 <th>Subject Name</th>
                                 <th class="text-center">Credits</th>
-                                <th class="text-center">Status</th>
+                                <th class="text-center">Grade</th>
                                 <th class="text-center">Attempts</th>
                             </tr>
                         </thead>
                         <tbody>
             `;
-            
+
             subjects.forEach((r, idx) => {
-                const attemptCount = results.filter(res => res.subject_code === r.subject_code && res.reg_no === regNo).length;
-                const isFirstAttempt = attemptCount === 1;
+                const attemptCount = r._allAttempts.length;
                 const isRetake = attemptCount > 1;
-                
+
                 html += `
                     <tr style="animation-delay: ${(semIndex * 0.08) + (idx * 0.04)}s">
-                        <td><code class="subject-code">${escapeHtml(r.subject_code)}</code></td>
-                        <td class="subject-name">${escapeHtml(r.subject_name)}</td>
-                        <td class="text-center"><span class="credit-badge">${r.credits}</span></td>
+                        <td><code class="subject-code">${escapeHtml(r.subject_code || '')}</code></td>
+                        <td class="subject-name">${escapeHtml(r.subject_name || '')}</td>
+                        <td class="text-center"><span class="credit-badge">${Number(r.credits) || 0}</span></td>
                         <td class="text-center">
                             <span class="grade-badge grade-f ${isRetake ? 'grade-retake' : ''}">
                                 ${isRetake ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>' : ''}
@@ -2321,15 +2494,21 @@ async function showArrearDetails(regNo, studentName) {
                     </tr>
                 `;
             });
-            
+
             html += `
                         </tbody>
                     </table>
                 </div>
             `;
         });
-        
+
         html += '</div>';
+
+        // Append cleared history section if any
+        if (clearedHistory.length > 0) {
+            html += buildClearedSection(clearedHistory, results, regNo);
+        }
+
         body.innerHTML = html;
     } catch (err) {
         body.innerHTML = `
@@ -2344,6 +2523,57 @@ async function showArrearDetails(regNo, studentName) {
             </div>
         `;
     }
+}
+
+// ─── Helper: render the "Cleared Arrears" history section ─────
+function buildClearedSection(clearedHistory, allResults, regNo) {
+    const count = clearedHistory.length;
+    const rows = clearedHistory.map((r, idx) => {
+        const attemptCount = r._allAttempts.length;
+        const gradeDisplay = escapeHtml((r.grade || '').toUpperCase());
+        return `
+            <tr style="animation-delay: ${idx * 0.04}s">
+                <td><code class="subject-code">${escapeHtml(r.subject_code || '')}</code></td>
+                <td class="subject-name">${escapeHtml(r.subject_name || '')}</td>
+                <td class="text-center"><span class="credit-badge">${Number(r.credits) || 0}</span></td>
+                <td class="text-center">
+                    <span class="grade-badge grade-cleared" title="Cleared after ${attemptCount} attempt(s)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px;height:12px;vertical-align:middle;margin-right:2px">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        ${gradeDisplay}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="attempt-badge attempt-cleared">${attemptCount}</span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    return `
+        <div class="arrear-cleared-section">
+            <div class="arrear-cleared-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span>Previously Cleared Arrears <em>(${count} subject${count > 1 ? 's' : ''})</em></span>
+            </div>
+            <table class="arrear-table arrear-table-cleared">
+                <thead>
+                    <tr>
+                        <th>Subject Code</th>
+                        <th>Subject Name</th>
+                        <th class="text-center">Credits</th>
+                        <th class="text-center">Final Grade</th>
+                        <th class="text-center">Attempts</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
 }
 
 function closeArrearModal() {
@@ -2368,6 +2598,163 @@ async function populateGradeBatchDropdown() {
         console.warn('Could not load batches for grade filter:', e);
     }
 }
+
+// ─── Grade/SGPA-CGPA Batch Pills ──────────────────────────────────────────────
+async function buildGradeBatchTabs() {
+    const container = $('grade-batch-tabs-container');
+    if (!container) return;
+    const students = await ensureStudentsCache();
+    const batches = new Set();
+    students.forEach(s => {
+        if (s.batch && s.batch.trim()) batches.add(s.batch.trim());
+    });
+    const sortedBatches = Array.from(batches).sort();
+    let html = `<button class="dept-tab ${currentGradeBatchFilter === 'All' ? 'active' : ''}" data-batch="All" onclick="selectGradeBatchTab('All')">
+        All Batches <span class="badge-count">${students.length}</span>
+    </button>`;
+    sortedBatches.forEach(b => {
+        const count = students.filter(s => (s.batch || '').trim() === b).length;
+        html += `<button class="dept-tab ${currentGradeBatchFilter === b ? 'active' : ''}" data-batch="${escapeHtml(b)}" onclick="selectGradeBatchTab('${escapeHtml(b)}')">
+            ${escapeHtml(b)} <span class="badge-count">${count}</span>
+        </button>`;
+    });
+    container.innerHTML = html;
+}
+
+function selectGradeBatchTab(batch) {
+    currentGradeBatchFilter = batch;
+    currentGradeDeptFilter = 'All';
+    buildGradeBatchTabs();
+    buildGradeDeptTabs();
+    loadGrades();
+}
+
+// ─── Grade/SGPA-CGPA Dept & Section Pills ─────────────────────────────────────
+async function buildGradeDeptTabs() {
+    const container = $('grade-dept-tabs-container');
+    if (!container) return;
+    const allStudents = await ensureStudentsCache();
+    let students = allStudents;
+    if (currentGradeBatchFilter !== 'All') {
+        students = allStudents.filter(s => (s.batch || '').trim() === currentGradeBatchFilter);
+    }
+    const tabCounts = {};
+    students.forEach(s => {
+        const tab = studentSectionTab(s);
+        tabCounts[tab] = (tabCounts[tab] || 0) + 1;
+    });
+    const sortedTabs = Object.keys(tabCounts).sort();
+    let html = `<button class="dept-tab ${currentGradeDeptFilter === 'All' ? 'active' : ''}" data-dept="All" onclick="selectGradeDeptTab('All')">
+        All <span class="badge-count">${students.length}</span>
+    </button>`;
+    sortedTabs.forEach(tab => {
+        html += `<button class="dept-tab ${currentGradeDeptFilter === tab ? 'active' : ''}" data-dept="${tab}" onclick="selectGradeDeptTab('${tab}')">
+            ${tab} <span class="badge-count">${tabCounts[tab]}</span>
+        </button>`;
+    });
+    container.innerHTML = html;
+}
+
+function selectGradeDeptTab(deptTab) {
+    currentGradeDeptFilter = deptTab;
+    buildGradeDeptTabs();
+    loadGrades();
+}
+
+// ─── Dept-Section filter helpers ──────────────────────────────────────────────
+
+/**
+ * Parse a filter value like "CSE-A" → { dept: "CSE", section: "A" }
+ * or "CSE" → { dept: "CSE", section: "" }
+ * We encode as "DEPT::SECTION" internally to avoid ambiguity with dept codes
+ * that contain a hyphen (e.g., "E-EEE" won't exist, but just in case).
+ */
+function parseDeptSection(value) {
+    if (!value) return { dept: '', section: '' };
+    if (value.includes('::')) {
+        const [dept, section] = value.split('::', 2);
+        return { dept: dept || '', section: section || '' };
+    }
+    return { dept: value, section: '' };
+}
+
+function encodeDeptSection(dept, section) {
+    return section ? `${dept}::${section}` : dept;
+}
+
+/**
+ * Build the HTML for a dept filter <select> from the dept-sections list.
+ * - Depts with ONE distinct section (or no section) → flat <option>
+ * - Depts with MULTIPLE sections → <optgroup label="CSE"> containing
+ *     <option value="CSE">CSE (All Sections)</option>
+ *     <option value="CSE::A">CSE-A</option>
+ *     ...
+ */
+function buildDeptFilterOptions(pairs, allLabel = 'All') {
+    // Group pairs by dept
+    const deptMap = {};
+    pairs.forEach(({ dept, section }) => {
+        if (!deptMap[dept]) deptMap[dept] = [];
+        if (section) deptMap[dept].push(section);
+    });
+
+    let html = `<option value="">${escapeHtml(allLabel)}</option>`;
+
+    const sortedDepts = Object.keys(deptMap).sort();
+    sortedDepts.forEach(dept => {
+        const sections = deptMap[dept].sort();
+        if (sections.length <= 1) {
+            // Single or no section — flat option, value = dept code only
+            html += `<option value="${escapeHtml(dept)}">${escapeHtml(dept)}</option>`;
+        } else {
+            // Multiple sections — use optgroup
+            html += `<optgroup label="${escapeHtml(dept)}">`;
+            html += `<option value="${escapeHtml(dept)}">${escapeHtml(dept)} (All Sections)</option>`;
+            sections.forEach(sec => {
+                const val = encodeDeptSection(dept, sec);
+                html += `<option value="${escapeHtml(val)}">${escapeHtml(dept)}-${escapeHtml(sec)}</option>`;
+            });
+            html += `</optgroup>`;
+        }
+    });
+
+    return html;
+}
+
+// Cached dept-sections data
+let deptSectionPairs = null;
+
+async function populateDeptFilters() {
+    try {
+        const pairs = await authFetch('/students/dept-sections');
+        deptSectionPairs = pairs || [];
+    } catch (e) {
+        console.warn('Could not load dept-sections:', e);
+        deptSectionPairs = [];
+    }
+
+    // The four dept filter selects across all views
+    const filterIds = [
+        { id: 'filter-department',  allLabel: 'All Depts' },
+        { id: 'grade-filter-dept',  allLabel: 'All' },
+        { id: 'cr-filter-dept',     allLabel: 'All' },
+    ];
+
+    const html = buildDeptFilterOptions(deptSectionPairs || []);
+    filterIds.forEach(({ id, allLabel }) => {
+        const el = $(id);
+        if (!el) return;
+        // Rebuild keeping current selected value if possible
+        const prev = el.value;
+        el.innerHTML = buildDeptFilterOptions(deptSectionPairs || [], allLabel);
+        // Restore selection if the option still exists
+        if (prev && el.querySelector(`option[value="${CSS.escape(prev)}"]`)) {
+            el.value = prev;
+        }
+    });
+}
+
+
 
 function toggleArrearDropdown(event) {
     if (event) event.stopPropagation();
@@ -2423,14 +2810,26 @@ async function loadGrades() {
     tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">Computing SGPA & CGPA…</td></tr>';
 
     try {
-        const dept = $('grade-filter-dept')?.value || '';
+        const deptVal = currentGradeDeptFilter !== 'All' ? currentGradeDeptFilter : '';
+        let dept = '';
+        let section = '';
+        if (deptVal) {
+            if (deptVal.includes('-')) {
+                const parts = deptVal.split('-');
+                dept = parts[0];
+                section = parts[1];
+            } else {
+                dept = deptVal;
+            }
+        }
         const sem  = $('grade-filter-sem')?.value || '';
-        const batch = $('grade-filter-batch')?.value || '';
+        const batch = currentGradeBatchFilter !== 'All' ? currentGradeBatchFilter : '';
         const cgpaSort = $('grade-filter-sort')?.value || 'desc';
         const creditsSort = $('grade-filter-credits-sort')?.value || 'none';
 
         let url = '/grades/summary?';
         if (dept) url += `department=${encodeURIComponent(dept)}&`;
+        if (section) url += `section=${encodeURIComponent(section)}&`;
         if (sem)  url += `semester=${encodeURIComponent(sem)}&`;
         if (batch) url += `batch=${encodeURIComponent(batch)}&`;
 
@@ -2503,6 +2902,10 @@ async function loadGrades() {
 let currentCrArrearFilter = ['all'];
 let allClassReportCache = [];
 
+// Class Report Filter State
+let currentCrBatchFilter = 'All';
+let currentCrDeptFilter = 'All';
+
 async function populateClassReportBatchDropdown() {
     const select = $('cr-filter-batch');
     if (!select) return;
@@ -2512,6 +2915,68 @@ async function populateClassReportBatchDropdown() {
     } catch (e) {
         console.warn('Could not load batches for class report filter:', e);
     }
+}
+
+// ─── Class Report Batch Pills ─────────────────────────────────────────────────
+async function buildCrBatchTabs() {
+    const container = $('cr-batch-tabs-container');
+    if (!container) return;
+    const students = await ensureStudentsCache();
+    const batches = new Set();
+    students.forEach(s => {
+        if (s.batch && s.batch.trim()) batches.add(s.batch.trim());
+    });
+    const sortedBatches = Array.from(batches).sort();
+    let html = `<button class="dept-tab ${currentCrBatchFilter === 'All' ? 'active' : ''}" data-batch="All" onclick="selectCrBatchTab('All')">
+        All Batches <span class="badge-count">${students.length}</span>
+    </button>`;
+    sortedBatches.forEach(b => {
+        const count = students.filter(s => (s.batch || '').trim() === b).length;
+        html += `<button class="dept-tab ${currentCrBatchFilter === b ? 'active' : ''}" data-batch="${escapeHtml(b)}" onclick="selectCrBatchTab('${escapeHtml(b)}')">
+            ${escapeHtml(b)} <span class="badge-count">${count}</span>
+        </button>`;
+    });
+    container.innerHTML = html;
+}
+
+function selectCrBatchTab(batch) {
+    currentCrBatchFilter = batch;
+    currentCrDeptFilter = 'All';
+    buildCrBatchTabs();
+    buildCrDeptTabs();
+    loadClassReport();
+}
+
+// ─── Class Report Dept & Section Pills ────────────────────────────────────────
+async function buildCrDeptTabs() {
+    const container = $('cr-dept-tabs-container');
+    if (!container) return;
+    const allStudents = await ensureStudentsCache();
+    let students = allStudents;
+    if (currentCrBatchFilter !== 'All') {
+        students = allStudents.filter(s => (s.batch || '').trim() === currentCrBatchFilter);
+    }
+    const tabCounts = {};
+    students.forEach(s => {
+        const tab = studentSectionTab(s);
+        tabCounts[tab] = (tabCounts[tab] || 0) + 1;
+    });
+    const sortedTabs = Object.keys(tabCounts).sort();
+    let html = `<button class="dept-tab ${currentCrDeptFilter === 'All' ? 'active' : ''}" data-dept="All" onclick="selectCrDeptTab('All')">
+        All <span class="badge-count">${students.length}</span>
+    </button>`;
+    sortedTabs.forEach(tab => {
+        html += `<button class="dept-tab ${currentCrDeptFilter === tab ? 'active' : ''}" data-dept="${tab}" onclick="selectCrDeptTab('${tab}')">
+            ${tab} <span class="badge-count">${tabCounts[tab]}</span>
+        </button>`;
+    });
+    container.innerHTML = html;
+}
+
+function selectCrDeptTab(deptTab) {
+    currentCrDeptFilter = deptTab;
+    buildCrDeptTabs();
+    loadClassReport();
 }
 
 function toggleCrArrearDropdown(event) {
@@ -2566,14 +3031,27 @@ async function loadClassReport() {
     tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">Loading Class Report\u2026</td></tr>';
 
     try {
-        const dept  = $('cr-filter-dept')?.value || '';
-        const batch = $('cr-filter-batch')?.value || '';
+        const deptVal  = currentCrDeptFilter !== 'All' ? currentCrDeptFilter : '';
+        let dept = '';
+        let section = '';
+        if (deptVal) {
+            if (deptVal.includes('-')) {
+                const parts = deptVal.split('-');
+                dept = parts[0];
+                section = parts[1];
+            } else {
+                dept = deptVal;
+            }
+        }
+        const batch = currentCrBatchFilter !== 'All' ? currentCrBatchFilter : '';
         const creditsSort = $('cr-filter-credits-sort')?.value || 'none';
 
         let url = '/grades/summary?';
-        if (dept)  url += `department=${encodeURIComponent(dept)}&`;
-        if (batch) url += `batch=${encodeURIComponent(batch)}&`;
+        if (dept)    url += `department=${encodeURIComponent(dept)}&`;
+        if (section) url += `section=${encodeURIComponent(section)}&`;
+        if (batch)   url += `batch=${encodeURIComponent(batch)}&`;
         currentCrArrearFilter.forEach(a => { url += `arrears=${encodeURIComponent(a)}&`; });
+
 
         const data = await authFetch(url);
 
@@ -2618,6 +3096,60 @@ async function loadClassReport() {
     }
 }
 
+// Client-side filter for Class Report by Reg No and Student Name
+function filterClassReport() {
+    const tbody = $('classreport-tbody');
+    if (!tbody || !allClassReportCache || !allClassReportCache.length) return;
+
+    // Get filter values
+    const regNoFilter = ($('cr-filter-regno')?.value || '').trim().toLowerCase();
+    const nameFilter = ($('cr-filter-name')?.value || '').trim().toLowerCase();
+
+    // Filter the cached data
+    let filteredData = allClassReportCache;
+
+    if (regNoFilter) {
+        filteredData = filteredData.filter(g => 
+            (g.reg_no || '').toLowerCase().includes(regNoFilter)
+        );
+    }
+
+    if (nameFilter) {
+        filteredData = filteredData.filter(g => 
+            (g.name || '').toLowerCase().includes(nameFilter)
+        );
+    }
+
+    // Render filtered results
+    if (!filteredData.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">No students match your search criteria.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filteredData.map((g, idx) => {
+        const arrCount = g.arrear_count || 0;
+        const arrClass = arrCount === 0 ? 'arrear-0' : (arrCount === 1 ? 'arrear-1' : (arrCount === 2 ? 'arrear-2' : 'arrear-3'));
+        const arrText  = arrCount === 0 ? '0 Arrears' : `${arrCount} Active Arr${arrCount > 1 ? 's' : ''}`;
+        const arrTooltip = arrCount === 0 ? 'All cleared / No pending arrears' : `${arrCount} active uncleared arrear subject${arrCount > 1 ? 's' : ''}`;
+        const isClickable = arrCount > 0 ? ' style="cursor:pointer;" onclick="showArrearDetails(\'' + escapeHtml(g.reg_no) + '\', \'' + escapeHtml(g.name) + '\')"' : '';
+        return `
+            <tr${isClickable}>
+                <td>${idx + 1}</td>
+                <td><strong>${escapeHtml(g.reg_no)}</strong></td>
+                <td>${escapeHtml(g.name)}</td>
+                <td>${escapeHtml(g.department)}</td>
+                <td>${g.total_credits}</td>
+                <td>${g.earned_credits}</td>
+                <td>
+                    <span class="arrear-badge ${arrClass}" title="${escapeHtml(arrTooltip)}${arrCount > 0 ? '\n\nClick to view F-grade subjects' : ''}">
+                        <span class="arrear-dot"></span> ${arrText}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
 function exportClassReportToExcel() {
     if (!allClassReportCache || !allClassReportCache.length) {
         showToast('No data to export', 'warning');
@@ -2625,15 +3157,23 @@ function exportClassReportToExcel() {
     }
 
     try {
-        const deptVal   = $('cr-filter-dept')?.value || '';
-        const batchVal  = $('cr-filter-batch')?.value || '';
+        const deptVal   = currentCrDeptFilter || 'All';
+        const batchVal  = currentCrBatchFilter || 'All';
         const deptNames = {
             'CE':'Civil Engineering (CE)','CHE':'Chemical Engineering (CHE)',
             'CSE':'Computer Science & Engineering (CSE)','ECE':'Electronics & Communication Engineering (ECE)',
             'EEE':'Electrical & Electronics Engineering (EEE)','EIE':'Electronics & Instrumentation Engineering (EIE)',
             'IT':'Information Technology (IT)','ME':'Mechanical Engineering (ME)','MT':'Mechatronics Engineering (MT)'
         };
-        const deptDisplay  = deptNames[deptVal] || (deptVal ? deptVal : 'All Departments');
+        let deptDisplay = 'All Departments';
+        if (deptVal && deptVal !== 'All') {
+            if (deptVal.includes('-')) {
+                const [dCode, sCode] = deptVal.split('-');
+                deptDisplay = (deptNames[dCode] || dCode) + ` - Section ${sCode}`;
+            } else {
+                deptDisplay = deptNames[deptVal] || deptVal;
+            }
+        }
         const batchDisplay = (batchVal && batchVal.toLowerCase() !== 'all') ? batchVal : 'All Batches';
         let arrearDisplay  = 'All Students';
         if (!currentCrArrearFilter.includes('all') && currentCrArrearFilter.length > 0) {
@@ -2681,8 +3221,7 @@ function exportGradesToExcel() {
 
     try {
         // ── 1. Extract Active Filter States ──
-        const deptSelect = $('grade-filter-dept');
-        const deptVal = deptSelect?.value || '';
+        const deptVal = currentGradeDeptFilter || 'All';
         const deptNames = {
             'CE': 'Civil Engineering (CE)',
             'CHE': 'Chemical Engineering (CHE)',
@@ -2694,12 +3233,20 @@ function exportGradesToExcel() {
             'ME': 'Mechanical Engineering (ME)',
             'MT': 'Mechatronics Engineering (MT)'
         };
-        const deptDisplay = deptNames[deptVal] || (deptVal ? deptVal : 'All Departments');
+        let deptDisplay = 'All Departments';
+        if (deptVal && deptVal !== 'All') {
+            if (deptVal.includes('-')) {
+                const [dCode, sCode] = deptVal.split('-');
+                deptDisplay = (deptNames[dCode] || dCode) + ` - Section ${sCode}`;
+            } else {
+                deptDisplay = deptNames[deptVal] || deptVal;
+            }
+        }
 
         const semVal = $('grade-filter-sem')?.value || '';
         const semDisplay = semVal ? `Semester ${semVal} (SGPA)` : 'Overall Cumulative (CGPA)';
 
-        const batchVal = $('grade-filter-batch')?.value || '';
+        const batchVal = currentGradeBatchFilter || 'All';
         const batchDisplay = (batchVal && batchVal.toLowerCase() !== 'all') ? batchVal : 'All Batches';
 
         let arrearDisplay = 'All Students (No Filter)';
@@ -3596,17 +4143,23 @@ function renderResourcesTable(resources) {
 
     const isDeveloper = (userRole || '').toLowerCase() === 'developer';
 
-    tbody.innerHTML = resources.map((r, idx) => {
+    const sortedResources = resources.slice().sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+
+    tbody.innerHTML = sortedResources.map((r, idx) => {
         const accType = r.account_type || 'Faculty';
         const typeClass = 'badge-' + accType.toLowerCase().replace(/\s+/g, '-');
         const statusBadge = r.has_account
-            ? '<span class="badge badge-active" title="Registered User Account Active">✓ Registered</span>'
-            : '<span class="badge badge-pending" title="Pre-registered. Waiting for user signup.">⏳ Pending Signup</span>';
+            ? '<span class="badge badge-active" title="Registered User Account Active"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:3px;"><polyline points="20 6 9 17 4 12"/></svg>Registered</span>'
+            : '<span class="badge badge-pending" title="Pre-registered. Waiting for user signup."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Pending Signup</span>';
 
         const actions = isDeveloper ? `
             <div class="table-actions" style="justify-content:center;">
-              <button class="action-btn edit" onclick="editResource(${r.id})" title="Edit Resource">✏️</button>
-              <button class="action-btn delete" onclick="deleteResource(${r.id}, '${escapeHtml(r.name)}')" title="Delete Resource">🗑️</button>
+              <button class="action-btn edit" onclick="editResource(${r.id})" title="Edit Resource"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              <button class="action-btn delete" onclick="deleteResource(${r.id}, '${escapeHtml(r.name)}')" title="Delete Resource"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
             </div>
         ` : '—';
 
@@ -3808,13 +4361,100 @@ async function deleteResource(id, name) {
     }
 }
 
+// Scroll-anywhere on hover - ultra-smooth momentum scrolling
+function initScrollAnywhere() {
+    const scrollSelectors = '.content-grid, .nav-menu, .table-scroll-region, .modal-body, .arrear-modal-body, .arrear-modal-table-container';
+    const activeScrolls = new Map();
+
+    // Industry standard scroll settings: 10 records per scroll, ultra-smooth deceleration
+    const scrollMultiplier = 0.1;
+    const friction = 0.95;
+    const maxVelocity = 15;
+    const minVelocity = 0.15;
+
+    document.addEventListener('wheel', (e) => {
+        const containers = document.querySelectorAll(scrollSelectors);
+        let targetContainer = null;
+
+        for (const c of containers) {
+            if (c.contains(e.target)) {
+                targetContainer = c;
+                break;
+            }
+        }
+
+        if (!targetContainer) return;
+
+        const isInput = e.target.closest('input, textarea, select, [contenteditable], .filter-select');
+        if (isInput) return;
+
+        const canScrollY = targetContainer.scrollHeight > targetContainer.clientHeight + 2;
+        const canScrollX = targetContainer.scrollWidth > targetContainer.clientWidth + 2;
+
+        if (!activeScrolls.has(targetContainer)) {
+            activeScrolls.set(targetContainer, { velY: 0, velX: 0, animId: null });
+        }
+        const scroll = activeScrolls.get(targetContainer);
+
+        const deltaY = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY) * scrollMultiplier, maxVelocity);
+        const deltaX = Math.sign(e.deltaX) * Math.min(Math.abs(e.deltaX || e.deltaY) * scrollMultiplier, maxVelocity);
+
+        if (canScrollY && Math.abs(e.deltaY) > 0) {
+            scroll.velY += deltaY;
+        }
+        if (canScrollX && Math.abs(e.deltaX || e.deltaY) > 0) {
+            scroll.velX += deltaX;
+        }
+
+        if (scroll.animId) {
+            cancelAnimationFrame(scroll.animId);
+        }
+
+        const animate = () => {
+            const s = activeScrolls.get(targetContainer);
+            if (!s) return;
+
+            let stillMoving = false;
+
+            if (canScrollY && Math.abs(s.velY) > minVelocity) {
+                targetContainer.scrollTop += s.velY;
+                s.velY *= friction;
+                stillMoving = true;
+            } else if (canScrollY) {
+                s.velY = 0;
+            }
+
+            if (canScrollX && Math.abs(s.velX) > minVelocity) {
+                targetContainer.scrollLeft += s.velX;
+                s.velX *= friction;
+                stillMoving = true;
+            } else if (canScrollX) {
+                s.velX = 0;
+            }
+
+            if (stillMoving) {
+                s.animId = requestAnimationFrame(animate);
+            } else {
+                s.velY = 0;
+                s.velX = 0;
+                s.animId = null;
+                activeScrolls.delete(targetContainer);
+            }
+        };
+
+        scroll.animId = requestAnimationFrame(animate);
+    }, { passive: false });
+}
+
 // ─── 17. Lifecycle & Event Binding ────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
+    syncThemeCheckbox(); // Sync the animated toggle with current theme
     initParticleCanvas();
     loadPublicStats();
     evaluateSessionState();
     initLoginRoleSelector();
+    initScrollAnywhere();
 
     // Results filters enter key immediate trigger
     $('filter-subject-code')?.addEventListener('keydown', (e) => {

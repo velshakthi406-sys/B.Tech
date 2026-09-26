@@ -244,9 +244,8 @@
         _navStaff.call(this);
         const section = document.getElementById('auth-section');
         if (section && !section.classList.contains('hidden')) {
-          revealSection(section, { dy: 12, dur: 300 });
-          const card = section.querySelector('.auth-card');
-          if (card) revealSection(card, { dy: 10, dur: 280, delay: 60 });
+          // Full orchestrated entrance: card → header → fields → pills → footer
+          requestAnimationFrame(() => initAuthEntrance());
         }
       };
     }
@@ -254,45 +253,95 @@
 
   /* ═══════════════════════════════════════════════════════════════
      3. AUTH WIZARD — Staff Sign-In Multi-Step Transitions
-     Patches showAuthStep to add slide-fade between steps
+     Uses CSS class-driven 3D flip-slide between steps with
+     direction awareness, matching the YouTube reference style.
   ═══════════════════════════════════════════════════════════════ */
+
+  // Step order for direction detection
+  const AUTH_STEP_ORDER = ['login', 'otp-request', 'otp-verify', 'set-password'];
+  let _lastAuthStep = 'login';
+
+  function _removeAuthStepClasses(el) {
+    el.classList.remove(
+      'auth-step-in-right', 'auth-step-in-left',
+      'auth-step-out-left', 'auth-step-out-right'
+    );
+  }
+
   function patchShowAuthStep() {
     if (typeof window.showAuthStep !== 'function') return;
     const _showAuthStep = window.showAuthStep;
+
     window.showAuthStep = function (stepName) {
-      _showAuthStep.call(this, stepName);
-
-      if (!canAnimate()) return;
-
-      const stepEl = document.getElementById(`auth-step-${stepName}`);
-      if (!stepEl || stepEl.style.display === 'none') return;
-
-      anime.remove(stepEl);
-      anime({
-        targets:    stepEl,
-        opacity:    [0, 1],
-        translateY: [10, 0],
-        duration:   260,
-        easing:     EASE_OUT,
-        complete:   () => clearInlineTransform(stepEl),
-      });
-
-      // Animate inner form fields for a polished cascade
-      const fields = stepEl.querySelectorAll('.form-group, .step-indicator');
-      if (fields.length) {
-        anime.remove(fields);
-        anime({
-          targets:    fields,
-          opacity:    [0, 1],
-          translateY: [8, 0],
-          delay:      anime.stagger(30, { start: 80 }),
-          duration:   220,
-          easing:     EASE_OUT,
-          complete:   () => fields.forEach(clearInlineTransform),
-        });
+      if (!canAnimate()) {
+        _showAuthStep.call(this, stepName);
+        _lastAuthStep = stepName;
+        return;
       }
+
+      const fromIdx = AUTH_STEP_ORDER.indexOf(_lastAuthStep);
+      const toIdx   = AUTH_STEP_ORDER.indexOf(stepName);
+      const goForward = toIdx >= fromIdx; // forward = register flow, backward = back to login
+
+      // ── 1. Exit the currently-visible step ──
+      const fromEl = document.getElementById(`auth-step-${_lastAuthStep}`);
+      if (fromEl && fromEl.style.display !== 'none') {
+        _removeAuthStepClasses(fromEl);
+        fromEl.classList.add(goForward ? 'auth-step-out-left' : 'auth-step-out-right');
+      }
+
+      // ── 2. After short exit, call original logic then animate entrance ──
+      const exitDur = 200; // ms — matches CSS authStepOutLeft duration
+      setTimeout(() => {
+        _showAuthStep.call(this, stepName);
+
+        const toEl = document.getElementById(`auth-step-${stepName}`);
+        if (!toEl || toEl.style.display === 'none') {
+          _lastAuthStep = stepName;
+          return;
+        }
+
+        // Force reflow so the class triggers the animation
+        _removeAuthStepClasses(toEl);
+        void toEl.offsetWidth; // reflow
+        toEl.classList.add(goForward ? 'auth-step-in-right' : 'auth-step-in-left');
+
+        // ── 3. Staggered cascade on inner form fields ──
+        const fields = toEl.querySelectorAll('.form-group, .step-indicator, .auth-footer');
+        if (fields.length && hasAnime) {
+          anime.remove(fields);
+          anime({
+            targets:    fields,
+            opacity:    [0, 1],
+            translateY: [10, 0],
+            delay:      anime.stagger(28, { start: 120 }),
+            duration:   240,
+            easing:     EASE_OUT,
+            complete:   () => fields.forEach(clearInlineTransform),
+          });
+        }
+
+        // ── 4. Auth card title morph: brief scale-pulse on header ──
+        const header = toEl.closest('.auth-card')?.querySelector('.auth-card-header');
+        if (header && hasAnime) {
+          anime.remove(header);
+          anime({
+            targets:  header,
+            opacity:  [0.5, 1],
+            scale:    [0.97, 1],
+            duration: 280,
+            easing:   EASE_OUT,
+            complete: () => clearInlineTransform(header),
+          });
+        }
+
+        _lastAuthStep = stepName;
+      }, exitDur);
+
+      _lastAuthStep = stepName; // optimistic update for rapid re-clicks
     };
   }
+
 
   function _shakeAuthCard() {
     const card = document.querySelector('.auth-card');
@@ -394,22 +443,105 @@
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     6. AUTH CARD ENTRANCE (on initial page load)
+     6. AUTH CARD ENTRANCE (on initial page load / when portal opens)
+     Coordinates: card → header → form fields → role pills → footer
   ═══════════════════════════════════════════════════════════════ */
   function initAuthEntrance() {
-    const card = document.querySelector('.auth-card');
+    const card = document.querySelector('#auth-section .auth-card');
     if (!card || !canAnimate()) return;
+
+    // Card itself — already handled by CSS cardIn keyframe,
+    // but we reinforce with anime for the JS-controlled open path
     anime({
-      targets: card,
-      opacity: [0, 1],
-      translateY: [20, 0],
-      scale: [0.985, 1],
-      duration: 520,
-      delay: 80,
-      easing: EASE_OUT,
-      complete: () => clearInlineTransform(card),
+      targets:    card,
+      opacity:    [0, 1],
+      translateY: [28, 0],
+      scale:      [0.94, 1],
+      rotateX:    [8, 0],
+      duration:   520,
+      delay:      80,
+      easing:     EASE_OUT,
+      complete:   () => clearInlineTransform(card),
     });
+
+    // Header
+    const header = card.querySelector('.auth-card-header');
+    if (header) {
+      anime.remove(header);
+      anime({
+        targets:    header,
+        opacity:    [0, 1],
+        translateY: [10, 0],
+        duration:   300,
+        delay:      240,
+        easing:     EASE_OUT,
+        complete:   () => clearInlineTransform(header),
+      });
+    }
+
+    // Form fields
+    const fields = card.querySelectorAll('.form-group, .step-indicator');
+    if (fields.length) {
+      anime.remove(fields);
+      anime({
+        targets:    fields,
+        opacity:    [0, 1],
+        translateY: [12, 0],
+        delay:      anime.stagger(40, { start: 320 }),
+        duration:   280,
+        easing:     EASE_OUT,
+        complete:   () => fields.forEach(clearInlineTransform),
+      });
+    }
+
+    // Role pill buttons — staggered pop-in
+    const pills = card.querySelectorAll('.role-pill-btn');
+    if (pills.length) {
+      anime.remove(pills);
+      anime({
+        targets:    pills,
+        opacity:    [0, 1],
+        scale:      [0.85, 1],
+        translateY: [8, 0],
+        delay:      anime.stagger(45, { start: 400 }),
+        duration:   260,
+        easing:     'easeOutBack',
+        complete:   () => pills.forEach(clearInlineTransform),
+      });
+    }
+
+    // Submit button
+    const submitBtn = card.querySelector('.btn-primary');
+    if (submitBtn) {
+      anime.remove(submitBtn);
+      anime({
+        targets:    submitBtn,
+        opacity:    [0, 1],
+        translateY: [8, 0],
+        scale:      [0.96, 1],
+        duration:   260,
+        delay:      560,
+        easing:     EASE_OUT,
+        complete:   () => clearInlineTransform(submitBtn),
+      });
+    }
+
+    // Auth footer links
+    const footers = card.querySelectorAll('.auth-footer');
+    if (footers.length) {
+      anime.remove(footers);
+      anime({
+        targets:    footers,
+        opacity:    [0, 1],
+        translateY: [6, 0],
+        delay:      anime.stagger(30, { start: 600 }),
+        duration:   220,
+        easing:     EASE_OUT,
+        complete:   () => footers.forEach(clearInlineTransform),
+      });
+    }
   }
+
 
   /* ═══════════════════════════════════════════════════════════════
      7. DEVELOPER REPORT CARD MODAL — Open / Close
@@ -920,11 +1052,51 @@
   }
 
   /* ═══════════════════════════════════════════════════════════════
+     15. ROLE PILL SELECTION — Pop + scale micro-animation
+     Triggers on each role pill click for kinetic feedback
+  ═══════════════════════════════════════════════════════════════ */
+  function initAuthRolePills() {
+    const container = document.getElementById('auth-role-pills');
+    if (!container) return;
+
+    container.addEventListener('click', (e) => {
+      const pill = e.target.closest('.role-pill-btn');
+      if (!pill || !canAnimate()) return;
+
+      // De-select pop: subtle squeeze on all non-active pills
+      const allPills = container.querySelectorAll('.role-pill-btn');
+      allPills.forEach((p) => {
+        if (p !== pill) {
+          anime.remove(p);
+          anime({
+            targets:  p,
+            scale:    [1, 0.95, 1],
+            duration: 200,
+            easing:   'easeOutQuad',
+            complete: () => { p.style.transform = ''; },
+          });
+        }
+      });
+
+      // Selected pill: scale-pop with overshoot
+      anime.remove(pill);
+      anime({
+        targets:  pill,
+        scale:    [1, 0.92, 1.10, 1],
+        duration: 360,
+        easing:   'easeOutElastic(1, 0.6)',
+        complete: () => { pill.style.transform = ''; },
+      });
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
      INIT — Wire everything up after DOM ready
   ═══════════════════════════════════════════════════════════════ */
   document.addEventListener('DOMContentLoaded', () => {
     initRipples();
     initAuthEntrance();
+    initAuthRolePills();
     initHeroEntrance();
     initTabIndicators();
     initTableRowStagger();

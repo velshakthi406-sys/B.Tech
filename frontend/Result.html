@@ -24,18 +24,25 @@
     })();
   </script>
 
-  <!-- Fonts -->
+  <!-- Fonts - Optimized with display=swap for faster rendering -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" /></noscript>
 
-  <!-- Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
-  <script src="xlsx.bundle.js"></script>
-  <script>if (!window.XLSX) { document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"><\/script>'); }</script>
+  <!-- Critical CSS Inline (fonts fallback) -->
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+  </style>
 
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="Result.css" />
+  <!-- Stylesheet - Load asynchronously -->
+  <link rel="preload" href="Result.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="Result.css" /></noscript>
+
+  <!-- Libraries - Defer non-critical scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" defer></script>
+  <script src="xlsx.bundle.js" defer></script>
+  <script>if (!window.XLSX) { document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" defer><\/script>'); }</script>
 </head>
 <body>
 
@@ -108,22 +115,29 @@
         <span>Management Portal</span>
       </button>
 
-      <!-- Segmented Theme Switch Pill -->
-      <div class="theme-switch-pill theme-pill" role="radiogroup" aria-label="Theme switcher">
-        <button type="button" class="theme-switch-option" id="theme-btn-light" onclick="setTheme('light')" role="radio" aria-checked="false" title="Switch to Light Mode">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
-          </svg>
-          <span>Light</span>
-        </button>
-        <button type="button" class="theme-switch-option" id="theme-btn-dark" onclick="setTheme('dark')" role="radio" aria-checked="true" title="Switch to Dark Mode">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-          </svg>
-          <span>Dark</span>
-        </button>
-      </div>
+      <!-- Animated Theme Switch Toggle -->
+      <label class="theme-switch-animated">
+        <input type="checkbox" class="theme-switch-animated__checkbox" id="theme-toggle-checkbox" onchange="toggleThemeAnimated()" checked>
+        <div class="theme-switch-animated__container">
+          <div class="theme-switch-animated__clouds"></div>
+          <div class="theme-switch-animated__stars-container">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 55" fill="none">
+              <path fill-rule="evenodd" clip-rule="evenodd"
+                d="M135.831 3.00688C135.055 3.85027 134.111 4.29946 133 4.35447C134.111 4.40947 135.055 4.85867 135.831 5.71123C136.607 6.55462 136.996 7.56303 136.996 8.72727C136.996 7.95722 137.172 7.25134 137.525 6.59129C137.886 5.93124 138.372 5.39954 138.98 5.00535C139.598 4.60199 140.268 4.39114 141 4.35447C139.88 4.2903 138.936 3.85027 138.16 3.00688C137.384 2.16348 136.996 1.16425 136.996 0C136.996 1.16425 136.607 2.16348 135.831 3.00688ZM31 23.3545C32.1114 23.2995 33.0551 22.8503 33.8313 22.0069C34.6075 21.1635 34.9956 20.1642 34.9956 19C34.9956 20.1642 35.3837 21.1635 36.1599 22.0069C36.9361 22.8503 37.8798 23.2903 39 23.3545C38.2679 23.3911 37.5976 23.602 36.9802 24.0053C36.3716 24.3995 35.8864 24.9312 35.5248 25.5913C35.172 26.2513 34.9956 26.9572 34.9956 27.7273C34.9956 26.563 34.6075 25.5546 33.8313 24.7112C33.0551 23.8587 32.1114 23.4095 31 23.3545ZM0 36.3545C1.11136 36.2995 2.05513 35.8503 2.83131 35.0069C3.6075 34.1635 3.99559 33.1642 3.99559 32C3.99559 33.1642 4.38368 34.1635 5.15987 35.0069C5.93605 35.8503 6.87982 36.2903 8 36.3545C7.26792 36.3911 6.59757 36.602 5.98015 37.0053C5.37155 37.3995 4.88644 37.9312 4.52481 38.5913C4.172 39.2513 3.99559 39.9572 3.99559 40.7273C3.99559 39.563 3.6075 38.5546 2.83131 37.7112C2.05513 36.8587 1.11136 36.4095 0 36.3545ZM56.8313 24.0069C56.0551 24.8503 55.1114 25.2995 54 25.3545C55.1114 25.4095 56.0551 25.8587 56.8313 26.7112C57.6075 27.5546 57.9956 28.563 57.9956 29.7273C57.9956 28.9572 58.172 28.2513 58.5248 27.5913C58.8864 26.9312 59.3716 26.3995 59.9802 26.0053C60.5976 25.602 61.2679 25.3911 62 25.3545C60.8798 25.2903 59.9361 24.8503 59.1599 24.0069C58.3837 23.1635 57.9956 22.1642 57.9956 21C57.9956 22.1642 57.6075 23.1635 56.8313 24.0069ZM81 25.3545C82.1114 25.2995 83.0551 24.8503 83.8313 24.0069C84.6075 23.1635 84.9956 22.1642 84.9956 21C84.9956 22.1642 85.3837 23.1635 86.1599 24.0069C86.9361 24.8503 87.8798 25.2903 89 25.3545C88.2679 25.3911 87.5976 25.602 86.9802 26.0053C86.3716 26.3995 85.8864 24.9312 85.5248 25.5913C85.172 26.2513 84.9956 26.9572 84.9956 27.7273C84.9956 26.563 84.6075 25.5546 83.8313 24.7112C83.0551 23.8587 82.1114 23.4095 81 25.3545ZM136 36.3545C137.111 36.2995 138.055 35.8503 138.831 35.0069C139.608 34.1635 139.996 33.1642 139.996 32C139.996 33.1642 140.384 34.1635 141.16 35.0069C141.936 35.8503 142.88 36.2903 144 36.3545C143.268 36.3911 142.598 36.602 141.98 37.0053C141.372 37.3995 140.886 37.9312 140.525 38.5913C140.172 39.2513 139.996 39.9572 139.996 40.7273C139.996 39.563 139.608 38.5546 138.831 37.7112C138.055 36.8587 137.111 36.4095 136 36.3545Z"
+                fill="currentColor"></path>
+            </svg>
+          </div>
+          <div class="theme-switch-animated__circle-container">
+            <div class="theme-switch-animated__sun-moon-container">
+              <div class="theme-switch-animated__moon">
+                <div class="theme-switch-animated__spot"></div>
+                <div class="theme-switch-animated__spot"></div>
+                <div class="theme-switch-animated__spot"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </label>
     </div>
   </header>
 
@@ -256,8 +270,8 @@
       <!-- Notice Marquee -->
       <div class="notice-marquee marquee" role="status" aria-label="Important notice">
         <div class="notice-marquee-track marquee-track">
-          <span class="notice-marquee-item marquee-item">📢 Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
-          <span class="notice-marquee-item marquee-item">📢 Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
+          <span class="notice-marquee-item marquee-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
+          <span class="notice-marquee-item marquee-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send it to velshakthi406@gmail.com</span>
         </div>
       </div>
 
@@ -360,7 +374,8 @@
           <div class="form-group">
             <label for="auth-password">Password</label>
             <div class="password-wrapper">
-              <input type="password" id="auth-password" required placeholder="••••••••" autocomplete="current-password" />
+              <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <input type="password" id="auth-password" required placeholder="••••••••" autocomplete="current-password" class="has-icon" />
               <button type="button" class="password-toggle" onclick="togglePasswordVisibility('auth-password', this)" aria-label="Toggle password visibility">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
@@ -394,7 +409,7 @@
           <div class="form-group" id="otp-name-group">
             <label for="otp-req-name">Full Name</label>
             <div style="position:relative;">
-              <span class="input-icon">👤</span>
+              <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
               <input type="text" id="otp-req-name" placeholder="Exactly as pre-registered (e.g. Dr. Ramesh)" class="has-icon" />
             </div>
             <small style="font-size:12px; color:var(--text-muted); margin-top:4px; display:block;">* Must exactly match the name recorded in Resources.</small>
@@ -402,7 +417,7 @@
           <div class="form-group">
             <label for="otp-req-email">Email Address</label>
             <div style="position:relative;">
-              <span class="input-icon">✉️</span>
+              <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
               <input type="email" id="otp-req-email" required placeholder="your.email@ptuniv.edu.in" autocomplete="email" class="has-icon" />
             </div>
           </div>
@@ -532,7 +547,7 @@
         <div class="form-group">
           <label for="rc-reg-no">Register Number</label>
           <div style="position:relative;">
-            <span class="input-icon">🆔</span>
+            <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M7 17h.01"/><path d="M17 17h.01"/></svg></span>
             <input type="text" id="rc-reg-no" class="has-icon" required maxlength="10" placeholder="Enter 10-digit Reg No (e.g. 2401112050)" autocomplete="off" />
           </div>
         </div>
@@ -541,7 +556,7 @@
             <label for="rc-email" style="margin-bottom:0;">Registered Email ID</label>
           </div>
           <div style="position:relative;">
-            <span class="input-icon">✉️</span>
+            <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
             <input type="email" id="rc-email" class="has-icon" required placeholder="e.g. 2401112050@ptuniv.edu.in" autocomplete="email" />
           </div>
         </div>
@@ -563,7 +578,10 @@
     <div class="auth-card report-card-lookup-card hidden" id="rc-step-otp">
       <div class="auth-card-header">
         <div class="rc-badge-pill"><span class="rc-badge-dot"></span>Two-Step Verification</div>
-        <h2>🔐 Verify OTP</h2>
+        <h2 style="display:flex;align-items:center;gap:8px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;vertical-align:middle;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Verify OTP</span>
+        </h2>
         <p>We've sent a 6-digit code to <strong id="rc-otp-target-email">your email</strong></p>
       </div>
 
@@ -587,7 +605,7 @@
         <div class="form-group">
           <label for="rc-otp-input">One-Time Passcode</label>
           <div style="position:relative;">
-            <span class="input-icon">🔐</span>
+            <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
             <input type="text" id="rc-otp-input" class="otp-input has-icon" required
                    pattern="[0-9A-Za-z]{6}" maxlength="6"
                    autocomplete="one-time-code" placeholder="• • • • • •" style="text-transform:uppercase;letter-spacing:0.3em;" />
@@ -739,8 +757,8 @@
           </button>
           <h1 id="module-title">Resources Management</h1>
         </div>
-        <div class="header-actions">
-          <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle theme (Alt + T)" onclick="toggleTheme()">
+          <div class="header-actions">
+          <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle theme (Alt + T)" onclick="toggleTheme(event)">
             <!-- Sun (shown in dark mode to switch to light) -->
             <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
@@ -819,7 +837,7 @@
                   <div class="stat-label">Departments</div>
                   <div class="stat-value" id="stat-depts">0</div>
                 </div>
-                <div class="stat-icon">🏛️</div>
+                <div class="stat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><path d="M10 10h4"/></svg></div>
               </div>
               <div class="stat-trend">CE · CSE · ECE…</div>
             </div>
@@ -833,7 +851,7 @@
           <div class="panel-section purge-batch-card" id="developer-purge-batch-section" style="display:none;">
             <div class="purge-batch-header">
               <div class="purge-batch-title-wrap">
-                <span class="purge-batch-icon">🗑️</span>
+                <span class="purge-batch-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
                 <div>
                   <h4 class="purge-batch-title">Graduated Batch Data Purge</h4>
                   <p class="purge-batch-desc">Permanently delete all student rosters and exam results for a graduated batch.</p>
@@ -861,7 +879,7 @@
           <div class="panel-section testing-report-card-card" id="developer-direct-rc-section" style="display:none;">
             <div class="testing-rc-header">
               <div class="testing-rc-title-wrap">
-                <span class="testing-rc-icon">🎓</span>
+                <span class="testing-rc-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>
                 <div>
                   <h4 class="testing-rc-title">Generate Student Report Card</h4>
                   <p class="testing-rc-desc">Direct student transcript lookup without OTP verification.</p>
@@ -871,7 +889,7 @@
             </div>
             <form id="developer-direct-rc-form" onsubmit="handleDeveloperDirectReportCard(event)" class="testing-rc-form">
               <div class="testing-rc-input-group">
-                <span class="input-icon">🆔</span>
+                <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M7 17h.01"/><path d="M17 17h.01"/></svg></span>
                 <input type="text" id="developer-rc-regno" class="has-icon" placeholder="Enter student Reg No (e.g. 2301104045)" required autocomplete="off" />
               </div>
               <button type="submit" id="developer-rc-btn" class="btn-primary testing-rc-btn">
@@ -888,7 +906,7 @@
           <div class="panel-section testing-report-card-card" id="developer-upload-resources-section" style="display:none;">
             <div class="testing-rc-header">
               <div class="testing-rc-title-wrap">
-                <span class="testing-rc-icon">📤</span>
+                <span class="testing-rc-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
                 <div>
                   <h4 class="testing-rc-title">Upload Resources (Staff Directory)</h4>
                   <p class="testing-rc-desc">Bulk upload staff directory from Excel (.xlsx/.xls) with Name, Email, and Account Type.</p>
@@ -1106,23 +1124,14 @@
           <!-- Batch tabs for Results -->
           <div class="dept-tabs" id="results-batch-tabs-container"></div>
 
-          <!-- Filters -->
+          <!-- Results: Dept pill tabs -->
+          <div class="dept-tabs"><div class="dept-tabs-scroll" id="results-dept-tabs-container"></div></div>
+          <!-- Results: Section pill tabs (shown only when a multi-section dept is selected) -->
+          <div class="dept-tabs" id="results-section-tabs-wrap" style="display:none;"><div class="dept-tabs-scroll" id="results-section-tabs-container"></div></div>
+
+          <!-- Filters (semester, subject code, reg no, reset) -->
           <div class="sgpa-filters-container" role="search" aria-label="Filter results">
             <div class="filter-bar">
-              <!-- Department Filter -->
-              <div class="filter-item filter-dept">
-                <label for="filter-department">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-                  Department
-                </label>
-                <select class="filter-select" id="filter-department" onchange="applyFilters()">
-                  <option value="">All Depts</option>
-                  <option value="CE">CE</option><option value="CHE">CHE</option><option value="CSE">CSE</option>
-                  <option value="ECE">ECE</option><option value="EEE">EEE</option><option value="EIE">EIE</option>
-                  <option value="IT">IT</option><option value="ME">ME</option><option value="MT">MT</option>
-                </select>
-              </div>
-
               <!-- Semester Filter -->
               <div class="filter-item filter-sem">
                 <label for="filter-semester">
@@ -1165,6 +1174,7 @@
               </div>
             </div>
           </div>
+
 
           <!-- Edit Result form -->
           <div id="result-form-container" class="inline-form-panel" style="display:none;">
@@ -1397,47 +1407,21 @@
             </button>
           </div>
 
+          <!-- Batch Pills -->
+          <div class="dept-tabs"><div class="dept-tabs-scroll" id="grade-batch-tabs-container"></div></div>
+          <!-- Department Pills -->
+          <div class="dept-tabs"><div class="dept-tabs-scroll" id="grade-dept-tabs-container"></div></div>
+
           <!-- Filters -->
-          <div class="sgpa-filters-container" role="search" aria-label="Filter grades">
-            <div class="filter-bar">
-              <!-- Batch Filter -->
-              <div class="filter-item filter-batch">
-                <label for="grade-filter-batch">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  Batch
-                </label>
-                <select class="filter-select" id="grade-filter-batch" onchange="loadGrades()">
-                  <option value="">All Batches</option>
-                </select>
-              </div>
-
-              <!-- Department Filter -->
-              <div class="filter-item filter-dept">
-                <label for="grade-filter-dept">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-                  Department
-                </label>
-                <select class="filter-select" id="grade-filter-dept" onchange="loadGrades()">
-                  <option value="">All</option>
-                  <option value="CE">CE</option>
-                  <option value="CHE">CHE</option>
-                  <option value="CSE">CSE</option>
-                  <option value="ECE">ECE</option>
-                  <option value="EEE">EEE</option>
-                  <option value="EIE">EIE</option>
-                  <option value="IT">IT</option>
-                  <option value="ME">ME</option>
-                  <option value="MT">MT</option>
-                </select>
-              </div>
-
+          <div class="sgpa-filters-container compact-filters" role="search" aria-label="Filter grades">
+            <div class="filter-bar-compact">
               <!-- Semester Filter (SGPA) -->
-              <div class="filter-item filter-sem">
+              <div class="filter-item-compact filter-sem">
                 <label for="grade-filter-sem">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                   Semester
                 </label>
-                <select class="filter-select" id="grade-filter-sem" onchange="loadGrades()">
+                <select class="filter-select-compact" id="grade-filter-sem" onchange="loadGrades()">
                   <option value="">CGPA (Overall)</option>
                   <option value="I">Sem I</option>
                   <option value="II">Sem II</option>
@@ -1449,16 +1433,14 @@
                   <option value="VIII">Sem VIII</option>
                 </select>
               </div>
-            </div>
 
-            <div class="filter-bar filter-bar-row-2">
               <!-- Sort by CGPA -->
-              <div class="filter-item filter-sort-cgpa">
+              <div class="filter-item-compact filter-sort-cgpa">
                 <label for="grade-filter-sort">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
                   Sort by CGPA
                 </label>
-                <select class="filter-select" id="grade-filter-sort" onchange="loadGrades()">
+                <select class="filter-select-compact" id="grade-filter-sort" onchange="loadGrades()">
                   <option value="none">None</option>
                   <option value="desc">Descending (↓)</option>
                   <option value="asc">Ascending (↑)</option>
@@ -1466,12 +1448,12 @@
               </div>
 
               <!-- Sort by Credits -->
-              <div class="filter-item filter-sort-credits">
+              <div class="filter-item-compact filter-sort-credits">
                 <label for="grade-filter-credits-sort">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   Sort by Credits
                 </label>
-                <select class="filter-select" id="grade-filter-credits-sort" onchange="loadGrades()">
+                <select class="filter-select-compact" id="grade-filter-credits-sort" onchange="loadGrades()">
                   <option value="none">None</option>
                   <option value="desc">Descending (↓)</option>
                   <option value="asc">Ascending (↑)</option>
@@ -1479,13 +1461,13 @@
               </div>
 
               <!-- Arrear Status Multi-select -->
-              <div class="filter-item filter-arrear">
+              <div class="filter-item-compact filter-arrear">
                 <label>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   Arrear Status
                 </label>
                 <div class="multi-select" id="grade-filter-arrears-wrap">
-                  <button type="button" class="multi-select-btn filter-select" id="grade-filter-arrears-btn" onclick="toggleArrearDropdown(event)">
+                  <button type="button" class="multi-select-btn filter-select-compact" id="grade-filter-arrears-btn" onclick="toggleArrearDropdown(event)">
                     <span id="grade-filter-arrears-label">ALL</span>
                     <span class="multi-select-caret">▾</span>
                   </button>
@@ -1550,61 +1532,53 @@
             </button>
           </div>
 
+          <!-- Batch Pills -->
+          <div class="dept-tabs"><div class="dept-tabs-scroll" id="cr-batch-tabs-container"></div></div>
+          <!-- Department Pills -->
+          <div class="dept-tabs"><div class="dept-tabs-scroll" id="cr-dept-tabs-container"></div></div>
+
           <!-- Filters -->
-          <div class="sgpa-filters-container" role="search" aria-label="Filter class report">
-            <div class="filter-bar">
-              <!-- Batch Filter -->
-              <div class="filter-item filter-batch">
-                <label for="cr-filter-batch">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  Batch
+          <div class="sgpa-filters-container compact-filters" role="search" aria-label="Filter class report">
+            <div class="filter-bar-compact">
+              <!-- Reg No Filter -->
+              <div class="filter-item-compact filter-regno">
+                <label for="cr-filter-regno">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Reg No
                 </label>
-                <select class="filter-select" id="cr-filter-batch" onchange="loadClassReport()">
-                  <option value="">All Batches</option>
-                </select>
+                <input type="text" class="filter-select-compact filter-input-compact" id="cr-filter-regno" placeholder="Search by Reg No..." oninput="filterClassReport()" />
               </div>
 
-              <!-- Department Filter -->
-              <div class="filter-item filter-dept">
-                <label for="cr-filter-dept">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-                  Department
+              <!-- Student Name Filter -->
+              <div class="filter-item-compact filter-name">
+                <label for="cr-filter-name">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Student Name
                 </label>
-                <select class="filter-select" id="cr-filter-dept" onchange="loadClassReport()">
-                  <option value="">All</option>
-                  <option value="CE">CE</option>
-                  <option value="CHE">CHE</option>
-                  <option value="CSE">CSE</option>
-                  <option value="ECE">ECE</option>
-                  <option value="EEE">EEE</option>
-                  <option value="EIE">EIE</option>
-                  <option value="IT">IT</option>
-                  <option value="ME">ME</option>
-                  <option value="MT">MT</option>
-                </select>
+                <input type="text" class="filter-select-compact filter-input-compact" id="cr-filter-name" placeholder="Search by name..." oninput="filterClassReport()" />
               </div>
 
               <!-- Sort by Credits -->
-              <div class="filter-item filter-sort-credits">
+              <div class="filter-item-compact filter-sort-credits">
                 <label for="cr-filter-credits-sort">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  Sort by Credits
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Credits
                 </label>
-                <select class="filter-select" id="cr-filter-credits-sort" onchange="loadClassReport()">
+                <select class="filter-select-compact" id="cr-filter-credits-sort" onchange="loadClassReport()">
                   <option value="none">None</option>
-                  <option value="desc">Descending (↓)</option>
-                  <option value="asc">Ascending (↑)</option>
+                  <option value="desc">High to Low</option>
+                  <option value="asc">Low to High</option>
                 </select>
               </div>
 
               <!-- Arrear Status Multi-select -->
-              <div class="filter-item filter-arrear">
+              <div class="filter-item-compact filter-arrear">
                 <label>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   Arrear Status
                 </label>
                 <div class="multi-select" id="cr-filter-arrears-wrap">
-                  <button type="button" class="multi-select-btn filter-select" id="cr-filter-arrears-btn" onclick="toggleCrArrearDropdown(event)">
+                  <button type="button" class="multi-select-btn filter-select-compact" id="cr-filter-arrears-btn" onclick="toggleCrArrearDropdown(event)">
                     <span id="cr-filter-arrears-label">ALL</span>
                     <span class="multi-select-caret">▾</span>
                   </button>
@@ -1823,9 +1797,9 @@
     </div>
   </div>
 
-  <!-- App scripts -->
-  <script src="Result.js"></script>
-  <script src="Result-motion.js"></script>
+  <!-- App scripts - Defer for better performance -->
+  <script src="Result.js" defer></script>
+  <script src="Result-motion.js" defer></script>
 
 </body>
 </html>

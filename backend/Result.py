@@ -1,4 +1,4 @@
-import datetime
+﻿import datetime
 import io
 import re
 import os
@@ -414,6 +414,8 @@ def find_student_batch(reg_no: str) -> Optional[Tuple[str, str]]:
         except Exception:
             continue
     return None
+
+def delete_batch_database(batch: str) -> bool:
     """Completely and permanently deletes all student and result data for a batch database."""
     sanitized = sanitize_batch_name(batch)
     if sanitized in _batch_engines:
@@ -572,6 +574,8 @@ class GradeSummary(BaseModel):
     reg_no: str
     name: str
     department: str
+    section: Optional[str] = None
+    batch: Optional[str] = None
     semester: Optional[str] = None
     sgpa: Optional[float] = None
     cgpa: Optional[float] = None
@@ -1081,8 +1085,15 @@ def _verify_report_card_token(token: str, reg_no: str, email: str) -> None:
 # ==========================================
 # FASTAPI APP
 # ==========================================
+# FASTAPI APP INITIALIZATION with Performance Optimizations
+# ==========================================
 app = FastAPI(title="University Grade Processing System")
+
+# CORS Middleware
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# GZip Compression Middleware for faster data transfer (reduces response size by ~70%)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.on_event("startup")
 def log_email_startup():
@@ -1092,6 +1103,7 @@ def log_email_startup():
     smtp = SMTP_CONFIGURED
     from_e = os.getenv("BREVO_FROM_EMAIL", "").strip() or SMTP_FROM_EMAIL
     print(f"[STARTUP] Email providers: Brevo={brevo}, Resend={resend}, SendGrid={sendgrid}, SMTP={smtp} | from={from_e}", flush=True)
+    print(f"[STARTUP] Performance optimizations: GZip compression enabled, SQLite WAL mode active", flush=True)
 
 # ==========================================
 # AUTH ROUTES
@@ -2604,16 +2616,32 @@ _REEVAL_SUBCODE_PATTERN = re.compile(r'^[A-Z]{2,6}\d{2,4}$')
 _REEVAL_GRADE_PATTERN = re.compile(r'^[A-Z]{1,3}\+?$')
 _REEVAL_NON_BTECH_PROGRAMMES = {"MTECH", "MCA", "MSC", "PHD"}
 
-def extract_reevaluation_table_from_pdf(file_content: bytes) -> Dict[str, Any]:
+def extract_reevaluation_table_from_pdf(file_content: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Extract re-evaluation results from a PDF file.
+    
+    Re-evaluation PDFs contain lines like:
+        PTU B.Tech CSE 2401106043 CEUC102 B
+    
+    Returns semester if detected from filename or content.
+    """
     rows_by_reg: Dict[str, Dict[str, Any]] = {}
     skipped_nc = 0
     skipped_non_btech = 0
+    semester = None
 
     with pdfplumber.open(io.BytesIO(file_content)) as pdf:
         for page in pdf.pages:
             text = page.extract_text()
             if not text:
                 continue
+            
+            # Try to extract semester from page text or filename
+            if not semester:
+                meta = extract_semester_year_department(text, filename=filename)
+                if meta.get("semester"):
+                    semester = meta["semester"]
+            
             for line in text.split('\n'):
                 parts = line.strip().split()
                 if "PTU" not in parts:
@@ -2652,8 +2680,17 @@ def extract_reevaluation_table_from_pdf(file_content: bytes) -> Dict[str, Any]:
                     "grades": {},
                 })
                 entry["grades"][subcode] = grade
+    
+    # Try to extract semester from filename if not found in content
+    if not semester and filename:
+        # Look for patterns like "3rd-sem-Re-Evaluation" or "sem-3-reeval"
+        fn_match = re.search(r'(\d+)(?:st|nd|rd|th)?[\s_.-]*sem(?:ester)?', filename, re.I)
+        if fn_match:
+            sem_num = int(fn_match.group(1))
+            semester = _NUM_TO_ROMAN.get(sem_num, str(sem_num))
 
     return {
+        "semester": semester,
         "rows": list(rows_by_reg.values()),
         "skipped_nc": skipped_nc,
         "skipped_non_btech": skipped_non_btech,
@@ -3004,6 +3041,7 @@ async def upload_results(
     sem = parsed['semester']
     yr = parsed.get('year')
     skipped_unknown_students = 0
+    skipped_student_details: List[str] = []
 
     # Build subjects lookup map from subjects.db
     all_subjects = subjects_db.query(Subject).all()
@@ -3017,6 +3055,7 @@ async def upload_results(
     try:
         for row in parsed['rows']:
             reg_no = row['reg_no']
+            student_name = row.get('name', 'Unknown')
             grades = row['grades']
 
             # Determine target batch DB
@@ -3028,6 +3067,8 @@ async def upload_results(
 
             if not target_batch:
                 skipped_unknown_students += 1
+                skipped_student_details.append(f"Student {reg_no} ({student_name}) - Not found in any batch database")
+                logger.warning(f"Results upload: Student {reg_no} not found in any batch database. Skipping.")
                 continue
 
             sanitized_key = sanitize_batch_name(target_batch)
@@ -3048,6 +3089,8 @@ async def upload_results(
 
             if not student:
                 skipped_unknown_students += 1
+                skipped_student_details.append(f"Student {reg_no} ({student_name}) - Not found in database. Please upload student roster first.")
+                logger.warning(f"Results upload: Student {reg_no} not found in batch {target_batch}. Skipping.")
                 continue
 
             for code, grade_str in grades.items():
@@ -3121,8 +3164,11 @@ async def upload_results(
 
     if skipped_unknown_students:
         errors.append(
-            f"Skipped {skipped_unknown_students} student record(s) not found in any batch database."
+            f"⚠️ SKIPPED {skipped_unknown_students} student record(s) not found in database. Upload student roster first:"
         )
+        errors.extend(skipped_student_details[:10])  # Show first 10 for brevity
+        if len(skipped_student_details) > 10:
+            errors.append(f"... and {len(skipped_student_details) - 10} more students")
 
     return UploadResponse(
         message=f"Results processed in batch database(s). Results saved: {results_added}.",
@@ -3140,18 +3186,39 @@ async def upload_reevaluation(
     subjects_db: Session = Depends(get_subjects_db),
     user: User = Depends(allow_write)
 ):
+    """
+    Upload re-evaluation results PDF. This updates EXISTING records ONLY.
+    
+    CRITICAL RULES:
+    1. Student MUST exist in the database (skip if not found)
+    2. First attempt MUST exist in the database (skip if not found)
+    3. UPDATES the existing record in the SAME semester WITHOUT creating new records
+    4. Re-evaluation PDFs contain improved grades for subjects that were already attempted
+    
+    Format: PTU B.Tech CSE 2401106043 CEUC102 B
+    """
     content = await file.read()
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files accepted for re-evaluation results.")
 
-    parsed = extract_reevaluation_table_from_pdf(content)
+    # Parse with filename for semester detection
+    parsed = extract_reevaluation_table_from_pdf(content, filename=file.filename)
     errors = []
     results_updated = 0
+    skipped_no_student = 0
+    skipped_no_first_attempt = 0
+    skipped_no_improvement = 0
+    skipped_student_details: List[str] = []
+    skipped_first_attempt_details: List[str] = []
 
     if not parsed.get('rows'):
         errors.append("No re-evaluation rows found in PDF.")
-    if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))
+
+    # Use semester from parsed data or from form parameter
+    detected_semester = parsed.get('semester') or semester
+    if not detected_semester and not semester:
+        errors.append("⚠️ WARNING: Could not detect semester from PDF. Provide it manually if updates fail.")
 
     all_subjects = subjects_db.query(Subject).all()
     subjects_by_code: Dict[str, List[Subject]] = {}
@@ -3165,6 +3232,7 @@ async def upload_reevaluation(
             reg_no = row['reg_no']
             grades = row['grades']
 
+            # Step 1: Find which batch database contains this student
             target_batch = batch
             if not target_batch:
                 found = find_student_batch(reg_no)
@@ -3172,6 +3240,9 @@ async def upload_reevaluation(
                     target_batch = found[0]
 
             if not target_batch:
+                skipped_no_student += 1
+                skipped_student_details.append(f"Student {reg_no} - Not found in any batch database")
+                logger.warning(f"Re-evaluation upload: Student {reg_no} not found in any batch database. Skipping.")
                 continue
 
             sanitized_key = sanitize_batch_name(target_batch)
@@ -3179,54 +3250,133 @@ async def upload_reevaluation(
                 active_sessions[sanitized_key] = get_batch_session(sanitized_key)
             batch_db = active_sessions[sanitized_key]
 
+            # Step 2: Verify student exists in database
             student = batch_db.query(Student).filter(Student.reg_no == reg_no).first()
             if not student:
+                skipped_no_student += 1
+                skipped_student_details.append(f"Student {reg_no} - Not found in database")
+                logger.warning(f"Re-evaluation upload: Student {reg_no} not found in batch {target_batch}. Skipping.")
                 continue
 
+            # Step 3: Process each subject's re-evaluation grade
             for code, grade_str in grades.items():
                 candidates = subjects_by_code.get(code, [])
                 if not candidates:
+                    errors.append(f"Subject {code} not found in Subjects DB for student {reg_no}")
                     continue
-                subject = candidates[0]
+                
+                # Pick the subject (prefer one already linked to this student)
+                if len(candidates) == 1:
+                    subject = candidates[0]
+                else:
+                    candidate_ids = [s.id for s in candidates]
+                    prior = batch_db.query(Result).filter(
+                        Result.student_id == student.id,
+                        Result.subject_id.in_(candidate_ids),
+                    ).first()
+                    subject = (
+                        next((s for s in candidates if s.id == prior.subject_id), candidates[0])
+                        if prior else candidates[0]
+                    )
 
-                existing_query = batch_db.query(Result).filter(
+                # Step 4: Find the FIRST attempt record to update
+                # Re-evaluation ALWAYS updates the FIRST/ORIGINAL attempt in the same semester
+                # It does NOT create new attempts
+                all_attempts = batch_db.query(Result).filter(
                     Result.student_id == student.id,
                     Result.subject_id == subject.id,
-                )
-                if semester:
-                    existing = existing_query.filter(Result.semester == semester).first()
-                else:
-                    existing = existing_query.order_by(Result.attempt.desc()).first()
+                ).order_by(Result.semester, Result.attempt.asc()).all()
 
-                if not existing:
+                if not all_attempts:
+                    # CRITICAL: No first attempt exists - SKIP this record
+                    skipped_no_first_attempt += 1
+                    skipped_first_attempt_details.append(
+                        f"Student {reg_no} - Subject {code}: No first attempt found in database. Upload original results first."
+                    )
+                    logger.warning(
+                        f"Re-evaluation upload: Student {reg_no}, Subject {code} - No first attempt found. Skipping."
+                    )
                     continue
 
+                # Find the record to update:
+                # 1. If semester specified, find attempt in that semester
+                # 2. Otherwise, find the attempt in the detected semester
+                # 3. Fallback: update the first attempt chronologically
+                target_record = None
+                
+                if detected_semester:
+                    # Find attempt in the detected/specified semester
+                    semester_attempts = [r for r in all_attempts if r.semester == detected_semester]
+                    if semester_attempts:
+                        # Update the FIRST attempt in this semester (not the latest)
+                        target_record = min(semester_attempts, key=lambda r: r.attempt)
+                    else:
+                        # Semester detected but no record in that semester - try to find by subject's original semester
+                        if subject.semester:
+                            semester_attempts = [r for r in all_attempts if r.semester == subject.semester]
+                            if semester_attempts:
+                                target_record = min(semester_attempts, key=lambda r: r.attempt)
+                
+                if not target_record:
+                    # Fallback: update the very first attempt (earliest semester, lowest attempt number)
+                    target_record = min(all_attempts, key=lambda r: (_semester_sort_key(r.semester), r.attempt))
+
+                # Step 5: Validate the update is an improvement
                 new_gp = parse_grade(grade_str)
-                old_gp = existing.grade_point
-                old_grade = (existing.grade or "").strip().upper()
+                old_gp = target_record.grade_point
+                old_grade = (target_record.grade or "").strip().upper()
                 FAIL_GRADES = {"F", "AB", "ABSENT", "NC", "E", "Z", "S", "P"}
                 is_old_fail = old_gp == 0 or old_grade in FAIL_GRADES
                 
                 # Update if: new grade is better OR old was F and new is passing
                 if new_gp <= old_gp and not (is_old_fail and new_gp > 0):
+                    skipped_no_improvement += 1
+                    logger.info(
+                        f"Re-evaluation: Skipping {reg_no}/{code} - New grade ({grade_str}/{new_gp}) not better than old ({old_grade}/{old_gp})"
+                    )
                     continue
 
-                existing.grade = normalize_grade(grade_str)
-                existing.grade_point = new_gp
+                # Step 6: Update the existing record (NOT creating a new one)
+                target_record.grade = normalize_grade(grade_str)
+                target_record.grade_point = new_gp
                 results_updated += 1
+                logger.info(
+                    f"Re-evaluation: Updated {reg_no}/{code} Sem {target_record.semester} Attempt {target_record.attempt} from {old_grade} ({old_gp}) to {normalize_grade(grade_str)} ({new_gp})"
+                )
 
-                # Re-sequence attempts and update arrear status accurately
+                # Step 7: Re-calculate arrear status for all attempts of this subject
                 # This preserves arrear history even when F is upgraded to passing
                 resequence_student_subject_attempts(batch_db, student.id, subject.id)
 
+        # Commit all changes
         for s in active_sessions.values():
             s.commit()
     finally:
         for s in active_sessions.values():
             s.close()
 
+    # Add detailed error messages
+    if skipped_no_student > 0:
+        errors.append(f"⚠️ SKIPPED {skipped_no_student} re-evaluation record(s) - Student not found in database:")
+        errors.extend(skipped_student_details[:10])  # Show first 10
+        if len(skipped_student_details) > 10:
+            errors.append(f"... and {len(skipped_student_details) - 10} more students")
+    
+    if skipped_no_first_attempt > 0:
+        errors.append(f"⚠️ SKIPPED {skipped_no_first_attempt} re-evaluation record(s) - No first attempt in database:")
+        errors.extend(skipped_first_attempt_details[:10])  # Show first 10
+        if len(skipped_first_attempt_details) > 10:
+            errors.append(f"... and {len(skipped_first_attempt_details) - 10} more records")
+    
+    if skipped_no_improvement > 0:
+        errors.append(f"ℹ️ Skipped {skipped_no_improvement} record(s) where re-evaluation grade was not better than original")
+
+    success_msg = f"Re-evaluation processed successfully. Updated: {results_updated} existing record(s)"
+    if detected_semester:
+        success_msg += f" in Semester {detected_semester}"
+
     return UploadResponse(
-        message="Re-evaluation processed",
+        message=success_msg,
         students_added=0,
         results_added=results_updated,
         errors=errors
@@ -3274,7 +3424,10 @@ async def upload_arrear(
     results_added   = 0
     results_updated = 0
     skipped_unknown_students = 0
+    skipped_no_first_attempt = 0
     skipped_unknown_subjects: List[str] = []
+    skipped_student_details: List[str] = []
+    skipped_first_attempt_details: List[str] = []
 
     if not parsed.get("rows"):
         raise HTTPException(status_code=400, detail="No student rows found in the arrear PDF.")
@@ -3304,6 +3457,8 @@ async def upload_arrear(
 
             if not target_batch:
                 skipped_unknown_students += 1
+                skipped_student_details.append(f"Student {reg_no} - Not found in any batch database")
+                logger.warning(f"Arrear upload: Student {reg_no} not found in any batch database. Skipping.")
                 continue
 
             sanitized_key = sanitize_batch_name(target_batch)
@@ -3324,6 +3479,8 @@ async def upload_arrear(
 
             if not student:
                 skipped_unknown_students += 1
+                skipped_student_details.append(f"Student {reg_no} - Not found in database")
+                logger.warning(f"Arrear upload: Student {reg_no} not found in batch {target_batch}. Skipping.")
                 continue
 
             # ── Process each subject/grade ────────────────────────────────
@@ -3401,9 +3558,12 @@ async def upload_arrear(
 
                 else:
                     # No base record yet — skip and report
-                    errors.append(
-                        f"No base result for {reg_no}/{code}. "
-                        "Upload the original semester results first."
+                    skipped_no_first_attempt += 1
+                    skipped_first_attempt_details.append(
+                        f"Student {reg_no} - Subject {code}: No first attempt found in database. Upload original semester results first."
+                    )
+                    logger.warning(
+                        f"Arrear upload: Student {reg_no}, Subject {code} - No first attempt found. Skipping."
                     )
 
         for s in active_sessions.values():
@@ -3413,10 +3573,19 @@ async def upload_arrear(
         for s in active_sessions.values():
             s.close()
 
+    # Add detailed error messages
     if skipped_unknown_students:
-        errors.append(
-            f"Skipped {skipped_unknown_students} student(s) not found in any batch database."
-        )
+        errors.append(f"⚠️ SKIPPED {skipped_unknown_students} student(s) not found in database:")
+        errors.extend(skipped_student_details[:10])  # Show first 10
+        if len(skipped_student_details) > 10:
+            errors.append(f"... and {len(skipped_student_details) - 10} more students")
+    
+    if skipped_no_first_attempt > 0:
+        errors.append(f"⚠️ SKIPPED {skipped_no_first_attempt} arrear record(s) - No first attempt in database:")
+        errors.extend(skipped_first_attempt_details[:10])  # Show first 10
+        if len(skipped_first_attempt_details) > 10:
+            errors.append(f"... and {len(skipped_first_attempt_details) - 10} more records")
+    
     errors.extend(skipped_unknown_subjects)
 
     total = results_added + results_updated
@@ -3561,6 +3730,43 @@ _VALID_BATCH_PATTERN = re.compile(r'^\d{4}\s*-\s*\d{4}$')
 @app.get("/students/batches", response_model=List[str])
 def get_student_batches(user: User = Depends(allow_all)):
     return get_all_batch_names()
+
+@app.get("/students/dept-sections")
+def get_dept_sections(user: User = Depends(allow_all)):
+    """
+    Returns a sorted list of objects {dept, section} for every unique
+    (department, section) pair found across all batch databases.
+    Departments without any section will have section = "" (empty string).
+    This is used to populate department filter dropdowns with section sub-options.
+    """
+    seen: set = set()
+    pairs: list = []
+
+    for _batch_name, batch_db in get_all_batch_sessions():
+        try:
+            rows = (
+                batch_db.query(Student.department, Student.section)
+                .filter(Student.source == "roster", Student.department != None, Student.department != "")
+                .distinct()
+                .all()
+            )
+            for dept, sec in rows:
+                dept = (dept or "").strip()
+                sec  = (sec  or "").strip()
+                if not dept:
+                    continue
+                key = (dept, sec)
+                if key not in seen:
+                    seen.add(key)
+                    pairs.append({"dept": dept, "section": sec})
+        except Exception as e:
+            logger.warning("dept-sections: error on batch: %s", e)
+            continue
+
+    # Sort: by dept, then section (empty section first so "CSE" sorts before "CSE-A")
+    pairs.sort(key=lambda x: (x["dept"], x["section"]))
+    return pairs
+
 
 @app.get("/batches/{batch_name}/info")
 def get_batch_info(batch_name: str, user: User = Depends(allow_all)):
@@ -3862,6 +4068,7 @@ def get_results(
     student_id: Optional[int] = None,
     reg_no: Optional[str] = None,
     department: Optional[str] = None,
+    section: Optional[str] = None,
     semester: Optional[str] = None,
     subject_code: Optional[str] = None,
     batch: Optional[str] = None,
@@ -3910,10 +4117,13 @@ def get_results(
             )
         if department:
             query = query.filter(Student.department == department)
+        if section:
+            query = query.filter(Student.section == section)
         if semester:
             query = query.filter(Result.semester == semester)
         if target_subject_ids is not None:
             query = query.filter(Result.subject_id.in_(target_subject_ids))
+
 
         batch_results = []
         for r in query.all():
@@ -4112,6 +4322,7 @@ def get_grade_summary(
     student_id: Optional[int] = None,
     reg_no: Optional[str] = None,
     department: Optional[str] = None,
+    section: Optional[str] = None,
     semester: Optional[str] = None,
     batch: Optional[str] = None,
     arrears: Optional[List[str]] = Query(None),
@@ -4134,7 +4345,7 @@ def get_grade_summary(
     for _batch_name, batch_db in batch_sessions:
         try:
             stu_query = batch_db.query(
-                Student.id, Student.reg_no, Student.name, Student.department
+                Student.id, Student.reg_no, Student.name, Student.department, Student.section, Student.batch
             ).filter(Student.source == "roster")
             if student_id:
                 stu_query = stu_query.filter(Student.id == student_id)
@@ -4142,6 +4353,8 @@ def get_grade_summary(
                 stu_query = stu_query.filter(Student.reg_no == reg_no)
             if department:
                 stu_query = stu_query.filter(Student.department == department)
+            if section:
+                stu_query = stu_query.filter(Student.section == section)
 
             students = stu_query.all()
             if not students:
@@ -4160,7 +4373,7 @@ def get_grade_summary(
             for row in res_rows:
                 student_subject_map.setdefault(row.student_id, {}).setdefault(row.subject_id, []).append(row)
 
-            for stu_id, stu_reg, stu_name, stu_dept in students:
+            for stu_id, stu_reg, stu_name, stu_dept, stu_section, stu_batch in students:
                 subj_dict = student_subject_map.get(stu_id, {})
                 total_credits = 0.0
                 grade_points_sum = 0.0
@@ -4260,6 +4473,8 @@ def get_grade_summary(
                     reg_no=stu_reg,
                     name=stu_name,
                     department=stu_dept,
+                    section=stu_section or "",
+                    batch=stu_batch or _batch_name,
                     semester=sem_label,
                     sgpa=gpa if semester else None,
                     cgpa=gpa if not semester else None,
@@ -4754,40 +4969,86 @@ if os.path.isdir(FRONTEND_DIR):
     def serve_frontend_root():
         index_file = os.path.join(FRONTEND_DIR, "Result.html")
         if os.path.exists(index_file):
-            return FileResponse(index_file)
+            return FileResponse(
+                index_file,
+                media_type="text/html",
+                headers={"Cache-Control": "public, max-age=3600"}
+            )
         return {"status": "running", "message": "PTU Grade Portal API"}
 
     @app.get("/index.html", include_in_schema=False)
     def serve_frontend_index():
-        return FileResponse(os.path.join(FRONTEND_DIR, "Result.html"))
+        return FileResponse(
+            os.path.join(FRONTEND_DIR, "Result.html"),
+            media_type="text/html",
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
 
     @app.get("/favicon.ico", include_in_schema=False)
     def serve_favicon():
         favicon_file = os.path.join(FRONTEND_DIR, "ptu_logo.png")
         if os.path.exists(favicon_file):
-            return FileResponse(favicon_file, media_type="image/png")
+            return FileResponse(
+                favicon_file,
+                media_type="image/png",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
         raise HTTPException(status_code=404, detail="Favicon not found")
 
-    # Explicit high-priority asset routes
+    # Explicit high-priority asset routes with browser caching
     @app.get("/ptu_logo.png", include_in_schema=False)
     def serve_ptu_logo():
         img = os.path.join(FRONTEND_DIR, "ptu_logo.png")
         if os.path.exists(img):
-            return FileResponse(img, media_type="image/png")
+            return FileResponse(
+                img,
+                media_type="image/png",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
         raise HTTPException(status_code=404, detail="ptu_logo.png not found")
+    
+    @app.get("/ptu_logo.webp", include_in_schema=False)
+    def serve_ptu_logo_webp():
+        img = os.path.join(FRONTEND_DIR, "ptu_logo.webp")
+        if os.path.exists(img):
+            return FileResponse(
+                img,
+                media_type="image/webp",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
+        raise HTTPException(status_code=404, detail="ptu_logo.webp not found")
 
     @app.get("/ptu_campus.jpg", include_in_schema=False)
     def serve_ptu_campus():
         img = os.path.join(FRONTEND_DIR, "ptu_campus.jpg")
         if os.path.exists(img):
-            return FileResponse(img, media_type="image/jpeg")
+            return FileResponse(
+                img,
+                media_type="image/jpeg",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
         raise HTTPException(status_code=404, detail="ptu_campus.jpg not found")
+    
+    @app.get("/ptu_campus.webp", include_in_schema=False)
+    def serve_ptu_campus_webp():
+        img = os.path.join(FRONTEND_DIR, "ptu_campus.webp")
+        if os.path.exists(img):
+            return FileResponse(
+                img,
+                media_type="image/webp",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
+        raise HTTPException(status_code=404, detail="ptu_campus.webp not found")
 
     @app.get("/ptu_campus.mp4", include_in_schema=False)
     def serve_ptu_campus_video():
         vid = os.path.join(FRONTEND_DIR, "ptu_campus.mp4")
         if os.path.exists(vid):
-            return FileResponse(vid, media_type="video/mp4")
+            return FileResponse(
+                vid,
+                media_type="video/mp4",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
         raise HTTPException(status_code=404, detail="ptu_campus.mp4 not found")
 
     # Mount static files to serve any remaining assets (CSS, JS, XLSX bundle, fonts, etc.)
