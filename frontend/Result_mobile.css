@@ -1,0 +1,788 @@
+/* ============================================================
+   MOBILE RESPONSIVE ENHANCEMENTS
+   Comprehensive mobile optimization for Android/iOS phones and tablets
+   Added: 2026-09-27
+   ============================================================ */
+
+/* ═══════════════════════════════════════════════════════════
+   BASE MOBILE OPTIMIZATIONS (ALL DEVICES)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Improve touch target sizes - minimum 44x44px for accessibility */
+@media (max-width: 1024px) {
+  button, 
+  a, 
+  input[type="checkbox"], 
+  input[type="radio"],
+  .nav-item,
+  .btn-primary,
+  .btn-secondary {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Increase tap target spacing */
+  .nav-item {
+    margin: 4px 0;
+  }
+
+  /* Better touch scrolling */
+  .table-scroll-region,
+  .modal-body,
+  .panel {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent text size adjustment on orientation change */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLET LANDSCAPE (1024px - 768px)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) and (min-width: 769px) {
+  /* Sidebar optimization for tablets */
+  .sidebar {
+    width: 220px;
+  }
+
+  .main-content {
+    margin-left: 220px;
+  }
+
+  /* Compact stats cards */
+  .stats-row {
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  /* Table adjustments */
+  .data-table {
+    font-size: 0.9rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 10px 8px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLET PORTRAIT & SMALL TABLETS (768px - 481px)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Homepage adjustments */
+  #home-section {
+    padding: 60px 20px 40px;
+    background-attachment: scroll !important; /* Better performance on mobile */
+  }
+
+  .home-title,
+  .hero-title {
+    font-size: 2.2rem;
+    line-height: 1.2;
+  }
+
+  .home-desc,
+  .hero-desc {
+    font-size: 1rem;
+  }
+
+  /* Portal cards - stack vertically */
+  .portal-cards,
+  .portal-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .portal-card {
+    padding: 20px;
+  }
+
+  /* Stats row - 2 columns */
+  .home-stats,
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  /* PTU Nameplate */
+  .ptu-nameplate {
+    transform: scale(0.9);
+  }
+
+  /* Navigation adjustments */
+  .public-nav {
+    padding: 12px 16px;
+  }
+
+  .public-nav-brand,
+  .nav-brand {
+    gap: 8px;
+  }
+
+  .public-nav-logo,
+  .nav-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .public-nav-name {
+    font-size: 1rem;
+  }
+
+  .public-nav-subtitle {
+    font-size: 0.7rem;
+  }
+
+  /* Auth cards */
+  .auth-card,
+  .report-card-lookup-card {
+    max-width: 100%;
+    padding: 24px 20px;
+    margin: 0 16px;
+  }
+
+  /* Form elements */
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  .filter-select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    padding: 12px 14px;
+  }
+
+  /* Button sizing */
+  .btn-primary,
+  .btn-secondary {
+    padding: 12px 20px;
+    font-size: 1rem;
+  }
+
+  /* Dashboard layout - full width sidebar drawer */
+  .dashboard-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 1000;
+    transition: left 0.3s ease;
+  }
+
+  .sidebar.mobile-open {
+    left: 0;
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+  }
+
+  .sidebar-overlay.active {
+    display: block;
+  }
+
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    padding: 16px;
+  }
+
+  /* Top header mobile */
+  .top-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  #module-title {
+    font-size: 1.3rem;
+  }
+
+  /* Panel adjustments */
+  .panel {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  /* Filter section - stack vertically */
+  .filters-row,
+  .filter-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filter-item,
+  .filter-item-compact {
+    width: 100%;
+  }
+
+  .filter-select,
+  .filter-select-compact {
+    width: 100%;
+  }
+
+  /* Tables - horizontal scroll */
+  .table-scroll-region {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table {
+    min-width: 600px; /* Ensure table doesn't collapse */
+    font-size: 0.85rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 6px;
+    white-space: nowrap;
+  }
+
+  /* Upload cards */
+  .upload-block {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .upload-card {
+    padding: 20px;
+  }
+
+  /* Modal adjustments */
+  .modal-content {
+    width: 95%;
+    max-width: 500px;
+    max-height: 90vh;
+    margin: 5vh auto;
+  }
+
+  .modal-body {
+    max-height: 70vh;
+  }
+
+  /* Report card output */
+  .report-card-doc {
+    padding: 16px;
+  }
+
+  .report-card-paper {
+    padding: 20px;
+  }
+
+  /* Toast notifications */
+  .toast-container {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .toast {
+    min-width: auto;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE PHONES (480px and below)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  /* Typography scaling */
+  html {
+    font-size: 14px;
+  }
+
+  /* Homepage hero */
+  .home-title,
+  .hero-title {
+    font-size: 1.8rem;
+    line-height: 1.2;
+  }
+
+  .home-desc,
+  .hero-desc {
+    font-size: 0.9rem;
+  }
+
+  .portal-card-title,
+  .portal-title {
+    font-size: 1.1rem;
+  }
+
+  .portal-card-desc,
+  .portal-desc {
+    font-size: 0.85rem;
+  }
+
+  /* Single column stats */
+  .home-stats,
+  .stats-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  /* Navigation */
+  .public-nav {
+    padding: 10px 12px;
+  }
+
+  .public-nav-logo,
+  .nav-logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  .public-nav-name {
+    font-size: 0.9rem;
+  }
+
+  /* Hide subtitle on very small screens */
+  .public-nav-subtitle {
+    display: none;
+  }
+
+  /* Auth cards */
+  .auth-card,
+  .report-card-lookup-card {
+    padding: 20px 16px;
+    margin: 0 12px;
+  }
+
+  .auth-card-header h2 {
+    font-size: 1.5rem;
+  }
+
+  /* Role pill selector - stack */
+  .role-pill-selector {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .role-pill-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Step indicator - smaller */
+  .step-indicator {
+    gap: 8px;
+  }
+
+  .step-circle {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+
+  .step-label {
+    font-size: 0.7rem;
+  }
+
+  /* Buttons full width */
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Dashboard - compact sidebar */
+  .sidebar {
+    width: 260px;
+    left: -260px;
+  }
+
+  .brand-text {
+    display: none;
+  }
+
+  .nav-item .label {
+    font-size: 0.9rem;
+  }
+
+  .user-info {
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .user-name {
+    font-size: 0.9rem;
+  }
+
+  .user-role {
+    font-size: 0.7rem;
+  }
+
+  /* Main content - full width with minimal padding */
+  .main-content {
+    padding: 12px;
+  }
+
+  .top-header {
+    padding: 10px 12px;
+  }
+
+  #module-title {
+    font-size: 1.1rem;
+  }
+
+  /* Panel */
+  .panel {
+    padding: 12px;
+  }
+
+  .panel-header h3 {
+    font-size: 1.2rem;
+  }
+
+  /* Filters - compact */
+  .filter-item label,
+  .filter-item-compact label {
+    font-size: 0.85rem;
+  }
+
+  .filter-select,
+  .filter-select-compact,
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="search"] {
+    font-size: 16px; /* Prevents zoom */
+    padding: 10px 12px;
+  }
+
+  /* Tables - more compact */
+  .data-table {
+    font-size: 0.75rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 6px 4px;
+  }
+
+  /* Upload cards */
+  .upload-card-icon svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .upload-card h4 {
+    font-size: 1rem;
+  }
+
+  .upload-card-hint {
+    font-size: 0.8rem;
+  }
+
+  /* File dropzone */
+  .file-dropzone {
+    padding: 20px 12px;
+  }
+
+  .file-dropzone-svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .file-dropzone-text {
+    font-size: 0.85rem;
+  }
+
+  /* Modal - full screen on small phones */
+  .modal-content {
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .modal-header {
+    padding: 16px;
+  }
+
+  .modal-body {
+    padding: 16px;
+    max-height: calc(100vh - 120px);
+  }
+
+  /* Report card */
+  .report-card-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .report-card-actions button {
+    width: 100%;
+  }
+
+  .report-card-paper {
+    padding: 16px;
+  }
+
+  /* Multi-select dropdowns */
+  .multi-select-dropdown {
+    max-height: 200px;
+  }
+
+  /* Testing sections - compact */
+  .testing-rc-card,
+  .testing-report-card-card,
+  .purge-batch-card {
+    padding: 16px;
+  }
+
+  .testing-rc-title,
+  .purge-batch-title {
+    font-size: 1rem;
+  }
+
+  .testing-rc-desc,
+  .purge-batch-desc {
+    font-size: 0.8rem;
+  }
+
+  /* Badge sizing */
+  .badge-testing,
+  .badge-danger {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VERY SMALL PHONES (360px and below)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 360px) {
+  html {
+    font-size: 13px;
+  }
+
+  .home-title,
+  .hero-title {
+    font-size: 1.5rem;
+  }
+
+  .portal-card {
+    padding: 16px;
+  }
+
+  .main-content {
+    padding: 8px;
+  }
+
+  .panel {
+    padding: 10px;
+  }
+
+  .data-table {
+    font-size: 0.7rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 4px 3px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LANDSCAPE ORIENTATION OPTIMIZATIONS
+   ═══════════════════════════════════════════════════════════ */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Reduce vertical spacing in landscape */
+  #home-section {
+    padding: 40px 20px 30px;
+  }
+
+  .auth-card,
+  .report-card-lookup-card {
+    margin: 20px auto;
+  }
+
+  .modal-content {
+    max-height: 95vh;
+    margin: 2.5vh auto;
+  }
+
+  .home-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Compact step indicator */
+  .step-indicator {
+    margin-bottom: 12px;
+  }
+
+  .step-label {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOUCH-SPECIFIC ENHANCEMENTS
+   ═══════════════════════════════════════════════════════════ */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  button:hover,
+  .nav-item:hover,
+  .portal-card:hover {
+    transform: none !important;
+  }
+
+  /* Add active state feedback instead */
+  button:active,
+  .nav-item:active,
+  .portal-card:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+
+  /* Larger touch targets */
+  .password-toggle,
+  .btn-logout,
+  .theme-toggle {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 12px;
+  }
+
+  /* Remove hover tooltips - they don't work on touch */
+  [title]:hover::after {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   iOS-SPECIFIC FIXES
+   ═══════════════════════════════════════════════════════════ */
+@supports (-webkit-touch-callout: none) {
+  /* Safe area for iPhone notch */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .public-nav {
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+
+  .sidebar {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Fix iOS input zoom */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Smooth scrolling for iOS */
+  .table-scroll-region,
+  .modal-body,
+  .panel {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANDROID-SPECIFIC OPTIMIZATIONS
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Material Design ripple effect for Android feel */
+  button,
+  .nav-item,
+  .portal-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Better touch feedback */
+  button:active,
+  .nav-item:active {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  [data-theme="dark"] button:active,
+  [data-theme="dark"] .nav-item:active {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PRINT MEDIA - HIDE MOBILE ELEMENTS
+   ═══════════════════════════════════════════════════════════ */
+@media print {
+  .mobile-nav-toggle,
+  .sidebar-overlay,
+  .sidebar,
+  .top-header {
+    display: none !important;
+  }
+
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ACCESSIBILITY - ENSURE MOBILE CONTRAST
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Ensure text remains readable on mobile */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Larger focus indicators for mobile */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 3px solid var(--indigo);
+    outline-offset: 2px;
+  }
+}
