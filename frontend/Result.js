@@ -24,7 +24,12 @@ const API_URL = (() => {
 let authToken = localStorage.getItem('token') || null;
 let userRole = localStorage.getItem('role') || null;
 let currentUsername = localStorage.getItem('username') || null;
-let currentView = 'resources';
+const MANAGEMENT_VIEWS = new Set([
+    'dashboard', 'upload', 'results', 'students', 'subjects',
+    'grades', 'classreport', 'visualization', 'resources'
+]);
+const savedManagementView = localStorage.getItem('gradePortalCurrentView');
+let currentView = MANAGEMENT_VIEWS.has(savedManagementView) ? savedManagementView : 'resources';
 
 // Active navigation view state
 let _activePublicView = 'home'; // 'home' | 'auth' | 'report-card'
@@ -427,6 +432,7 @@ async function loadPublicStats() {
 function navigateToHome() {
     _activePublicView = 'home';
     $('public-navbar')?.classList.remove('hidden');
+    $('public-navbar')?.classList.add('public-nav--homepage');
     $('home-section')?.classList.remove('hidden');
     $('auth-section')?.classList.add('hidden');
     $('report-card-section')?.classList.add('hidden');
@@ -439,9 +445,152 @@ function navigateToHome() {
     loadPublicStats();
 }
 
+async function initSupportPortal() {
+    const widget = $('support-widget');
+    const toggleButton = $('support-toggle');
+    const closeButton = $('support-close');
+    const panel = $('support-panel');
+    const payLink = $('support-pay-link');
+    const payLabel = $('support-pay-label');
+    const copyButton = $('support-copy-upi');
+    const upiDisplay = $('support-upi-display');
+    const status = $('support-status');
+    const amountInput = $('support-custom-amount');
+    const amountButtons = Array.from(document.querySelectorAll('[data-support-amount]'));
+    if (!widget || !toggleButton || !panel || !closeButton || !payLink || !payLabel || !copyButton || !upiDisplay || !status || !amountInput) return;
+    const userAgent = navigator.userAgent || '';
+    const canLaunchUpiApp = navigator.userAgentData?.mobile === true
+        || /Android|iPhone|iPad|iPod|IEMobile|Windows Phone/i.test(userAgent)
+        || (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1);
+
+    const closePanel = (returnFocus = false) => {
+        panel.hidden = true;
+        toggleButton.setAttribute('aria-expanded', 'false');
+        if (returnFocus) toggleButton.focus();
+    };
+
+    toggleButton.addEventListener('click', () => {
+        const opening = panel.hidden;
+        panel.hidden = !opening;
+        toggleButton.setAttribute('aria-expanded', String(opening));
+        if (opening) {
+            (panel.querySelector('[data-support-amount]:not(:disabled)') || closeButton).focus();
+        }
+    });
+
+    closeButton.addEventListener('click', () => closePanel(true));
+    document.addEventListener('click', (event) => {
+        if (!widget.contains(event.target)) closePanel(panel.contains(document.activeElement));
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !panel.hidden) closePanel(true);
+    });
+
+    let supportConfig;
+    try {
+        const response = await fetch(`${API_URL}/support/config`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Support payments are unavailable.');
+        supportConfig = data;
+    } catch (error) {
+        status.textContent = 'The UPI button is unavailable. You can still scan the QR and enter an amount.';
+        payLabel.textContent = 'UPI button unavailable';
+        return;
+    }
+
+    if (!supportConfig.enabled) {
+        status.textContent = 'Scan the QR with any UPI app and enter your contribution amount.';
+        payLabel.textContent = 'Use the QR code';
+        return;
+    }
+
+    const upiId = String(supportConfig.upi_id || '');
+    const displayName = String(supportConfig.display_name || '');
+    if (!upiId || !displayName) {
+        status.textContent = 'Scan the QR to pay; the UPI button setup is incomplete.';
+        payLabel.textContent = 'UPI button unavailable';
+        return;
+    }
+
+    upiDisplay.hidden = false;
+    upiDisplay.textContent = `UPI ID: ${upiId}`;
+    copyButton.disabled = false;
+    amountButtons.forEach((button) => { button.disabled = false; });
+    amountInput.disabled = false;
+    payLabel.textContent = 'Continue with UPI';
+
+    const updatePaymentLink = () => {
+        const amount = Number(amountInput.value);
+        const validAmount = Number.isInteger(amount) && amount >= 1 && amount <= 50000;
+        if (!validAmount) {
+            payLink.href = '#';
+            payLink.setAttribute('aria-disabled', 'true');
+            status.textContent = 'Choose an amount from ₹1 to ₹50,000.';
+            return;
+        }
+
+        if (!canLaunchUpiApp) {
+            payLink.href = '#';
+            payLink.setAttribute('aria-disabled', 'true');
+            payLabel.textContent = 'Use QR or copy UPI ID';
+            status.textContent = 'This browser cannot open UPI apps. Scan the QR with your phone or copy the UPI ID.';
+            return;
+        }
+
+        const params = new URLSearchParams({
+            pa: upiId,
+            pn: displayName,
+            am: amount.toFixed(2),
+            cu: 'INR',
+            tn: 'Support PTU Grade Portal'
+        });
+        payLink.href = `upi://pay?${params.toString()}`;
+        payLink.setAttribute('aria-disabled', 'false');
+        payLabel.textContent = 'Continue with UPI';
+        status.textContent = 'Your contribution is optional. Portal access remains free.';
+    };
+
+    amountButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            amountInput.value = button.dataset.supportAmount || '';
+            amountButtons.forEach((item) => {
+                const selected = item === button;
+                item.classList.toggle('is-selected', selected);
+                item.setAttribute('aria-pressed', String(selected));
+            });
+            updatePaymentLink();
+        });
+    });
+
+    amountInput.addEventListener('input', () => {
+        amountButtons.forEach((button) => {
+            const selected = button.dataset.supportAmount === amountInput.value;
+            button.classList.toggle('is-selected', selected);
+            button.setAttribute('aria-pressed', String(selected));
+        });
+        updatePaymentLink();
+    });
+
+    payLink.addEventListener('click', (event) => {
+        if (payLink.getAttribute('aria-disabled') === 'true') event.preventDefault();
+    });
+
+    copyButton.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(upiId);
+            status.textContent = 'UPI ID copied. Open your UPI app to make a voluntary contribution.';
+        } catch (error) {
+            status.textContent = `Copy unavailable. Use this UPI ID in your UPI app: ${upiId}`;
+        }
+    });
+
+    updatePaymentLink();
+}
+
 function openReportCardFromHome() {
     _activePublicView = 'report-card';
     $('public-navbar')?.classList.remove('hidden');
+    $('public-navbar')?.classList.remove('public-nav--homepage');
     $('home-section')?.classList.add('hidden');
     $('auth-section')?.classList.add('hidden');
     $('report-card-section')?.classList.remove('hidden');
@@ -462,6 +611,7 @@ function openStaffPortalFromHome() {
     }
     _activePublicView = 'auth';
     $('public-navbar')?.classList.remove('hidden');
+    $('public-navbar')?.classList.remove('public-nav--homepage');
     $('home-section')?.classList.add('hidden');
     $('auth-section')?.classList.remove('hidden');
     $('report-card-section')?.classList.add('hidden');
@@ -903,6 +1053,7 @@ function evaluateSessionState() {
 
     if (authToken && userRole) {
         publicNav?.classList.add('hidden');
+        publicNav?.classList.remove('public-nav--homepage');
         homeSection?.classList.add('hidden');
         authSection?.classList.add('hidden');
         reportCardSection?.classList.add('hidden');
@@ -969,15 +1120,17 @@ function evaluateSessionState() {
 function applyRoleBasedNavigation(role) {
     const r = (role || '').trim().toLowerCase();
     const isDeveloper    = r === 'developer';
-    const isExamWing = r === 'exam wing';
-    const isFaculty  = r === 'faculty';
-    const isTNP      = r === 'tnp';
+    const isAdmin        = r === 'developer' || r === 'admin';
+    const isExamWing     = r === 'exam wing';
+    const isFaculty      = r === 'faculty';
+    const isTNP          = r === 'tnp';
 
     // Views that should be hidden per role
     const hiddenViews = new Set();
     if (isFaculty)  { hiddenViews.add('upload'); hiddenViews.add('grades'); }
-    if (isTNP)      { hiddenViews.add('upload'); hiddenViews.add('classreport'); }
-    if (isExamWing) { hiddenViews.add('grades'); hiddenViews.add('classreport'); }
+    if (isTNP)      { hiddenViews.add('upload'); hiddenViews.add('classreport'); hiddenViews.add('visualization'); }
+    if (isExamWing) { hiddenViews.add('grades'); hiddenViews.add('classreport'); hiddenViews.add('visualization'); }
+    if (!isFaculty && !isAdmin) { hiddenViews.add('visualization'); }
 
     // Show/hide nav buttons
     document.querySelectorAll('.nav-item').forEach(btn => {
@@ -1013,6 +1166,16 @@ function applyRoleBasedNavigation(role) {
         trackStudentsSection.style.display = isDeveloper ? '' : 'none';
     }
 
+    const dashboardTools = $('dashboard-tools');
+    if (dashboardTools) {
+        dashboardTools.hidden = ![
+            purgeSection,
+            rcSection,
+            uploadResourcesSection,
+            trackStudentsSection
+        ].some(section => section && section.style.display !== 'none');
+    }
+
     // If currently on a hidden view, redirect to resources
     if (hiddenViews.has(currentView)) {
         switchView('resources');
@@ -1021,7 +1184,18 @@ function applyRoleBasedNavigation(role) {
 
 // ─── 11. Dashboard & View Switching ───────────────────────────
 function switchView(view) {
+    if (!MANAGEMENT_VIEWS.has(view)) view = 'resources';
     currentView = view;
+    localStorage.setItem('gradePortalCurrentView', view);
+    document.body.classList.toggle('resources-active', view === 'resources');
+    document.body.classList.toggle('dashboard-active', view === 'dashboard');
+    document.body.classList.toggle('results-active', view === 'results');
+    document.body.classList.toggle('grades-active', view === 'grades');
+    document.body.classList.toggle('students-active', view === 'students');
+    document.body.classList.toggle('subjects-active', view === 'subjects');
+    document.body.classList.toggle('upload-active', view === 'upload');
+    document.body.classList.toggle('classreport-active', view === 'classreport');
+    document.documentElement.classList.toggle('upload-active', view === 'upload');
     document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
     const target = $(`view-${view}`);
     if (target) target.classList.remove('hidden');
@@ -1034,9 +1208,10 @@ function switchView(view) {
         upload: 'Upload Data',
         results: 'Student Results',
         students: 'Student Management',
-        subjects: 'Subject Master',
+        subjects: 'Subjects',
         grades: 'SGPA / CGPA Summary',
         classreport: 'Class Report',
+        visualization: 'Data Visualization',
         resources: 'Resources Management'
     };
     if ($('module-title')) {
@@ -1071,6 +1246,9 @@ function switchView(view) {
         buildCrBatchTabs();
         buildCrDeptTabs();
         loadClassReport();
+    }
+    if (view === 'visualization') {
+        initVisualizationView();
     }
     if (view === 'upload') {
         initUploadDropzones();
@@ -1498,13 +1676,15 @@ async function buildResultsBatchTabs() {
     }
 
     const totalCount = students.length;
-    let html = `<button class="dept-tab ${currentResultsBatchFilter === 'All' ? 'active' : ''}" onclick="selectResultsBatchTab('All')">
+    let html = `<button type="button" class="dept-tab ${currentResultsBatchFilter === 'All' ? 'active' : ''}"
+        aria-pressed="${currentResultsBatchFilter === 'All'}" onclick="selectResultsBatchTab('All')">
         All Batches <span class="badge-count">${totalCount}</span>
     </button>`;
 
     resultsAvailableBatches.forEach(b => {
         const count = students.filter(s => (s.batch || '').trim() === b).length;
-        html += `<button class="dept-tab ${currentResultsBatchFilter === b ? 'active' : ''}" onclick="selectResultsBatchTab('${escapeHtml(b)}')">
+        html += `<button type="button" class="dept-tab ${currentResultsBatchFilter === b ? 'active' : ''}"
+            aria-pressed="${currentResultsBatchFilter === b}" onclick="selectResultsBatchTab('${escapeHtml(b)}')">
             ${escapeHtml(b)} <span class="badge-count">${count}</span>
         </button>`;
     });
@@ -1613,8 +1793,12 @@ async function loadResults() {
         tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
         const countEl = $('results-showing-count');
         const fCountEl = $('results-f-showing-count');
+        const passRateEl = $('results-pass-rate-number');
+        const passDetailWrap = $('results-pass-detail-wrap');
         if (countEl) countEl.innerText = '0';
         if (fCountEl) fCountEl.innerText = '0';
+        if (passRateEl) passRateEl.innerText = '0.0%';
+        if (passDetailWrap) passDetailWrap.innerText = '(0/0)';
     }
 }
 
@@ -1662,6 +1846,34 @@ function renderResultsTable() {
             : `Total F grades in results: ${fCount}. Click to show only F grades.`;
     }
     updateFGradesFilterButton();
+
+    // Update Pass Percentage indicator pill
+    const passRateEl = $('results-pass-rate-number');
+    const passDetailWrap = $('results-pass-detail-wrap');
+    const passPill = $('results-pass-rate-pill');
+
+    const FAIL_GRADES_SET = new Set(['F', 'AB', 'ABSENT', 'NC', 'E', 'Z', '']);
+    const isPassGrade = r => {
+        const g = (r.grade || '').trim().toUpperCase();
+        if (!g || FAIL_GRADES_SET.has(g)) return false;
+        if (r.grade_point !== undefined && r.grade_point !== null && Number(r.grade_point) === 0) return false;
+        return true;
+    };
+
+    const passCount = allResultsCache.filter(isPassGrade).length;
+    const passPct = total > 0 ? ((passCount / total) * 100).toFixed(1) : '0.0';
+
+    const studentSet = new Set(allResultsCache.map(r => r.reg_no || r.student_id).filter(Boolean));
+    const failedStudentSet = new Set(allResultsCache.filter(r => !isPassGrade(r)).map(r => r.reg_no || r.student_id).filter(Boolean));
+    const passedStudentsCount = studentSet.size - failedStudentSet.size;
+    const studentPassPct = studentSet.size > 0 ? ((passedStudentsCount / studentSet.size) * 100).toFixed(1) : '0.0';
+
+    if (passRateEl) passRateEl.innerText = `${passPct}%`;
+    if (passDetailWrap) passDetailWrap.innerText = `(${passCount}/${total})`;
+    if (passPill) {
+        passPill.title = `Results Pass Rate: ${passPct}% (${passCount} passed of ${total} results)` +
+            (studentSet.size > 0 ? ` · Clear: ${passedStudentsCount}/${studentSet.size} students (${studentPassPct}%)` : '');
+    }
 
     // Update Pagination info
     const pageInfo = $('results-page-info');
@@ -1874,11 +2086,11 @@ function clearClassReportFilters() {
         });
     }
 
-    // Reset register number filter
-    if ($('cr-filter-regno')) $('cr-filter-regno').value = '';
+    // Reset semester filter
+    if ($('cr-filter-sem')) $('cr-filter-sem').value = '';
 
-    // Reset student name filter
-    if ($('cr-filter-name')) $('cr-filter-name').value = '';
+    // Reset CGPA sort
+    if ($('cr-filter-sort')) $('cr-filter-sort').value = 'none';
 
     // Reset credits sort
     if ($('cr-filter-credits-sort')) $('cr-filter-credits-sort').value = 'none';
@@ -2030,9 +2242,101 @@ function buildBatchTabs(students) {
     container.innerHTML = html;
 }
 
+function enablePillTabDragging(container) {
+    if (container.dataset.dragScrollReady) return;
+    container.dataset.dragScrollReady = 'true';
+
+    let pointerDown = false;
+    let dragStarted = false;
+    let startX = 0;
+    let startScrollLeft = 0;
+    let suppressClickUntil = 0;
+    let activePointerId = null;
+    let lastX = 0;
+    let lastMoveTime = 0;
+    let velocity = 0;
+    let momentumFrame = 0;
+
+    const stopMomentum = () => {
+        if (momentumFrame) cancelAnimationFrame(momentumFrame);
+        momentumFrame = 0;
+        container.classList.remove('is-inertial');
+    };
+
+    const startMomentum = () => {
+        if (Math.abs(velocity) < 0.08 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        container.classList.add('is-inertial');
+        let previousTime = performance.now();
+        const step = (time) => {
+            const elapsed = Math.min(time - previousTime, 32);
+            previousTime = time;
+            container.scrollLeft += velocity * elapsed;
+            velocity *= Math.pow(0.92, elapsed / 16);
+
+            const maxScroll = container.scrollWidth - container.clientWidth;
+            const atBoundary = (container.scrollLeft <= 0 && velocity < 0)
+                || (container.scrollLeft >= maxScroll && velocity > 0);
+            if (Math.abs(velocity) < 0.02 || atBoundary) {
+                stopMomentum();
+                return;
+            }
+            momentumFrame = requestAnimationFrame(step);
+        };
+        momentumFrame = requestAnimationFrame(step);
+    };
+
+    container.addEventListener('pointerdown', (event) => {
+        if (event.pointerType !== 'mouse' || event.button !== 0) return;
+        stopMomentum();
+        pointerDown = true;
+        dragStarted = false;
+        activePointerId = event.pointerId;
+        startX = event.clientX;
+        startScrollLeft = container.scrollLeft;
+        lastX = event.clientX;
+        lastMoveTime = performance.now();
+        velocity = 0;
+    });
+
+    document.addEventListener('pointermove', (event) => {
+        if (!pointerDown || event.pointerId !== activePointerId) return;
+        const distance = event.clientX - startX;
+        if (!dragStarted && Math.abs(distance) < 5) return;
+        dragStarted = true;
+        container.classList.add('is-dragging');
+        container.scrollLeft = startScrollLeft - distance;
+        const now = performance.now();
+        const elapsed = Math.max(now - lastMoveTime, 1);
+        const instantVelocity = -(event.clientX - lastX) / elapsed;
+        velocity = Math.max(-1.5, Math.min(1.5, velocity * 0.65 + instantVelocity * 0.35));
+        lastX = event.clientX;
+        lastMoveTime = now;
+        event.preventDefault();
+    });
+
+    const finishDrag = (event) => {
+        if (!pointerDown || event.pointerId !== activePointerId) return;
+        pointerDown = false;
+        activePointerId = null;
+        if (dragStarted) suppressClickUntil = Date.now() + 250;
+        container.classList.remove('is-dragging');
+        if (dragStarted) startMomentum();
+    };
+    document.addEventListener('pointerup', finishDrag);
+    document.addEventListener('pointercancel', finishDrag);
+
+    container.addEventListener('click', (event) => {
+        if (Date.now() > suppressClickUntil) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        suppressClickUntil = 0;
+    }, true);
+}
+
 function buildSectionTabs(students) {
     const container = $('section-tabs-container');
     if (!container) return;
+    enablePillTabDragging(container);
     const tabCounts = {};
     students.forEach(s => {
         const tab = studentSectionTab(s);
@@ -2077,9 +2381,30 @@ function filterStudentsSearch(query) {
     renderStudents();
 }
 
+function clearStudentSearch() {
+    const input = $('students-search-input');
+    if (!input) return;
+    input.value = '';
+    filterStudentsSearch('');
+    input.focus();
+}
+
+function resetStudentFilters() {
+    currentBatchFilter = 'All';
+    currentSectionFilter = 'All';
+    currentStudentSearch = '';
+    const input = $('students-search-input');
+    if (input) input.value = '';
+    buildBatchTabs(allStudentsCache);
+    buildSectionTabs(allStudentsCache);
+    renderStudents();
+    input?.focus();
+}
+
 function renderStudents() {
     const tbody = $('students-tbody');
     if (!tbody) return;
+    const table = $('students-table');
 
     let filtered = allStudentsCache;
     if (currentBatchFilter !== 'All') {
@@ -2125,15 +2450,40 @@ function renderStudents() {
             pill.title = `Total registered students: ${total}`;
         }
     }
+    const clearSearchButton = $('students-search-clear');
+    if (clearSearchButton) clearSearchButton.hidden = !currentStudentSearch;
 
     if (!filtered.length) {
-        const reason = currentStudentSearch ? `matching “${currentStudentSearch}”` :
-                       (currentSectionFilter !== 'All' ? 'for ' + currentSectionFilter : '') +
-                       (currentBatchFilter !== 'All' ? ' in batch ' + currentBatchFilter : '');
-        tbody.innerHTML = `<tr><td colspan="9" class="loading-cell">No students found ${reason}</td></tr>`;
+        table?.classList.add('is-empty');
+        const hasActiveFilters = currentStudentSearch ||
+                                 currentSectionFilter !== 'All' ||
+                                 currentBatchFilter !== 'All';
+        const title = total === 0 ? 'No student records yet' :
+                      currentStudentSearch ? 'No matching students' :
+                      'No students in this view';
+        const description = total === 0 ? 'Student records will appear here once they are added.' :
+                            currentStudentSearch ? `No records match “${escapeHtml(currentStudentSearch)}”.` :
+                            'Try a different batch or section, or reset the selected filters.';
+        const action = hasActiveFilters
+            ? `<button type="button" class="students-empty-action" onclick="resetStudentFilters()">Reset filters</button>`
+            : '';
+        tbody.innerHTML = `<tr><td colspan="9" class="students-empty-cell">
+            <div class="students-empty-state" role="status">
+                <span class="students-empty-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <circle cx="11" cy="8" r="4" />
+                        <path d="M3 21v-2a8 8 0 0 1 16 0v2M19 8v6M22 11h-6" />
+                    </svg>
+                </span>
+                <strong>${title}</strong>
+                <p>${description}</p>
+                ${action}
+            </div>
+        </td></tr>`;
         return;
     }
 
+    table?.classList.remove('is-empty');
     const html = filtered.map((s, idx) => `
         <tr>
             <td>${idx + 1}</td>
@@ -2263,6 +2613,7 @@ async function deleteStudent(regNo) {
 function buildDeptTabs(subjects) {
     const container = $('dept-tabs-container');
     if (!container) return;
+    enablePillTabDragging(container);
     const deptSet = new Set();
     subjects.forEach(s => {
         if (s.department && s.department.trim()) {
@@ -2270,12 +2621,12 @@ function buildDeptTabs(subjects) {
         }
     });
     const sortedDepts = Array.from(deptSet).sort();
-    let html = `<button class="dept-tab ${currentDeptFilter === 'All' ? 'active' : ''}" data-dept="All" onclick="selectDeptTab('All')">
+    let html = `<button type="button" class="dept-tab ${currentDeptFilter === 'All' ? 'active' : ''}" data-dept="All" aria-pressed="${currentDeptFilter === 'All'}" onclick="selectDeptTab('All')">
         All <span class="badge-count">${subjects.length}</span>
     </button>`;
     sortedDepts.forEach(dept => {
         const count = subjects.filter(s => s.department === dept).length;
-        html += `<button class="dept-tab ${currentDeptFilter === dept ? 'active' : ''}" data-dept="${dept}" onclick="selectDeptTab('${dept}')">
+        html += `<button type="button" class="dept-tab ${currentDeptFilter === dept ? 'active' : ''}" data-dept="${dept}" aria-pressed="${currentDeptFilter === dept}" onclick="selectDeptTab('${dept}')">
             ${dept} <span class="badge-count">${count}</span>
         </button>`;
     });
@@ -2290,7 +2641,17 @@ function selectDeptTab(dept) {
 
 function filterSubjectsSearch(query) {
     currentSubjectSearch = (query || '').trim().toLowerCase();
+    const clearButton = $('subjects-search-clear');
+    if (clearButton) clearButton.hidden = !currentSubjectSearch;
     renderSubjects();
+}
+
+function clearSubjectsSearch() {
+    const input = $('subjects-search-input');
+    if (!input) return;
+    input.value = '';
+    filterSubjectsSearch('');
+    input.focus();
 }
 
 function renderSubjects() {
@@ -2316,6 +2677,18 @@ function renderSubjects() {
     const pill = $('subjects-count-display');
     const total = allSubjectsCache.length;
     const showing = filtered.length;
+    const departmentCount = new Set(allSubjectsCache.map(s => (s.department || '').trim()).filter(Boolean)).size;
+    const semesterCount = new Set(allSubjectsCache.map(s => (s.semester || '').trim()).filter(Boolean)).size;
+
+    const summaryValues = [
+        ['subjects-total-value', total],
+        ['subjects-department-value', departmentCount],
+        ['subjects-semester-value', semesterCount]
+    ];
+    summaryValues.forEach(([id, value]) => {
+        const element = $(id);
+        if (element) element.textContent = value;
+    });
 
     if (countEl) {
         if (countEl.innerText !== String(showing)) {
@@ -2772,12 +3145,14 @@ async function buildGradeBatchTabs() {
         if (s.batch && s.batch.trim()) batches.add(s.batch.trim());
     });
     const sortedBatches = Array.from(batches).sort();
-    let html = `<button class="dept-tab ${currentGradeBatchFilter === 'All' ? 'active' : ''}" data-batch="All" onclick="selectGradeBatchTab('All')">
+    let html = `<button type="button" class="dept-tab ${currentGradeBatchFilter === 'All' ? 'active' : ''}"
+        data-batch="All" aria-pressed="${currentGradeBatchFilter === 'All'}" onclick="selectGradeBatchTab('All')">
         All Batches <span class="badge-count">${students.length}</span>
     </button>`;
     sortedBatches.forEach(b => {
         const count = students.filter(s => (s.batch || '').trim() === b).length;
-        html += `<button class="dept-tab ${currentGradeBatchFilter === b ? 'active' : ''}" data-batch="${escapeHtml(b)}" onclick="selectGradeBatchTab('${escapeHtml(b)}')">
+        html += `<button type="button" class="dept-tab ${currentGradeBatchFilter === b ? 'active' : ''}"
+            data-batch="${escapeHtml(b)}" aria-pressed="${currentGradeBatchFilter === b}" onclick="selectGradeBatchTab('${escapeHtml(b)}')">
             ${escapeHtml(b)} <span class="badge-count">${count}</span>
         </button>`;
     });
@@ -2796,6 +3171,7 @@ function selectGradeBatchTab(batch) {
 async function buildGradeDeptTabs() {
     const container = $('grade-dept-tabs-container');
     if (!container) return;
+    enablePillTabDragging(container);
     const allStudents = await ensureStudentsCache();
     let students = allStudents;
     if (currentGradeBatchFilter !== 'All') {
@@ -2807,11 +3183,13 @@ async function buildGradeDeptTabs() {
         tabCounts[tab] = (tabCounts[tab] || 0) + 1;
     });
     const sortedTabs = Object.keys(tabCounts).sort();
-    let html = `<button class="dept-tab ${currentGradeDeptFilter === 'All' ? 'active' : ''}" data-dept="All" onclick="selectGradeDeptTab('All')">
+    let html = `<button type="button" class="dept-tab ${currentGradeDeptFilter === 'All' ? 'active' : ''}"
+        data-dept="All" aria-pressed="${currentGradeDeptFilter === 'All'}" onclick="selectGradeDeptTab('All')">
         All <span class="badge-count">${students.length}</span>
     </button>`;
     sortedTabs.forEach(tab => {
-        html += `<button class="dept-tab ${currentGradeDeptFilter === tab ? 'active' : ''}" data-dept="${tab}" onclick="selectGradeDeptTab('${tab}')">
+        html += `<button type="button" class="dept-tab ${currentGradeDeptFilter === tab ? 'active' : ''}"
+            data-dept="${escapeHtml(tab)}" aria-pressed="${currentGradeDeptFilter === tab}" onclick="selectGradeDeptTab('${escapeHtml(tab)}')">
             ${tab} <span class="badge-count">${tabCounts[tab]}</span>
         </button>`;
     });
@@ -2958,6 +3336,38 @@ function updateArrearButtonLabel() {
     }
 }
 
+function updateGradesOverview(grades, semester) {
+    const records = Array.isArray(grades) ? grades : [];
+    const studentCount = records.length;
+    const scoreKey = semester ? 'sgpa' : 'cgpa';
+    const scores = records
+        .map(grade => grade[scoreKey])
+        .filter(value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)))
+        .map(Number);
+    const average = scores.length
+        ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(2)
+        : '—';
+    const arrears = records.reduce((sum, grade) => {
+        const count = Number(grade.arrear_count);
+        return sum + (Number.isFinite(count) ? Math.max(0, count) : 0);
+    }, 0);
+
+    if ($('grades-summary-students')) $('grades-summary-students').innerText = studentCount;
+    if ($('grades-summary-average')) $('grades-summary-average').innerText = average;
+    if ($('grades-summary-average-label')) {
+        $('grades-summary-average-label').innerText = semester ? 'Average SGPA' : 'Average CGPA';
+    }
+    if ($('grades-summary-average-note')) {
+        $('grades-summary-average-note').innerText = semester
+            ? `Semester ${semester} performance`
+            : 'Overall academic standing';
+    }
+    if ($('grades-summary-arrears')) $('grades-summary-arrears').innerText = arrears;
+    if ($('grades-summary-arrears-note')) {
+        $('grades-summary-arrears-note').innerText = `Across ${studentCount} students in view`;
+    }
+}
+
 // Close menu when clicking outside
 document.addEventListener('click', (e) => {
     const wrap = $('grade-filter-arrears-wrap');
@@ -3023,6 +3433,7 @@ async function loadGrades() {
         });
 
         allGradesCache = data;
+        updateGradesOverview(data, sem);
 
         if (!data.length) {
             tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">No students match current grade criteria.</td></tr>';
@@ -3058,6 +3469,13 @@ async function loadGrades() {
         tbody.innerHTML = html;
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
+        updateGradesOverview([], $('grade-filter-sem')?.value || '');
+        const crCountEl = $('cr-showing-count');
+        const crPassRateEl = $('cr-pass-rate-number');
+        const crPassDetailWrap = $('cr-pass-detail-wrap');
+        if (crCountEl) crCountEl.innerText = '0';
+        if (crPassRateEl) crPassRateEl.innerText = '0.0%';
+        if (crPassDetailWrap) crPassDetailWrap.innerText = '(0/0)';
     }
 }
 
@@ -3084,18 +3502,21 @@ async function populateClassReportBatchDropdown() {
 async function buildCrBatchTabs() {
     const container = $('cr-batch-tabs-container');
     if (!container) return;
+    enablePillTabDragging(container);
     const students = await ensureStudentsCache();
     const batches = new Set();
     students.forEach(s => {
         if (s.batch && s.batch.trim()) batches.add(s.batch.trim());
     });
     const sortedBatches = Array.from(batches).sort();
-    let html = `<button class="dept-tab ${currentCrBatchFilter === 'All' ? 'active' : ''}" data-batch="All" onclick="selectCrBatchTab('All')">
+    let html = `<button type="button" class="dept-tab ${currentCrBatchFilter === 'All' ? 'active' : ''}"
+        data-batch="All" aria-pressed="${currentCrBatchFilter === 'All'}" onclick="selectCrBatchTab('All')">
         All Batches <span class="badge-count">${students.length}</span>
     </button>`;
     sortedBatches.forEach(b => {
         const count = students.filter(s => (s.batch || '').trim() === b).length;
-        html += `<button class="dept-tab ${currentCrBatchFilter === b ? 'active' : ''}" data-batch="${escapeHtml(b)}" onclick="selectCrBatchTab('${escapeHtml(b)}')">
+        html += `<button type="button" class="dept-tab ${currentCrBatchFilter === b ? 'active' : ''}"
+            data-batch="${escapeHtml(b)}" aria-pressed="${currentCrBatchFilter === b}" onclick="selectCrBatchTab('${escapeHtml(b)}')">
             ${escapeHtml(b)} <span class="badge-count">${count}</span>
         </button>`;
     });
@@ -3114,6 +3535,7 @@ function selectCrBatchTab(batch) {
 async function buildCrDeptTabs() {
     const container = $('cr-dept-tabs-container');
     if (!container) return;
+    enablePillTabDragging(container);
     const allStudents = await ensureStudentsCache();
     let students = allStudents;
     if (currentCrBatchFilter !== 'All') {
@@ -3125,12 +3547,14 @@ async function buildCrDeptTabs() {
         tabCounts[tab] = (tabCounts[tab] || 0) + 1;
     });
     const sortedTabs = Object.keys(tabCounts).sort();
-    let html = `<button class="dept-tab ${currentCrDeptFilter === 'All' ? 'active' : ''}" data-dept="All" onclick="selectCrDeptTab('All')">
+    let html = `<button type="button" class="dept-tab ${currentCrDeptFilter === 'All' ? 'active' : ''}"
+        data-dept="All" aria-pressed="${currentCrDeptFilter === 'All'}" onclick="selectCrDeptTab('All')">
         All <span class="badge-count">${students.length}</span>
     </button>`;
     sortedTabs.forEach(tab => {
-        html += `<button class="dept-tab ${currentCrDeptFilter === tab ? 'active' : ''}" data-dept="${tab}" onclick="selectCrDeptTab('${tab}')">
-            ${tab} <span class="badge-count">${tabCounts[tab]}</span>
+        html += `<button type="button" class="dept-tab ${currentCrDeptFilter === tab ? 'active' : ''}"
+            data-dept="${escapeHtml(tab)}" aria-pressed="${currentCrDeptFilter === tab}" onclick="selectCrDeptTab('${escapeHtml(tab)}')">
+            ${escapeHtml(tab)} <span class="badge-count">${tabCounts[tab]}</span>
         </button>`;
     });
     container.innerHTML = html;
@@ -3191,10 +3615,10 @@ document.addEventListener('click', (e) => {
 async function loadClassReport() {
     const tbody = $('classreport-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">Loading Class Report\u2026</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">Computing Class Report (SGPA & CGPA)…</td></tr>';
 
     try {
-        const deptVal  = currentCrDeptFilter !== 'All' ? currentCrDeptFilter : '';
+        const deptVal = currentCrDeptFilter !== 'All' ? currentCrDeptFilter : '';
         let dept = '';
         let section = '';
         if (deptVal) {
@@ -3206,44 +3630,97 @@ async function loadClassReport() {
                 dept = deptVal;
             }
         }
+        const sem = $('cr-filter-sem')?.value || '';
         const batch = currentCrBatchFilter !== 'All' ? currentCrBatchFilter : '';
+        const cgpaSort = $('cr-filter-sort')?.value || 'desc';
         const creditsSort = $('cr-filter-credits-sort')?.value || 'none';
 
         let url = '/grades/summary?';
-        if (dept)    url += `department=${encodeURIComponent(dept)}&`;
+        if (dept) url += `department=${encodeURIComponent(dept)}&`;
         if (section) url += `section=${encodeURIComponent(section)}&`;
-        if (batch)   url += `batch=${encodeURIComponent(batch)}&`;
-        currentCrArrearFilter.forEach(a => { url += `arrears=${encodeURIComponent(a)}&`; });
+        if (sem)  url += `semester=${encodeURIComponent(sem)}&`;
+        if (batch) url += `batch=${encodeURIComponent(batch)}&`;
 
+        currentCrArrearFilter.forEach(a => {
+            url += `arrears=${encodeURIComponent(a)}&`;
+        });
 
         const data = await authFetch(url);
 
-        // Sort by Total Credits
-        if (creditsSort === 'asc') {
-            data.sort((a, b) => (Number(a.total_credits) || 0) - (Number(b.total_credits) || 0));
-        } else if (creditsSort === 'desc') {
-            data.sort((a, b) => (Number(b.total_credits) || 0) - (Number(a.total_credits) || 0));
-        }
+        // Sorting (Exact replica of SGPA/CGPA sorting)
+        data.sort((a, b) => {
+            // Sort by Total Credits if active
+            if (creditsSort === 'asc') {
+                const diff = (Number(a.total_credits) || 0) - (Number(b.total_credits) || 0);
+                if (diff !== 0) return diff;
+            } else if (creditsSort === 'desc') {
+                const diff = (Number(b.total_credits) || 0) - (Number(a.total_credits) || 0);
+                if (diff !== 0) return diff;
+            }
+
+            // Sort by CGPA/SGPA
+            const valA = sem ? (a.sgpa ?? -1) : (a.cgpa ?? -1);
+            const valB = sem ? (b.sgpa ?? -1) : (b.cgpa ?? -1);
+            if (cgpaSort === 'asc') return valA - valB;
+            if (cgpaSort === 'desc') return valB - valA;
+
+            return 0;
+        });
 
         allClassReportCache = data;
 
+        // Compute Pass Percentage of selected filters
+        const totalStudents = data.length;
+        const clearCount = data.filter(g => (Number(g.arrear_count) || 0) === 0).length;
+        const passPct = totalStudents > 0 ? ((clearCount / totalStudents) * 100).toFixed(1) : '0.0';
+
+        const crCountEl = $('cr-showing-count');
+        const crPassRateEl = $('cr-pass-rate-number');
+        const crPassDetailWrap = $('cr-pass-detail-wrap');
+        const crPassPill = $('cr-pass-rate-pill');
+        const averageLabelEl = $('cr-summary-average-label');
+        const averageEl = $('cr-summary-average');
+        const averageNoteEl = $('cr-summary-average-note');
+
+        if (crCountEl) crCountEl.innerText = totalStudents;
+        if (crPassRateEl) crPassRateEl.innerText = `${passPct}%`;
+        if (crPassDetailWrap) crPassDetailWrap.innerText = `(${clearCount}/${totalStudents})`;
+        const scoreKey = sem ? 'sgpa' : 'cgpa';
+        const scores = data
+            .map(grade => grade[scoreKey])
+            .filter(value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)))
+            .map(Number);
+        const average = scores.length ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(2) : '—';
+        if (averageLabelEl) averageLabelEl.innerText = sem ? 'Average SGPA' : 'Average CGPA';
+        if (averageEl) averageEl.innerText = average;
+        if (averageNoteEl) averageNoteEl.innerText = sem
+            ? `Across ${scores.length} students in the selected semester`
+            : 'Overall academic standing';
+        if (crPassPill) {
+            crPassPill.title = `Pass Percentage: ${passPct}% (${clearCount} of ${totalStudents} students passed with 0 arrears)`;
+        }
+
         if (!data.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">No students match current criteria.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">No students match current criteria.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = data.map((g, idx) => {
+        const html = data.map((g, idx) => {
             const arrCount = g.arrear_count || 0;
             const arrClass = arrCount === 0 ? 'arrear-0' : (arrCount === 1 ? 'arrear-1' : (arrCount === 2 ? 'arrear-2' : 'arrear-3'));
-            const arrText  = arrCount === 0 ? '0 Arrears' : `${arrCount} Active Arr${arrCount > 1 ? 's' : ''}`;
+            const arrText = arrCount === 0 ? '0 Arrears' : `${arrCount} Active Arr${arrCount > 1 ? 's' : ''}`;
             const arrTooltip = arrCount === 0 ? 'All cleared / No pending arrears' : `${arrCount} active uncleared arrear subject${arrCount > 1 ? 's' : ''}`;
             const isClickable = arrCount > 0 ? ' style="cursor:pointer;" onclick="showArrearDetails(\'' + escapeHtml(g.reg_no) + '\', \'' + escapeHtml(g.name) + '\')"' : '';
+
             return `
                 <tr${isClickable}>
                     <td>${idx + 1}</td>
                     <td><strong>${escapeHtml(g.reg_no)}</strong></td>
                     <td>${escapeHtml(g.name)}</td>
                     <td>${escapeHtml(g.department)}</td>
+                    <td>${escapeHtml(g.semester || 'All')}</td>
+                    <td><strong>${g.sgpa != null ? Number(g.sgpa).toFixed(2) : '—'}</strong></td>
+                    <td><strong>${g.cgpa != null ? Number(g.cgpa).toFixed(2) : '—'}</strong></td>
                     <td>${g.total_credits}</td>
                     <td>${g.earned_credits}</td>
                     <td>
@@ -3254,79 +3731,41 @@ async function loadClassReport() {
                 </tr>
             `;
         }).join('');
+        tbody.innerHTML = html;
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="7" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
+        const crCountEl = $('cr-showing-count');
+        const crPassRateEl = $('cr-pass-rate-number');
+        const crPassDetailWrap = $('cr-pass-detail-wrap');
+        const averageEl = $('cr-summary-average');
+        const averageNoteEl = $('cr-summary-average-note');
+        if (crCountEl) crCountEl.innerText = '0';
+        if (crPassRateEl) crPassRateEl.innerText = '0.0%';
+        if (crPassDetailWrap) crPassDetailWrap.innerText = '(0/0)';
+        if (averageEl) averageEl.innerText = '—';
+        if (averageNoteEl) averageNoteEl.innerText = 'No class data available';
     }
-}
-
-// Client-side filter for Class Report by Reg No and Student Name
-function filterClassReport() {
-    const tbody = $('classreport-tbody');
-    if (!tbody || !allClassReportCache || !allClassReportCache.length) return;
-
-    // Get filter values
-    const regNoFilter = ($('cr-filter-regno')?.value || '').trim().toLowerCase();
-    const nameFilter = ($('cr-filter-name')?.value || '').trim().toLowerCase();
-
-    // Filter the cached data
-    let filteredData = allClassReportCache;
-
-    if (regNoFilter) {
-        filteredData = filteredData.filter(g => 
-            (g.reg_no || '').toLowerCase().includes(regNoFilter)
-        );
-    }
-
-    if (nameFilter) {
-        filteredData = filteredData.filter(g => 
-            (g.name || '').toLowerCase().includes(nameFilter)
-        );
-    }
-
-    // Render filtered results
-    if (!filteredData.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">No students match your search criteria.</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = filteredData.map((g, idx) => {
-        const arrCount = g.arrear_count || 0;
-        const arrClass = arrCount === 0 ? 'arrear-0' : (arrCount === 1 ? 'arrear-1' : (arrCount === 2 ? 'arrear-2' : 'arrear-3'));
-        const arrText  = arrCount === 0 ? '0 Arrears' : `${arrCount} Active Arr${arrCount > 1 ? 's' : ''}`;
-        const arrTooltip = arrCount === 0 ? 'All cleared / No pending arrears' : `${arrCount} active uncleared arrear subject${arrCount > 1 ? 's' : ''}`;
-        const isClickable = arrCount > 0 ? ' style="cursor:pointer;" onclick="showArrearDetails(\'' + escapeHtml(g.reg_no) + '\', \'' + escapeHtml(g.name) + '\')"' : '';
-        return `
-            <tr${isClickable}>
-                <td>${idx + 1}</td>
-                <td><strong>${escapeHtml(g.reg_no)}</strong></td>
-                <td>${escapeHtml(g.name)}</td>
-                <td>${escapeHtml(g.department)}</td>
-                <td>${g.total_credits}</td>
-                <td>${g.earned_credits}</td>
-                <td>
-                    <span class="arrear-badge ${arrClass}" title="${escapeHtml(arrTooltip)}${arrCount > 0 ? '\n\nClick to view F-grade subjects' : ''}">
-                        <span class="arrear-dot"></span> ${arrText}
-                    </span>
-                </td>
-            </tr>
-        `;
-    }).join('');
 }
 
 function exportClassReportToExcel() {
     if (!allClassReportCache || !allClassReportCache.length) {
-        showToast('No data to export', 'warning');
+        showToast('No class report data to export', 'warning');
         return;
     }
 
     try {
-        const deptVal   = currentCrDeptFilter || 'All';
-        const batchVal  = currentCrBatchFilter || 'All';
+        // ── 1. Extract Active Filter States ──
+        const deptVal = currentCrDeptFilter || 'All';
         const deptNames = {
-            'CE':'Civil Engineering (CE)','CHE':'Chemical Engineering (CHE)',
-            'CSE':'Computer Science & Engineering (CSE)','ECE':'Electronics & Communication Engineering (ECE)',
-            'EEE':'Electrical & Electronics Engineering (EEE)','EIE':'Electronics & Instrumentation Engineering (EIE)',
-            'IT':'Information Technology (IT)','ME':'Mechanical Engineering (ME)','MT':'Mechatronics Engineering (MT)'
+            'CE': 'Civil Engineering (CE)',
+            'CHE': 'Chemical Engineering (CHE)',
+            'CSE': 'Computer Science & Engineering (CSE)',
+            'ECE': 'Electronics & Communication Engineering (ECE)',
+            'EEE': 'Electrical & Electronics Engineering (EEE)',
+            'EIE': 'Electronics & Instrumentation Engineering (EIE)',
+            'IT': 'Information Technology (IT)',
+            'ME': 'Mechanical Engineering (ME)',
+            'MT': 'Mechatronics Engineering (MT)'
         };
         let deptDisplay = 'All Departments';
         if (deptVal && deptVal !== 'All') {
@@ -3337,42 +3776,2407 @@ function exportClassReportToExcel() {
                 deptDisplay = deptNames[deptVal] || deptVal;
             }
         }
+
+        const semVal = $('cr-filter-sem')?.value || '';
+        const semDisplay = semVal ? `Semester ${semVal} (SGPA)` : 'Overall Cumulative (CGPA)';
+
+        const batchVal = currentCrBatchFilter || 'All';
         const batchDisplay = (batchVal && batchVal.toLowerCase() !== 'all') ? batchVal : 'All Batches';
-        let arrearDisplay  = 'All Students';
-        if (!currentCrArrearFilter.includes('all') && currentCrArrearFilter.length > 0) {
-            arrearDisplay = currentCrArrearFilter.map(v => v === '0' ? 'No Arrears' : `${v} Arrear(s)`).join(', ');
+
+        let arrearDisplay = 'All Students (No Filter)';
+        if (typeof currentCrArrearFilter !== 'undefined' && currentCrArrearFilter && !currentCrArrearFilter.includes('all') && currentCrArrearFilter.length > 0) {
+            const arrearLabels = {
+                '0': 'No Arrears (Clear Only)',
+                '1': '1 Arrear Only',
+                '2': '2 Arrears Only',
+                '3+': '3+ Arrears Only'
+            };
+            arrearDisplay = currentCrArrearFilter.map(a => arrearLabels[a] || `${a} Arrears`).join(', ');
+        }
+
+        const cgpaSort = $('cr-filter-sort')?.value || 'desc';
+        const sortDisplay = cgpaSort === 'desc'
+            ? (semVal ? 'SGPA (Highest to Lowest)' : 'CGPA (Highest to Lowest)')
+            : cgpaSort === 'asc'
+                ? (semVal ? 'SGPA (Lowest to Highest)' : 'CGPA (Lowest to Highest)')
+                : 'None / Natural Order';
+
+        const creditsSort = $('cr-filter-credits-sort')?.value || 'none';
+        const creditsSortDisplay = creditsSort === 'asc' ? 'Total Credits (Ascending)' : creditsSort === 'desc' ? 'Total Credits (Descending)' : 'None';
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const exportTimestamp = `${dateStr}, ${timeStr}`;
+
+        // ── 2. Summary Statistics ──
+        const totalStudents = allClassReportCache.length;
+        const clearCount = allClassReportCache.filter(g => (Number(g.arrear_count) || 0) === 0).length;
+        const arrearStudentsCount = totalStudents - clearCount;
+        const clearRate = totalStudents > 0 ? ((clearCount / totalStudents) * 100).toFixed(1) + '%' : '0%';
+
+        const validSgpas = allClassReportCache.map(g => Number(g.sgpa)).filter(v => !isNaN(v) && v >= 0);
+        const avgSgpa = validSgpas.length ? (validSgpas.reduce((a, b) => a + b, 0) / validSgpas.length).toFixed(2) : null;
+
+        const validCgpas = allClassReportCache.map(g => Number(g.cgpa)).filter(v => !isNaN(v) && v >= 0);
+        const avgCgpa = validCgpas.length ? (validCgpas.reduce((a, b) => a + b, 0) / validCgpas.length).toFixed(2) : null;
+
+        const validTotCredits = allClassReportCache.map(g => Number(g.total_credits)).filter(v => !isNaN(v) && v > 0);
+        const avgTotCredits = validTotCredits.length ? Math.round(validTotCredits.reduce((a, b) => a + b, 0) / validTotCredits.length) : null;
+
+        const validEarnCredits = allClassReportCache.map(g => Number(g.earned_credits)).filter(v => !isNaN(v) && v >= 0);
+        const avgEarnCredits = validEarnCredits.length ? Math.round(validEarnCredits.reduce((a, b) => a + b, 0) / validEarnCredits.length) : null;
+
+        // ── 3. Build Styled Excel Sheet ──
+        const ws = {};
+
+        function colToLetter(n) {
+            let s = '';
+            while (n >= 0) {
+                s = String.fromCharCode((n % 26) + 65) + s;
+                n = Math.floor(n / 26) - 1;
+            }
+            return s;
+        }
+
+        function setCell(r, c, val, style, type = 's') {
+            const ref = colToLetter(c) + (r + 1);
+            ws[ref] = { v: val, t: type, s: style };
+        }
+
+        // Shared Style Presets
+        const thinBorder = {
+            top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+            bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+            left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+            right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+        };
+
+        const filterLabelStyle = {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '475569' } },
+            fill: { fgColor: { rgb: 'F8FAFC' } },
+            alignment: { horizontal: 'right', vertical: 'center' },
+            border: thinBorder
+        };
+
+        const filterValueStyle = {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '0F172A' } },
+            fill: { fgColor: { rgb: 'FFFFFF' } },
+            alignment: { horizontal: 'left', vertical: 'center' },
+            border: thinBorder
+        };
+
+        // Row 0: University Header Banner
+        const univTitleStyle = {
+            font: { name: 'Calibri', sz: 16, bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '0F2942' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+        };
+        for (let c = 0; c <= 9; c++) {
+            setCell(0, c, c === 0 ? 'PUDUCHERRY TECHNOLOGICAL UNIVERSITY' : '', univTitleStyle);
+        }
+
+        // Row 1: Subtitle Banner
+        const subtitleStyle = {
+            font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'CCFBF1' } },
+            fill: { fgColor: { rgb: '0F766E' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+        };
+        for (let c = 0; c <= 9; c++) {
+            setCell(1, c, c === 0 ? 'OFFICIAL CLASS REPORT — SGPA / CGPA PERFORMANCE & ARREAR ANALYSIS' : '', subtitleStyle);
+        }
+
+        // Row 2: Applied Filter Section Heading
+        const filterSectionStyle = {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '1E293B' } },
+            fill: { fgColor: { rgb: 'E2E8F0' } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+                top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                bottom: { style: 'thin', color: { rgb: 'CBD5E1' } }
+            }
+        };
+        for (let c = 0; c <= 9; c++) {
+            setCell(2, c, c === 0 ? 'APPLIED FILTER CRITERIA & REPORT METADATA' : '', filterSectionStyle);
+        }
+
+        // Row 3: Filter Values Row 1
+        setCell(3, 0, 'Department:', filterLabelStyle);
+        setCell(3, 1, deptDisplay, filterValueStyle);
+        setCell(3, 2, '', filterValueStyle);
+
+        setCell(3, 3, 'Semester / Scope:', filterLabelStyle);
+        setCell(3, 4, semDisplay, filterValueStyle);
+        setCell(3, 5, '', filterValueStyle);
+
+        setCell(3, 6, 'Batch:', filterLabelStyle);
+        setCell(3, 7, batchDisplay, filterValueStyle);
+
+        setCell(3, 8, 'Exported On:', filterLabelStyle);
+        setCell(3, 9, exportTimestamp, filterValueStyle);
+
+        // Row 4: Filter Values Row 2
+        setCell(4, 0, 'Arrear Filter:', filterLabelStyle);
+        setCell(4, 1, arrearDisplay, filterValueStyle);
+        setCell(4, 2, '', filterValueStyle);
+
+        setCell(4, 3, 'Sort By (CGPA):', filterLabelStyle);
+        setCell(4, 4, sortDisplay, filterValueStyle);
+        setCell(4, 5, '', filterValueStyle);
+
+        setCell(4, 6, 'Credits Sort:', filterLabelStyle);
+        setCell(4, 7, creditsSortDisplay, filterValueStyle);
+
+        setCell(4, 8, 'Total Records:', filterLabelStyle);
+        setCell(4, 9, `${totalStudents} Students (${clearCount} Clear, ${arrearStudentsCount} Arrear)`, Object.assign({}, filterValueStyle, {
+            font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: '0F766E' } }
+        }));
+
+        // Row 5: Blank Spacer Row
+        for (let c = 0; c <= 9; c++) {
+            setCell(5, c, '', { fill: { fgColor: { rgb: 'FFFFFF' } } });
+        }
+
+        // Row 6: Main Table Column Headers
+        const tableHeaders = ['Rank', 'Register No', 'Student Name', 'Department', 'Semester', 'SGPA', 'CGPA', 'Total Credits', 'Earned Credits', 'Arrear Status'];
+        const thBaseStyle = {
+            font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '0F766E' } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+                top: { style: 'medium', color: { rgb: '115E59' } },
+                bottom: { style: 'medium', color: { rgb: '115E59' } },
+                left: { style: 'thin', color: { rgb: '99F6E4' } },
+                right: { style: 'thin', color: { rgb: '99F6E4' } }
+            }
+        };
+        tableHeaders.forEach((h, idx) => {
+            const style = Object.assign({}, thBaseStyle);
+            if (idx === 2) style.alignment = { horizontal: 'left', vertical: 'center' };
+            setCell(6, idx, h, style);
+        });
+
+        // Rows 7+: Student Rows
+        const dataRowBorder = {
+            top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+            bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+            left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+            right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+        };
+
+        allClassReportCache.forEach((g, idx) => {
+            const r = 7 + idx;
+            const isOdd = idx % 2 === 1;
+            const rowBg = isOdd ? 'F8FAFC' : 'FFFFFF';
+
+            // Col 0: Rank
+            setCell(r, 0, idx + 1, {
+                font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '475569' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 'n');
+
+            // Col 1: Register Number
+            setCell(r, 1, String(g.reg_no || ''), {
+                font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '0F172A' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 2: Student Name
+            setCell(r, 2, String(g.name || ''), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '0F172A' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'left', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 3: Department
+            setCell(r, 3, String(g.department || ''), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 4: Semester
+            setCell(r, 4, String(g.semester || 'All'), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+
+            // Col 5: SGPA
+            const hasSgpa = g.sgpa != null && g.sgpa !== '' && !isNaN(Number(g.sgpa));
+            setCell(r, 5, hasSgpa ? Number(g.sgpa) : '—', {
+                font: { name: 'Calibri', sz: 10.5, bold: true, color: { rgb: '1E293B' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder,
+                numFmt: hasSgpa ? '0.00' : undefined
+            }, hasSgpa ? 'n' : 's');
+
+            // Col 6: CGPA (Highlighted Teal)
+            const hasCgpa = g.cgpa != null && g.cgpa !== '' && !isNaN(Number(g.cgpa));
+            setCell(r, 6, hasCgpa ? Number(g.cgpa) : '—', {
+                font: { name: 'Calibri', sz: 10.5, bold: true, color: { rgb: '0F766E' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder,
+                numFmt: hasCgpa ? '0.00' : undefined
+            }, hasCgpa ? 'n' : 's');
+
+            // Col 7: Total Credits
+            const totCr = Number(g.total_credits);
+            const hasTotCr = !isNaN(totCr);
+            setCell(r, 7, hasTotCr ? totCr : (g.total_credits ?? '—'), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, hasTotCr ? 'n' : 's');
+
+            // Col 8: Earned Credits
+            const earnCr = Number(g.earned_credits);
+            const hasEarnCr = !isNaN(earnCr);
+            setCell(r, 8, hasEarnCr ? earnCr : (g.earned_credits ?? '—'), {
+                font: { name: 'Calibri', sz: 10, color: { rgb: '334155' } },
+                fill: { fgColor: { rgb: rowBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, hasEarnCr ? 'n' : 's');
+
+            // Col 9: Arrear Status Badge
+            const arr = Number(g.arrear_count) || 0;
+            let arrBg = 'DCFCE7';
+            let arrColor = '15803D';
+            let arrLabel = '0 (Clear)';
+            if (arr === 1) {
+                arrBg = 'FEF3C7';
+                arrColor = 'B45309';
+                arrLabel = '1 Arrear';
+            } else if (arr === 2) {
+                arrBg = 'FEF3C7';
+                arrColor = 'B45309';
+                arrLabel = '2 Arrears';
+            } else if (arr > 2) {
+                arrBg = 'FEE2E2';
+                arrColor = 'B91C1C';
+                arrLabel = `${arr} Arrears`;
+            }
+
+            setCell(r, 9, arrLabel, {
+                font: { name: 'Calibri', sz: 9.5, bold: true, color: { rgb: arrColor } },
+                fill: { fgColor: { rgb: arrBg } },
+                alignment: { horizontal: 'center', vertical: 'center' },
+                border: dataRowBorder
+            }, 's');
+        });
+
+        // Summary / Footer Row
+        const summaryRowIndex = 7 + totalStudents;
+        const footerStyle = {
+            font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: '0F172A' } },
+            fill: { fgColor: { rgb: 'F1F5F9' } },
+            alignment: { horizontal: 'right', vertical: 'center' },
+            border: {
+                top: { style: 'thin', color: { rgb: '94A3B8' } },
+                bottom: { style: 'double', color: { rgb: '475569' } },
+                left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+            }
+        };
+
+        setCell(summaryRowIndex, 0, `Class Average & Summary (${totalStudents} Students, Pass Rate: ${clearRate}):`, footerStyle);
+        for (let c = 1; c <= 4; c++) {
+            setCell(summaryRowIndex, c, '', footerStyle);
+        }
+
+        const footerValStyle = Object.assign({}, footerStyle, {
+            alignment: { horizontal: 'center', vertical: 'center' }
+        });
+
+        // SGPA Average
+        setCell(summaryRowIndex, 5, avgSgpa !== null ? Number(avgSgpa) : '—', Object.assign({}, footerValStyle, {
+            numFmt: avgSgpa !== null ? '0.00' : undefined
+        }), avgSgpa !== null ? 'n' : 's');
+
+        // CGPA Average
+        setCell(summaryRowIndex, 6, avgCgpa !== null ? Number(avgCgpa) : '—', Object.assign({}, footerValStyle, {
+            font: Object.assign({}, footerValStyle.font, { color: { rgb: '0F766E' } }),
+            numFmt: avgCgpa !== null ? '0.00' : undefined
+        }), avgCgpa !== null ? 'n' : 's');
+
+        // Total Credits Average
+        setCell(summaryRowIndex, 7, avgTotCredits !== null ? avgTotCredits : '—', footerValStyle, avgTotCredits !== null ? 'n' : 's');
+
+        // Earned Credits Average
+        setCell(summaryRowIndex, 8, avgEarnCredits !== null ? avgEarnCredits : '—', footerValStyle, avgEarnCredits !== null ? 'n' : 's');
+
+        // Arrear Summary Breakdown
+        setCell(summaryRowIndex, 9, `${clearCount} Clear / ${arrearStudentsCount} Arrear`, Object.assign({}, footerValStyle, {
+            font: Object.assign({}, footerValStyle.font, { sz: 9 })
+        }), 's');
+
+        // Merges
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
+            { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } },
+            { s: { r: 3, c: 1 }, e: { r: 3, c: 2 } },
+            { s: { r: 3, c: 4 }, e: { r: 3, c: 5 } },
+            { s: { r: 4, c: 1 }, e: { r: 4, c: 2 } },
+            { s: { r: 4, c: 4 }, e: { r: 4, c: 5 } },
+            { s: { r: summaryRowIndex, c: 0 }, e: { r: summaryRowIndex, c: 4 } }
+        ];
+
+        // Row Heights
+        const rowHeights = [
+            { hpt: 32 }, // Row 0
+            { hpt: 20 }, // Row 1
+            { hpt: 18 }, // Row 2
+            { hpt: 19 }, // Row 3
+            { hpt: 19 }, // Row 4
+            { hpt: 10 }, // Row 5
+            { hpt: 24 }  // Row 6
+        ];
+        for (let i = 0; i < totalStudents; i++) {
+            rowHeights.push({ hpt: 19 });
+        }
+        rowHeights.push({ hpt: 22 });
+        ws['!rows'] = rowHeights;
+
+        ws['!cols'] = [
+            { wch: 8 },  // Rank
+            { wch: 17 }, // Register No
+            { wch: 32 }, // Student Name
+            { wch: 15 }, // Department
+            { wch: 12 }, // Semester
+            { wch: 12 }, // SGPA
+            { wch: 12 }, // CGPA
+            { wch: 14 }, // Total Credits
+            { wch: 14 }, // Earned Credits
+            { wch: 17 }  // Arrear Status
+        ];
+
+        ws['!autofilter'] = { ref: `A7:J${7 + totalStudents}` };
+        ws['!ref'] = `A1:J${summaryRowIndex + 1}`;
+
+        // ── 5. Export Workbook ──
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Class_Report');
+
+        const fileDept = (deptVal || 'All').replace(/[^a-zA-Z0-9_-]/g, '');
+        const fileSem = semVal ? `Sem${semVal}` : 'Overall';
+        const fileDate = now.toISOString().slice(0, 10);
+        const fileName = `PTU_Class_Report_${fileDept}_${fileSem}_${fileDate}.xlsx`;
+
+        XLSX.writeFile(wb, fileName);
+        showToast('Class Report exported to Excel', 'success');
+    } catch (err) {
+        console.error('Error in styled Class Report Excel export:', err);
+        showToast('Export failed: ' + err.message, 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DATA VISUALIZATION (Faculty & Admin Feature)
+// ═══════════════════════════════════════════════════════════════
+const VIS_DEPT_NAMES = {
+    'CE': 'Civil Engineering',
+    'CHE': 'Chemical Engineering',
+    'CSE': 'Computer Science & Engineering',
+    'ECE': 'Electronics & Communication Engineering',
+    'EEE': 'Electrical & Electronics Engineering',
+    'EIE': 'Electronics & Instrumentation Engineering',
+    'IT': 'Information Technology',
+    'ME': 'Mechanical Engineering',
+    'MT': 'Mechatronics Engineering'
+};
+
+let currentVisBatchFilter = 'All';
+let currentVisData = null;
+let currentVisSections = [];
+let visChartInstance = null;
+let currentVisGpaData = null;
+// ═══════════════════════════════════════════════════════════════
+// VISUALIZATION SUB-TAB STATE
+// ═══════════════════════════════════════════════════════════════
+let currentVisTab = 'pass';  // 'pass' | 'gpa'
+let visGpaChartInstance = null;
+let currentGpaRegNo = '';
+
+// ── Master Visualization View Initializer ──
+async function initVisualizationView() {
+    // 1. Activate active sub-tab (defaults to 'pass')
+    switchVisTab(currentVisTab || 'pass');
+
+    // 2. Populate Batch filter dropdown
+    await populateVisBatchDropdown();
+
+    // 3. Populate autocomplete datalist for GPA Trend
+    populateGpaDatalist();
+
+    // 4. Load Pass Percentage data
+    await loadVisualizationData();
+}
+
+// ── Batch Filter Handler ──
+function onVisBatchChange(val) {
+    currentVisBatchFilter = val || 'All';
+    const semSelect = $('vis-filter-sem');
+    if (semSelect) semSelect.innerHTML = '<option value="All">All Semesters</option>';
+    const deptSelect = $('vis-filter-dept');
+    if (deptSelect) deptSelect.innerHTML = '<option value="All">All Departments</option>';
+    loadVisualizationData();
+}
+
+// ── Populate Visualization Batch Dropdown ──
+async function populateVisBatchDropdown() {
+    const batchSelect = $('vis-filter-batch');
+    if (!batchSelect) return;
+    try {
+        let batches = [];
+        try {
+            batches = await authFetch('/students/batches');
+        } catch (e) {
+            console.warn('Fallback to student cache for vis batches:', e);
+        }
+        if (!batches || !batches.length) {
+            const students = await ensureStudentsCache();
+            const set = new Set();
+            students.forEach(s => {
+                if (s.batch && s.batch.trim()) set.add(s.batch.trim());
+            });
+            batches = Array.from(set).sort();
+        }
+        let html = '<option value="All">All Batches</option>';
+        (batches || []).forEach(b => {
+            html += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+        });
+        batchSelect.innerHTML = html;
+        batchSelect.value = currentVisBatchFilter || 'All';
+    } catch (err) {
+        console.warn('Could not populate visualization batch dropdown:', err);
+    }
+}
+
+// ── Tab switcher ──
+function switchVisTab(tab) {
+    currentVisTab = tab;
+
+    // Update tab buttons
+    document.querySelectorAll('.vis-tab').forEach(btn => {
+        const isActive = btn.id === `vis-tab-${tab}`;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    // Show/hide panes
+    ['pass', 'gpa', 'subject', 'placement'].forEach(t => {
+        const pane = $(`vis-pane-${t}`);
+        if (pane) pane.classList.toggle('hidden', t !== tab);
+    });
+
+    if (tab === 'subject') {
+        if (!currentVisSubjectData) {
+            populateSubjectBatchDropdown().then(() => loadSubjectAnalytics());
+        }
+    } else if (tab === 'placement') {
+        if (!currentVisPlacementData) {
+            populatePlacementBatchDropdown().then(() => loadPlacementEligibility());
+        }
+    }
+}
+
+// ── Populate autocomplete datalist for GPA search ──
+function populateGpaDatalist() {
+    const datalist = $('vis-gpa-reg-datalist');
+    if (!datalist || datalist.children.length > 0) return;
+
+    if (allStudentsCache && allStudentsCache.length) {
+        let options = '';
+        allStudentsCache.slice(0, 100).forEach(s => {
+            if (s.reg_no) {
+                options += `<option value="${escapeHtml(s.reg_no)}">${escapeHtml(s.name)} (${escapeHtml(s.department || '')})</option>`;
+            }
+        });
+        datalist.innerHTML = options;
+    }
+}
+
+// ── GPA input controls ──
+function onGpaRegnoInput(val) {
+    const clearBtn = $('vis-gpa-clear-btn');
+    if (clearBtn) {
+        clearBtn.style.display = (val && val.trim().length > 0) ? 'flex' : 'none';
+    }
+    // If input changed from current loaded student, reveal empty state
+    if (val.trim() !== currentGpaRegNo && currentGpaRegNo) {
+        $('vis-gpa-content')?.classList.add('hidden');
+        $('vis-gpa-error')?.classList.add('hidden');
+        $('vis-gpa-empty')?.classList.remove('hidden');
+    }
+}
+
+function clearGpaInput() {
+    const input = $('vis-gpa-regno-input');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    const clearBtn = $('vis-gpa-clear-btn');
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
+    $('vis-gpa-content')?.classList.add('hidden');
+    $('vis-gpa-error')?.classList.add('hidden');
+    $('vis-gpa-empty')?.classList.remove('hidden');
+    currentGpaRegNo = '';
+}
+
+// ── Load GPA chart for a student (Executive UI/UX standard) ──
+async function loadGPAChart() {
+    const input = $('vis-gpa-regno-input');
+    const regNo = (input ? input.value : '').trim();
+    if (!regNo) {
+        showToast('Please enter a Register Number', 'warning');
+        return;
+    }
+
+    currentGpaRegNo = regNo;
+
+    const btn = $('vis-gpa-search-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Searching…`;
+    }
+
+    // State transitions
+    $('vis-gpa-content')?.classList.add('hidden');
+    $('vis-gpa-empty')?.classList.add('hidden');
+    $('vis-gpa-error')?.classList.add('hidden');
+    $('vis-gpa-loading')?.classList.remove('hidden');
+
+    try {
+        const data = await authFetch(`/visualization/student-gpa/${encodeURIComponent(regNo)}`);
+
+        if (!data || !data.semesters || data.semesters.length === 0) {
+            $('vis-gpa-loading')?.classList.add('hidden');
+            const errCard = $('vis-gpa-error');
+            if (errCard) {
+                errCard.classList.remove('hidden');
+                const titleEl = $('vis-gpa-error-title');
+                const msgEl = $('vis-gpa-error-msg');
+                if (titleEl) titleEl.innerText = `No Academic Records for "${regNo}"`;
+                if (msgEl) msgEl.innerText = 'No published semester results were found for this registration number.';
+            }
+            showToast('No GPA data found for this student', 'warning');
+            return;
+        }
+
+        currentVisGpaData = data;
+
+        // ── 1. Update Student Profile Header ──
+        const nameEl    = $('vis-gpa-student-name');
+        const deptBadge = $('vis-gpa-dept-badge');
+        const metaEl    = $('vis-gpa-student-meta');
+        const avatarEl  = $('vis-gpa-avatar');
+
+        if (nameEl) nameEl.innerText = escapeHtml(data.name || '—');
+        if (deptBadge) {
+            deptBadge.innerText = [data.department, data.section ? `Sec ${data.section}` : '', data.batch].filter(Boolean).join(' · ');
+        }
+        if (metaEl) {
+            metaEl.innerText = `Reg No: ${data.reg_no} · Programme: ${data.programme || 'Bachelor of Technology'} · Status: Active`;
+        }
+        if (avatarEl) {
+            avatarEl.innerText = (data.name || '?')[0].toUpperCase();
+        }
+
+        // ── 2. Sort Semesters Chronologically ──
+        const SEM_ORDER = ['I','II','III','IV','V','VI','VII','VIII'];
+        const semesters = [...data.semesters].sort((a, b) => {
+            const ai = SEM_ORDER.indexOf(a.semester);
+            const bi = SEM_ORDER.indexOf(b.semester);
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        });
+
+        // ── 3. Populate 4 Executive KPI Cards ──
+        const cgpaVal = data.cgpa != null ? Number(data.cgpa).toFixed(2) : '0.00';
+        const cgpaNum = Number(cgpaVal);
+
+        const kpiCgpaEl = $('vis-gpa-kpi-cgpa');
+        const kpiClassEl = $('vis-gpa-kpi-class');
+        if (kpiCgpaEl) kpiCgpaEl.innerText = cgpaVal;
+        if (kpiClassEl) {
+            let standingText = 'Pass Standing';
+            if (cgpaNum >= 8.5) standingText = 'First Class with Distinction (Tier 1)';
+            else if (cgpaNum >= 6.5) standingText = 'First Class (Tier 2)';
+            else if (cgpaNum >= 5.5) standingText = 'Second Class (Tier 3)';
+            kpiClassEl.innerText = `Standing: ${standingText}`;
+        }
+
+        // Credits KPI
+        const totalCredits = Number(data.total_credits != null && Number(data.total_credits) > 0
+            ? data.total_credits
+            : semesters.reduce((sum, s) => sum + (Number(s.total_credits) || 0), 0));
+        const earnedCredits = Number(data.earned_credits != null && Number(data.earned_credits) > 0
+            ? data.earned_credits
+            : semesters.reduce((sum, s) => sum + (Number(s.earned_credits) || 0), 0));
+        const creditPct = totalCredits > 0 ? Math.min(100, Math.round((earnedCredits / totalCredits) * 100)) : 100;
+
+        const kpiCreditsEl = $('vis-gpa-kpi-credits');
+        const kpiCreditPctEl = $('vis-gpa-kpi-credit-pct');
+        if (kpiCreditsEl) kpiCreditsEl.innerText = `${earnedCredits.toFixed(1)} / ${totalCredits.toFixed(1)} Cr`;
+        if (kpiCreditPctEl) kpiCreditPctEl.innerText = `${creditPct}% Completion Rate (${semesters.length} Semesters)`;
+
+        // Arrear Standing KPI
+        const activeArrears = data.active_arrears != null ? data.active_arrears : (data.has_arrears ? 1 : 0);
+        const kpiArrearsEl = $('vis-gpa-kpi-arrears');
+        const kpiArrearSubEl = $('vis-gpa-kpi-arrear-sub');
+        const arrearCard = $('vis-gpa-arrear-card');
+        const arrearIcon = $('vis-gpa-arrear-icon');
+
+        if (kpiArrearsEl) kpiArrearsEl.innerText = activeArrears === 0 ? '0 Active' : `${activeArrears} Pending`;
+        if (kpiArrearSubEl) {
+            kpiArrearSubEl.innerText = activeArrears === 0
+                ? 'All registered subjects cleared'
+                : `${activeArrears} active uncleared arrear subject${activeArrears > 1 ? 's' : ''}`;
+        }
+        if (arrearCard) {
+            arrearCard.className = activeArrears === 0 ? 'stat-card green' : 'stat-card red';
+        }
+        if (arrearIcon) {
+            arrearIcon.style.background = activeArrears === 0 ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+            arrearIcon.style.color = activeArrears === 0 ? 'var(--emerald,#10b981)' : 'var(--red,#ef4444)';
+        }
+
+        // Latest Velocity KPI
+        const lastSem = semesters[semesters.length - 1];
+        const prevSem = semesters.length > 1 ? semesters[semesters.length - 2] : null;
+
+        const kpiLatestEl = $('vis-gpa-kpi-latest');
+        const kpiDeltaEl = $('vis-gpa-kpi-delta');
+
+        if (kpiLatestEl && lastSem) {
+            const lastSgpa = lastSem.sgpa != null ? Number(lastSem.sgpa).toFixed(2) : '—';
+            kpiLatestEl.innerText = `${lastSgpa} (Sem ${lastSem.semester})`;
+        }
+        if (kpiDeltaEl && lastSem) {
+            if (prevSem && lastSem.sgpa != null && prevSem.sgpa != null) {
+                const diff = (Number(lastSem.sgpa) - Number(prevSem.sgpa)).toFixed(2);
+                const isPositive = Number(diff) >= 0;
+                kpiDeltaEl.innerHTML = `<span style="color:${isPositive ? 'var(--emerald,#10b981)' : 'var(--amber,#f59e0b)'}; font-weight:700;">
+                    ${isPositive ? '+' : ''}${diff} ${isPositive ? '↑' : '↓'}
+                </span> vs Sem ${prevSem.semester}`;
+            } else {
+                kpiDeltaEl.innerText = `Baseline semester performance`;
+            }
+        }
+
+        // Update chart subtitle and table counter
+        const chartSub = $('vis-gpa-chart-subtitle');
+        const tableCount = $('vis-gpa-table-count');
+        const cgpaPill = $('vis-gpa-cgpa-pill');
+
+        if (chartSub) chartSub.innerText = `${data.name} (${data.reg_no}) · Overall CGPA: ${cgpaVal}`;
+        if (tableCount) tableCount.innerText = `${semesters.length} Semester${semesters.length !== 1 ? 's' : ''} Evaluated`;
+        if (cgpaPill) {
+            cgpaPill.innerHTML = `<span class="dash"></span> CGPA Ref (${cgpaVal})`;
+        }
+
+        // ── 4. Build Detailed Breakdown Table ──
+        const tbody = $('vis-gpa-tbody');
+        if (tbody) {
+            tbody.innerHTML = semesters.map((s, idx) => {
+                const sgpaNum = s.sgpa != null ? Number(s.sgpa) : null;
+                const sgpaStr = sgpaNum != null ? sgpaNum.toFixed(2) : '—';
+
+                // Classification tier badge
+                let tierClass = 'benchmark-red';
+                let tierLabel = 'Needs Focus (<6.0)';
+                if (sgpaNum != null) {
+                    if (sgpaNum >= 8.5) {
+                        tierClass = 'benchmark-green';
+                        tierLabel = 'Distinction (≥8.5)';
+                    } else if (sgpaNum >= 7.0) {
+                        tierClass = 'benchmark-blue';
+                        tierLabel = 'Good (7.0–8.4)';
+                    } else if (sgpaNum >= 6.0) {
+                        tierClass = 'benchmark-amber';
+                        tierLabel = 'Average (6.0–6.9)';
+                    }
+                }
+
+                const semArrears = s.arrears || 0;
+                const arrearTag = semArrears === 0
+                    ? `<span style="color:var(--emerald,#10b981);font-weight:600;">0 Clear</span>`
+                    : `<span style="color:var(--danger,#ef4444);font-weight:700;">${semArrears} Arrear${semArrears > 1 ? 's' : ''}</span>`;
+
+                return `<tr>
+                    <td style="text-align:center;">${idx + 1}</td>
+                    <td><strong>Semester ${escapeHtml(s.semester)}</strong></td>
+                    <td style="text-align:center;">
+                        ${sgpaNum != null
+                            ? `<span class="counter-number" style="font-weight:800; font-size:0.95rem;">${sgpaStr}</span>`
+                            : '<span style="color:var(--text-light)">—</span>'}
+                    </td>
+                    <td style="text-align:center;">${s.total_credits != null ? Number(s.total_credits).toFixed(1) : '—'}</td>
+                    <td style="text-align:center;">${s.earned_credits != null ? Number(s.earned_credits).toFixed(1) : '—'}</td>
+                    <td style="text-align:center;">${s.subjects ? s.subjects.length : (s.subjects_count || '—')}</td>
+                    <td style="text-align:center;">${arrearTag}</td>
+                    <td>
+                        <span class="benchmark-pill ${tierClass}" style="font-size:0.72rem; padding:3px 10px;">
+                            <span class="dot"></span> ${tierLabel}
+                        </span>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ── 5. Render Line Chart (Chart.js) ──
+        const canvas = $('vis-gpa-chart');
+        if (canvas) {
+            if (visGpaChartInstance) {
+                visGpaChartInstance.destroy();
+                visGpaChartInstance = null;
+            }
+
+            const labels = semesters.map(s => `Sem ${s.semester}`);
+            const sgpaData = semesters.map(s => s.sgpa != null ? Number(s.sgpa) : null);
+            const cgpaLineData = labels.map(() => data.cgpa != null ? Number(data.cgpa) : null);
+
+            const ctx = canvas.getContext('2d');
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('dark-theme');
+            const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+
+            // Area Gradient Fill
+            const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+            gradient.addColorStop(0, isDark ? 'rgba(99,102,241,0.30)' : 'rgba(99,102,241,0.22)');
+            gradient.addColorStop(1, 'rgba(99,102,241,0.00)');
+
+            // Point colors based on performance
+            const pointColors = sgpaData.map(v => {
+                if (v == null) return '#94a3b8';
+                if (v >= 8.5) return '#10b981';
+                if (v >= 7.0) return '#3b82f6';
+                if (v >= 6.0) return '#f59e0b';
+                return '#ef4444';
+            });
+
+            visGpaChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Semester SGPA',
+                            data: sgpaData,
+                            borderColor: '#6366f1',
+                            backgroundColor: gradient,
+                            borderWidth: 2.8,
+                            pointBackgroundColor: pointColors,
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2.5,
+                            pointRadius: 6.5,
+                            pointHoverRadius: 9.5,
+                            pointHoverBackgroundColor: pointColors,
+                            pointHoverBorderColor: '#ffffff',
+                            pointHoverBorderWidth: 3,
+                            tension: 0.36,
+                            fill: true,
+                            spanGaps: true,
+                            order: 1
+                        },
+                        {
+                            label: `Cumulative CGPA (${cgpaVal})`,
+                            data: cgpaLineData,
+                            borderColor: '#10b981',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: '#10b981',
+                            pointBorderColor: '#ffffff',
+                            fill: false,
+                            order: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 750,
+                        easing: 'easeOutQuart'
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                color: textColor,
+                                font: { size: 12, weight: '600', family: 'Inter, sans-serif' },
+                                boxWidth: 14,
+                                boxHeight: 3,
+                                usePointStyle: false,
+                                padding: 16
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: isDark ? 'rgba(15,23,42,0.95)' : 'rgba(15,23,42,0.90)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#e2e8f0',
+                            borderColor: isDark ? 'rgba(99,102,241,0.35)' : 'rgba(99,102,241,0.20)',
+                            borderWidth: 1,
+                            padding: 14,
+                            boxPadding: 6,
+                            usePointStyle: true,
+                            titleFont: { size: 13, weight: 'bold', family: 'Inter, sans-serif' },
+                            bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                            callbacks: {
+                                title: (items) => items[0]?.label ? `Semester ${items[0].label.replace('Sem ', '')}` : '',
+                                label: (item) => {
+                                    if (item.datasetIndex === 0) {
+                                        const val = item.raw;
+                                        if (val == null) return ' SGPA: —';
+                                        let rating = 'Needs Focus';
+                                        if (val >= 8.5) rating = 'Excellent';
+                                        else if (val >= 7.0) rating = 'Good';
+                                        else if (val >= 6.0) rating = 'Average';
+                                        return ` SGPA: ${Number(val).toFixed(2)} (${rating})`;
+                                    } else {
+                                        return ` Overall CGPA Reference: ${Number(item.raw).toFixed(2)}`;
+                                    }
+                                },
+                                afterBody: (items) => {
+                                    const idx = items[0]?.dataIndex;
+                                    if (idx != null && semesters[idx]) {
+                                        const s = semesters[idx];
+                                        return [
+                                            ` Registered Credits: ${s.total_credits || 0}`,
+                                            ` Earned Credits: ${s.earned_credits || 0}`
+                                        ];
+                                    }
+                                    return [];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { size: 12, weight: '700', family: 'Inter, sans-serif' }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Academic Semester',
+                                color: textColor,
+                                font: { size: 12, weight: '600' }
+                            }
+                        },
+                        y: {
+                            min: 0,
+                            max: 10,
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { size: 11, family: 'monospace' },
+                                stepSize: 1,
+                                callback: v => v.toFixed(1)
+                            },
+                            title: {
+                                display: true,
+                                text: 'SGPA (0.00 – 10.00)',
+                                color: textColor,
+                                font: { size: 12, weight: '600' }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Reveal content
+        $('vis-gpa-loading')?.classList.add('hidden');
+        $('vis-gpa-content')?.classList.remove('hidden');
+
+    } catch (err) {
+        $('vis-gpa-loading')?.classList.add('hidden');
+        const errCard = $('vis-gpa-error');
+        if (errCard) {
+            errCard.classList.remove('hidden');
+            const titleEl = $('vis-gpa-error-title');
+            const msgEl = $('vis-gpa-error-msg');
+            if (titleEl) titleEl.innerText = 'Search Error';
+            if (msgEl) msgEl.innerText = err.message || 'Could not fetch student trajectory.';
+        }
+        showToast('Error loading GPA: ' + err.message, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg> <span>Show Trajectory</span>`;
+        }
+    }
+}
+
+// ── Download GPA Chart as PNG ──
+function downloadGpaChart() {
+    if (!visGpaChartInstance) {
+        showToast('GPA Chart is not ready to download', 'warning');
+        return;
+    }
+    try {
+        const link = document.createElement('a');
+        const reg = currentGpaRegNo || 'Student';
+        const today = new Date().toISOString().slice(0, 10);
+        link.download = `PTU_SGPA_Trajectory_${reg}_${today}.png`;
+        link.href = visGpaChartInstance.toBase64Image('image/png', 1.0);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('GPA Trajectory chart downloaded as PNG!', 'success');
+    } catch (e) {
+        console.error('Download GPA chart error:', e);
+        showToast('Could not download chart: ' + e.message, 'error');
+    }
+}
+
+// ── Export Student GPA Trajectory to Excel ──
+function exportGpaExcel() {
+    if (!currentVisGpaData || !currentVisGpaData.semesters || !currentVisGpaData.semesters.length) {
+        showToast('No GPA data to export', 'warning');
+        return;
+    }
+
+    try {
+        const data = currentVisGpaData;
+        const SEM_ORDER = ['I','II','III','IV','V','VI','VII','VIII'];
+        const semesters = [...data.semesters].sort((a, b) => {
+            const ai = SEM_ORDER.indexOf(a.semester);
+            const bi = SEM_ORDER.indexOf(b.semester);
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        });
+
+        const rows = [
+            ['PONDICHERRY TECHNOLOGICAL UNIVERSITY - GPA TRAJECTORY REPORT'],
+            ['Generated on:', new Date().toLocaleString('en-IN')],
+            [],
+            ['STUDENT INFORMATION'],
+            ['Register Number:', data.reg_no],
+            ['Student Name:', data.name],
+            ['Department:', data.department],
+            ['Programme:', data.programme || 'Bachelor of Technology'],
+            ['Batch:', data.batch || '—'],
+            ['Section:', data.section || '—'],
+            ['Cumulative GPA (CGPA):', data.cgpa != null ? Number(data.cgpa).toFixed(2) : '—'],
+            ['Total Credits Completed:', `${earnedCredits.toFixed(1)} / ${totalCredits.toFixed(1)} Cr`],
+            ['Active Arrears:', data.active_arrears != null ? data.active_arrears : 0],
+            [],
+            ['SEMESTER-WISE SGPA PROGRESSION'],
+            ['Semester', 'SGPA', 'Total Credits', 'Earned Credits', 'Subjects Count', 'Arrears in Sem', 'Standing']
+        ];
+
+        semesters.forEach(s => {
+            const sgpa = s.sgpa != null ? Number(s.sgpa).toFixed(2) : '—';
+            let standing = 'Needs Focus';
+            if (s.sgpa != null) {
+                if (s.sgpa >= 8.5) standing = 'Distinction';
+                else if (s.sgpa >= 7.0) standing = 'Good';
+                else if (s.sgpa >= 6.0) standing = 'Average';
+            }
+            rows.push([
+                `Semester ${s.semester}`,
+                sgpa,
+                s.total_credits != null ? s.total_credits : '—',
+                s.earned_credits != null ? s.earned_credits : '—',
+                s.subjects ? s.subjects.length : (s.subjects_count || '—'),
+                s.arrears || 0,
+                standing
+            ]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws['!cols'] = [
+            { wch: 22 },
+            { wch: 12 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 22 }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'GPA Trajectory');
+        const fileName = `PTU_GPA_Trajectory_${data.reg_no}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        showToast('GPA Trajectory exported to Excel successfully!', 'success');
+    } catch (e) {
+        console.error('Export GPA excel error:', e);
+        showToast('Could not export to Excel: ' + e.message, 'error');
+    }
+}
+
+async function loadVisualizationData() {
+    const tbody = $('vis-tbody');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">Calculating section pass percentages…</td></tr>';
+    }
+
+    try {
+        const batch = currentVisBatchFilter !== 'All' ? currentVisBatchFilter : '';
+        const sem = $('vis-filter-sem')?.value || 'All';
+        const dept = $('vis-filter-dept')?.value || 'All';
+
+        let url = '/visualization/pass-percentage?';
+        if (batch) url += `batch=${encodeURIComponent(batch)}&`;
+        if (sem && sem !== 'All') url += `semester=${encodeURIComponent(sem)}&`;
+        if (dept && dept !== 'All') url += `department=${encodeURIComponent(dept)}&`;
+
+        const data = await authFetch(url);
+        currentVisData = data;
+
+        // Populate batch filter options if returned and dropdown is empty
+        const batchSelect = $('vis-filter-batch');
+        if (batchSelect && data.available_batches && batchSelect.options.length <= 1) {
+            let bHtml = '<option value="All">All Batches</option>';
+            data.available_batches.forEach(b => {
+                bHtml += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+            });
+            batchSelect.innerHTML = bHtml;
+            batchSelect.value = currentVisBatchFilter || 'All';
+        }
+
+        // Populate semester filter options if first time or changed
+        const semSelect = $('vis-filter-sem');
+        if (semSelect && data.available_semesters && semSelect.options.length <= 1) {
+            let sHtml = '<option value="All">All Semesters</option>';
+            data.available_semesters.forEach(s => {
+                sHtml += `<option value="${escapeHtml(s)}">Semester ${escapeHtml(s)}</option>`;
+            });
+            semSelect.innerHTML = sHtml;
+            semSelect.value = sem;
+        }
+
+        // Populate department filter options if first time
+        const deptSelect = $('vis-filter-dept');
+        if (deptSelect && data.available_departments && deptSelect.options.length <= 1) {
+            let dHtml = '<option value="All">All Departments</option>';
+            data.available_departments.forEach(d => {
+                const label = VIS_DEPT_NAMES[d] ? `${d} - ${VIS_DEPT_NAMES[d]}` : d;
+                dHtml += `<option value="${escapeHtml(d)}">${escapeHtml(label)}</option>`;
+            });
+            deptSelect.innerHTML = dHtml;
+            deptSelect.value = dept;
+        }
+
+        // Update KPI metrics
+        updateVisualizationKPIs(data);
+
+        // Sort sections according to sort dropdown
+        applyVisualizationSort();
+
+    } catch (err) {
+        console.error('Visualization load error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" class="loading-cell" style="color:var(--red,#ef4444);">Failed to load visualization: ${escapeHtml(err.message || 'Unknown error')}</td></tr>`;
+        }
+        showToast('Error loading visualization data: ' + (err.message || 'Check connection'), 'error');
+    }
+}
+
+function updateVisualizationKPIs(data) {
+    if (!data) return;
+
+    // 1. Average Pass Rate
+    const avgEl = $('vis-kpi-avg');
+    const avgSub = $('vis-kpi-avg-sub');
+    if (avgEl) avgEl.textContent = `${data.overall_pass_percentage.toFixed(1)}%`;
+    if (avgSub) {
+        const batchTxt = data.batch_filter === 'All' ? 'All Batches' : `Batch ${data.batch_filter}`;
+        avgSub.textContent = `${batchTxt} · ${data.sections.length} Sections`;
+    }
+
+    // 2. Top and Lowest Section
+    const topEl = $('vis-kpi-top');
+    const topSub = $('vis-kpi-top-sub');
+    const lowEl = $('vis-kpi-low');
+    const lowSub = $('vis-kpi-low-sub');
+
+    if (data.sections && data.sections.length > 0) {
+        const sortedByPct = [...data.sections].sort((a, b) => b.pass_percentage - a.pass_percentage);
+        const topSec = sortedByPct[0];
+        const lowSec = sortedByPct[sortedByPct.length - 1];
+
+        if (topEl) topEl.textContent = `${topSec.section_code}`;
+        if (topSub) topSub.textContent = `${topSec.pass_percentage.toFixed(1)}% (${topSec.passed_students}/${topSec.appeared_students} passed)`;
+
+        if (lowEl) lowEl.textContent = `${lowSec.section_code}`;
+        if (lowSub) lowSub.textContent = `${lowSec.pass_percentage.toFixed(1)}% (${lowSec.passed_students}/${lowSec.appeared_students} passed)`;
+    } else {
+        if (topEl) topEl.textContent = '—';
+        if (topSub) topSub.textContent = 'No section data';
+        if (lowEl) lowEl.textContent = '—';
+        if (lowSub) lowSub.textContent = 'No section data';
+    }
+
+    // 3. Total Students
+    const totEl = $('vis-kpi-total');
+    const totSub = $('vis-kpi-total-sub');
+    if (totEl) totEl.textContent = data.overall_appeared_students.toLocaleString();
+    if (totSub) {
+        totSub.textContent = `${data.overall_passed_students.toLocaleString()} Passed · ${data.overall_failed_students.toLocaleString()} Uncleared`;
+    }
+
+    // Subtitle on chart
+    const chartSub = $('vis-chart-subtitle');
+    if (chartSub) {
+        const batchLabel = data.batch_filter === 'All' ? 'All Batches' : `Batch ${data.batch_filter}`;
+        const semLabel = data.semester_filter === 'All' ? 'Overall Cumulative' : `Semester ${data.semester_filter}`;
+        const deptLabel = data.department_filter === 'All' ? 'All Departments' : data.department_filter;
+        chartSub.textContent = `${batchLabel} · ${semLabel} · ${deptLabel} (${data.sections.length} sections analyzed)`;
+    }
+}
+
+function applyVisualizationSort() {
+    if (!currentVisData || !currentVisData.sections) return;
+
+    const sortVal = $('vis-filter-sort')?.value || 'pct_desc';
+    const sections = [...currentVisData.sections];
+
+    if (sortVal === 'pct_desc') {
+        sections.sort((a, b) => b.pass_percentage - a.pass_percentage || a.section_code.localeCompare(b.section_code));
+    } else if (sortVal === 'pct_asc') {
+        sections.sort((a, b) => a.pass_percentage - b.pass_percentage || a.section_code.localeCompare(b.section_code));
+    } else if (sortVal === 'name_asc') {
+        sections.sort((a, b) => a.section_code.localeCompare(b.section_code));
+    }
+
+    currentVisSections = sections;
+    renderVisualizationChart(sections);
+    renderVisualizationTable(sections);
+}
+
+function renderVisualizationChart(sections) {
+    const canvas = $('vis-pass-chart');
+    const fallback = $('vis-chart-fallback');
+    if (!canvas) return;
+
+    if (!sections || sections.length === 0) {
+        if (visChartInstance) {
+            visChartInstance.destroy();
+            visChartInstance = null;
+        }
+        canvas.style.display = 'none';
+        if (fallback) {
+            fallback.classList.remove('hidden');
+            fallback.innerHTML = '<div style="text-align:center;width:100%;color:var(--text-muted,#64748b);padding:40px 0;">No section data available for selected filters.</div>';
+        }
+        return;
+    }
+
+    canvas.style.display = 'block';
+    if (fallback) fallback.classList.add('hidden');
+
+    const labels = sections.map(s => s.section_code);
+    const passPercentages = sections.map(s => s.pass_percentage);
+
+    const backgroundColors = passPercentages.map(pct => {
+        if (pct >= 75) return 'rgba(16, 185, 129, 0.85)';
+        if (pct >= 50) return 'rgba(59, 130, 246, 0.85)';
+        return 'rgba(239, 68, 68, 0.85)';
+    });
+
+    const borderColors = passPercentages.map(pct => {
+        if (pct >= 75) return '#059669';
+        if (pct >= 50) return '#2563eb';
+        return '#dc2626';
+    });
+
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded, using fallback');
+        renderFallbackBarChart(sections);
+        return;
+    }
+
+    if (visChartInstance) {
+        visChartInstance.destroy();
+    }
+
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('dark-theme');
+    const textColor = isDarkMode ? '#cbd5e1' : '#1e293b';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+
+    const ctx = canvas.getContext('2d');
+    visChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Pass Percentage (%)',
+                data: passPercentages,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 1.5,
+                borderRadius: 6,
+                borderSkipped: false,
+                barPercentage: 0.65,
+                categoryPercentage: 0.85
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 650,
+                easing: 'easeOutQuart'
+            },
+            layout: {
+                padding: { top: 20, right: 15, bottom: 5, left: 10 }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.90)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#e2e8f0',
+                    borderColor: 'rgba(255, 255, 255, 0.15)',
+                    borderWidth: 1,
+                    padding: 12,
+                    boxPadding: 6,
+                    usePointStyle: true,
+                    titleFont: { size: 13, weight: 'bold', family: 'Inter, sans-serif' },
+                    bodyFont: { size: 12, family: 'Inter, sans-serif' },
+                    callbacks: {
+                        title: function(items) {
+                            const idx = items[0].dataIndex;
+                            const sec = sections[idx];
+                            return `${sec.section_label} (${sec.batch})`;
+                        },
+                        label: function(ctx) {
+                            const sec = sections[ctx.dataIndex];
+                            return ` Pass Rate: ${sec.pass_percentage.toFixed(1)}%`;
+                        },
+                        afterLabel: function(ctx) {
+                            const sec = sections[ctx.dataIndex];
+                            const deptName = VIS_DEPT_NAMES[sec.department] || sec.department;
+                            return [
+                                ` Department: ${deptName}`,
+                                ` Passed: ${sec.passed_students} / ${sec.appeared_students} appeared`,
+                                ` Uncleared: ${sec.failed_students}`,
+                                ` Total Enrolled: ${sec.total_students}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    grid: {
+                        color: gridColor,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: textColor,
+                        font: { size: 11, family: 'Inter, sans-serif' },
+                        callback: function(val) { return val + '%'; },
+                        stepSize: 20
+                    },
+                    title: {
+                        display: true,
+                        text: 'Pass Percentage (%)',
+                        color: textColor,
+                        font: { size: 12, weight: '600', family: 'Inter, sans-serif' }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: textColor,
+                        font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                        maxRotation: 45,
+                        minRotation: 0
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderFallbackBarChart(sections) {
+    const canvas = $('vis-pass-chart');
+    const fallback = $('vis-chart-fallback');
+    if (!fallback) return;
+    if (canvas) canvas.style.display = 'none';
+    fallback.classList.remove('hidden');
+
+    let html = '';
+    sections.forEach(s => {
+        const pct = s.pass_percentage;
+        const color = pct >= 75 ? '#10b981' : (pct >= 50 ? '#3b82f6' : '#ef4444');
+        html += `
+            <div class="vis-fallback-col" title="${escapeHtml(s.section_label)}: ${pct}%">
+                <div style="font-size:0.70rem;font-weight:700;margin-bottom:4px;color:${color}">${pct.toFixed(0)}%</div>
+                <div class="vis-fallback-bar" style="height:${pct}%; background:${color};"></div>
+                <div class="vis-fallback-label">${escapeHtml(s.section_code)}</div>
+            </div>
+        `;
+    });
+    fallback.innerHTML = html;
+}
+
+function renderVisualizationTable(sections) {
+    const tbody = $('vis-tbody');
+    const countEl = $('vis-table-count');
+    if (!tbody) return;
+
+    if (!sections || sections.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">No sections match current criteria.</td></tr>';
+        if (countEl) countEl.textContent = 'Showing 0 sections';
+        return;
+    }
+
+    if (countEl) {
+        countEl.textContent = `Showing ${sections.length} section${sections.length !== 1 ? 's' : ''}`;
+    }
+
+    tbody.innerHTML = sections.map((s, idx) => {
+        const pct = s.pass_percentage;
+        const fillClass = pct >= 75 ? 'fill-green' : (pct >= 50 ? 'fill-blue' : 'fill-red');
+        const color = pct >= 75 ? '#059669' : (pct >= 50 ? '#2563eb' : '#dc2626');
+        const deptName = VIS_DEPT_NAMES[s.department] || s.department;
+
+        const passBadge = `<span class="arrear-badge arrear-0" style="padding:3px 8px;font-size:0.75rem;">${s.passed_students}</span>`;
+        const failBadge = s.failed_students > 0
+            ? `<span class="arrear-badge arrear-3" style="padding:3px 8px;font-size:0.75rem;">${s.failed_students}</span>`
+            : `<span style="color:var(--text-muted,#64748b);font-size:0.80rem;">0</span>`;
+
+        return `
+            <tr>
+                <td style="text-align:center; font-weight:700; color:var(--text-muted,#64748b);">${idx + 1}</td>
+                <td><span class="vis-section-badge">${escapeHtml(s.section_code)}</span></td>
+                <td>${escapeHtml(deptName)}</td>
+                <td style="text-align:center; font-variant-numeric:tabular-nums;">${s.total_students}</td>
+                <td style="text-align:center; font-variant-numeric:tabular-nums; font-weight:600;">${s.appeared_students}</td>
+                <td style="text-align:center;">${passBadge}</td>
+                <td style="text-align:center;">${failBadge}</td>
+                <td>
+                    <div class="vis-progress-bar-wrap">
+                        <div class="vis-progress-track">
+                            <div class="vis-progress-fill ${fillClass}" style="width: ${Math.min(100, Math.max(0, pct))}%;"></div>
+                        </div>
+                        <span class="vis-progress-label" style="color:${color};">${pct.toFixed(2)}%</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function clearVisualizationFilters() {
+    const btn = document.querySelector('#view-visualization .btn-reset-enhanced');
+    if (btn) {
+        btn.classList.add('is-resetting');
+        setTimeout(() => btn.classList.remove('is-resetting'), 600);
+    }
+
+    currentVisBatchFilter = 'All';
+    const batchSelect = $('vis-filter-batch');
+    if (batchSelect) batchSelect.value = 'All';
+
+    const semSelect = $('vis-filter-sem');
+    if (semSelect) semSelect.value = 'All';
+
+    const deptSelect = $('vis-filter-dept');
+    if (deptSelect) deptSelect.value = 'All';
+
+    const sortSelect = $('vis-filter-sort');
+    if (sortSelect) sortSelect.value = 'pct_desc';
+
+    loadVisualizationData();
+}
+
+function downloadVisualizationChart() {
+    if (currentVisTab === 'gpa') {
+        downloadGpaChart();
+        return;
+    }
+    if (currentVisTab === 'subject') {
+        downloadSubjectChart();
+        return;
+    }
+    if (currentVisTab === 'placement') {
+        downloadPlacementChart();
+        return;
+    }
+    if (!visChartInstance) {
+        showToast('Chart is not ready to download', 'warning');
+        return;
+    }
+
+    try {
+        const link = document.createElement('a');
+        const batchName = currentVisBatchFilter || 'All';
+        const today = new Date().toISOString().slice(0, 10);
+        link.download = `PTU_Section_Pass_Percentage_${batchName}_${today}.png`;
+        link.href = visChartInstance.toBase64Image('image/png', 1.0);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Chart downloaded as PNG image!', 'success');
+    } catch (e) {
+        console.error('Download chart error:', e);
+        showToast('Could not download chart: ' + e.message, 'error');
+    }
+}
+
+function exportVisualizationExcel() {
+    if (currentVisTab === 'gpa') {
+        exportGpaExcel();
+        return;
+    }
+    if (currentVisTab === 'subject') {
+        exportSubjectAnalyticsExcel();
+        return;
+    }
+    if (currentVisTab === 'placement') {
+        exportPlacementEligibilityExcel();
+        return;
+    }
+    if (!currentVisSections || currentVisSections.length === 0) {
+        showToast('No visualization data to export', 'warning');
+        return;
+    }
+
+    try {
+        if (typeof XLSX === 'undefined') {
+            showToast('Excel exporter not ready', 'error');
+            return;
         }
 
         const wb = XLSX.utils.book_new();
-        const wsData = [];
+        const batchVal = currentVisBatchFilter || 'All Batches';
+        const semVal = $('vis-filter-sem')?.value || 'All Semesters';
+        const deptVal = $('vis-filter-dept')?.value || 'All Departments';
+        const now = new Date();
+        const timestamp = now.toLocaleDateString('en-IN') + ', ' + now.toLocaleTimeString('en-IN');
 
-        wsData.push(['PUDUCHERRY TECHNOLOGICAL UNIVERSITY']);
-        wsData.push(['CLASS REPORT']);
-        wsData.push([]);
-        wsData.push(['Department:', deptDisplay, '', 'Batch:', batchDisplay, '', 'Arrear Filter:', arrearDisplay]);
-        wsData.push([]);
-        wsData.push(['#', 'Register No', 'Student Name', 'Department', 'Total Credits', 'Earned Credits', 'Arrear Status']);
+        const wsData = [
+            ['PUDUCHERRY TECHNOLOGICAL UNIVERSITY (PTU)'],
+            ['SECTION-WISE PASS PERCENTAGE ANALYTICAL REPORT'],
+            [],
+            ['Batch Filter:', batchVal, 'Semester Filter:', semVal, 'Department Filter:', deptVal],
+            ['Generated On:', timestamp, 'Total Sections:', currentVisSections.length, 'Overall Pass %:', (currentVisData?.overall_pass_percentage || 0).toFixed(2) + '%'],
+            [],
+            ['Rank', 'Section Code', 'Section Label', 'Department', 'Enrolled Students', 'Appeared Students', 'Passed Students', 'Uncleared Students', 'Pass Percentage (%)']
+        ];
 
-        allClassReportCache.forEach((g, idx) => {
-            const arrCount = g.arrear_count || 0;
-            const arrText  = arrCount === 0 ? 'No Arrears' : `${arrCount} Arrear${arrCount > 1 ? 's' : ''}`;
-            wsData.push([idx + 1, g.reg_no, g.name, g.department, g.total_credits, g.earned_credits, arrText]);
+        currentVisSections.forEach((s, idx) => {
+            const deptName = VIS_DEPT_NAMES[s.department] || s.department;
+            wsData.push([
+                idx + 1,
+                s.section_code,
+                s.section_label,
+                deptName,
+                s.total_students,
+                s.appeared_students,
+                s.passed_students,
+                s.failed_students,
+                Number(s.pass_percentage.toFixed(2))
+            ]);
         });
 
         wsData.push([]);
-        wsData.push([`Total Students: ${allClassReportCache.length}`]);
+        if (currentVisData) {
+            wsData.push([
+                'Total / Overall Summary',
+                '',
+                '',
+                '',
+                currentVisData.overall_total_students,
+                currentVisData.overall_appeared_students,
+                currentVisData.overall_passed_students,
+                currentVisData.overall_failed_students,
+                Number(currentVisData.overall_pass_percentage.toFixed(2))
+            ]);
+        }
 
         const ws = XLSX.utils.aoa_to_sheet(wsData);
-        ws['!cols'] = [{wch:5},{wch:16},{wch:30},{wch:14},{wch:14},{wch:15},{wch:16}];
-        XLSX.utils.book_append_sheet(wb, ws, 'Class_Report');
+        ws['!cols'] = [
+            { wch: 6 },
+            { wch: 14 },
+            { wch: 22 },
+            { wch: 38 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 16 },
+            { wch: 18 },
+            { wch: 20 }
+        ];
 
+        XLSX.utils.book_append_sheet(wb, ws, 'Section_Pass_Analysis');
         const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const fileDept  = deptVal  || 'All';
-        const fileBatch = batchVal || 'All';
-        XLSX.writeFile(wb, `PTU_Class_Report_${fileDept}_${fileBatch}_${today}.xlsx`);
-        showToast('Class Report exported!', 'success');
+        const filename = `PTU_Section_Pass_Percentage_${batchVal}_${today}.xlsx`;
+        XLSX.writeFile(wb, filename);
+        showToast('Visualization data exported to Excel!', 'success');
     } catch (err) {
+        console.error('Export visualization error:', err);
         showToast('Export failed: ' + err.message, 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUBJECT ANALYTICS TAB FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+let currentVisSubjectData = null;
+let currentVisSubjectList = [];
+let visSubjectBarChart = null;
+let visSubjectGradeChart = null;
+let currentSubBatchFilter = 'All';
+
+async function populateSubjectBatchDropdown() {
+    const sel = $('vis-sub-filter-batch');
+    if (!sel) return;
+    try {
+        let batches = [];
+        try {
+            batches = await authFetch('/students/batches');
+        } catch (e) {
+            console.warn('Fallback batch fetch:', e);
+        }
+        if (!batches || !batches.length) {
+            const students = await ensureStudentsCache();
+            const set = new Set();
+            students.forEach(s => { if (s.batch && s.batch.trim()) set.add(s.batch.trim()); });
+            batches = Array.from(set).sort();
+        }
+        let html = '<option value="All">All Batches</option>';
+        (batches || []).forEach(b => {
+            html += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+        });
+        sel.innerHTML = html;
+        sel.value = currentSubBatchFilter || 'All';
+    } catch (e) {
+        console.warn('Could not populate subject batch dropdown:', e);
+    }
+}
+
+function onSubjectBatchChange(val) {
+    currentSubBatchFilter = val || 'All';
+    const semSelect = $('vis-sub-filter-sem');
+    if (semSelect) semSelect.innerHTML = '<option value="All">All Semesters</option>';
+    const deptSelect = $('vis-sub-filter-dept');
+    if (deptSelect) deptSelect.innerHTML = '<option value="All">All Departments</option>';
+    loadSubjectAnalytics();
+}
+
+async function loadSubjectAnalytics() {
+    const tbody = $('vis-sub-tbody');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">Analyzing course performance across batches…</td></tr>';
+    }
+
+    try {
+        const batch = currentSubBatchFilter !== 'All' ? currentSubBatchFilter : '';
+        const sem = $('vis-sub-filter-sem')?.value || 'All';
+        const dept = $('vis-sub-filter-dept')?.value || 'All';
+
+        let url = '/visualization/subject-analytics?';
+        if (batch) url += `batch=${encodeURIComponent(batch)}&`;
+        if (sem && sem !== 'All') url += `semester=${encodeURIComponent(sem)}&`;
+        if (dept && dept !== 'All') url += `department=${encodeURIComponent(dept)}&`;
+
+        const data = await authFetch(url);
+        currentVisSubjectData = data;
+
+        // Populate Semester dropdown if needed
+        const semSelect = $('vis-sub-filter-sem');
+        if (semSelect && data.available_semesters && semSelect.options.length <= 1) {
+            let sHtml = '<option value="All">All Semesters</option>';
+            data.available_semesters.forEach(s => {
+                sHtml += `<option value="${escapeHtml(s)}">Semester ${escapeHtml(s)}</option>`;
+            });
+            semSelect.innerHTML = sHtml;
+            semSelect.value = sem;
+        }
+
+        // Populate Department dropdown if needed
+        const deptSelect = $('vis-sub-filter-dept');
+        if (deptSelect && data.available_departments && deptSelect.options.length <= 1) {
+            let dHtml = '<option value="All">All Departments</option>';
+            data.available_departments.forEach(d => {
+                const label = VIS_DEPT_NAMES[d] ? `${d} - ${VIS_DEPT_NAMES[d]}` : d;
+                dHtml += `<option value="${escapeHtml(d)}">${escapeHtml(label)}</option>`;
+            });
+            deptSelect.innerHTML = dHtml;
+            deptSelect.value = dept;
+        }
+
+        // Update KPIs
+        const totalEl = $('vis-sub-kpi-total');
+        const avgEl = $('vis-sub-kpi-avg');
+        const toughEl = $('vis-sub-kpi-toughest');
+        const toughSubEl = $('vis-sub-kpi-toughest-sub');
+        const bestEl = $('vis-sub-kpi-best');
+        const bestSubEl = $('vis-sub-kpi-best-sub');
+
+        if (totalEl) totalEl.innerText = data.total_subjects;
+        if (avgEl) avgEl.innerText = `${data.average_pass_rate}%`;
+
+        if (toughEl) {
+            toughEl.innerText = data.toughest_subject || 'None';
+            toughEl.title = data.toughest_subject || '';
+        }
+        if (toughSubEl && data.toughest_pass_rate != null) {
+            toughSubEl.innerText = `Lowest Pass: ${data.toughest_pass_rate}% · High Backlogs`;
+        }
+
+        if (bestEl) {
+            bestEl.innerText = data.best_subject || 'None';
+            bestEl.title = data.best_subject || '';
+        }
+        if (bestSubEl && data.best_pass_rate != null) {
+            bestSubEl.innerText = `Highest Pass: ${data.best_pass_rate}% · Exemplary`;
+        }
+
+        applySubjectSort();
+    } catch (err) {
+        console.error('Subject analytics error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--red,#ef4444);">Failed to load subject analytics: ${escapeHtml(err.message || 'Error')}</td></tr>`;
+        }
+        showToast('Error loading subject analytics: ' + err.message, 'error');
+    }
+}
+
+function applySubjectSort() {
+    if (!currentVisSubjectData || !currentVisSubjectData.subjects) return;
+    const sortVal = $('vis-sub-filter-sort')?.value || 'pass_asc';
+    const subjects = [...currentVisSubjectData.subjects];
+
+    if (sortVal === 'pass_asc') {
+        subjects.sort((a, b) => a.pass_percentage - b.pass_percentage);
+    } else if (sortVal === 'pass_desc') {
+        subjects.sort((a, b) => b.pass_percentage - a.pass_percentage);
+    } else if (sortVal === 'code_asc') {
+        subjects.sort((a, b) => a.code.localeCompare(b.code));
+    } else if (sortVal === 'enrolled_desc') {
+        subjects.sort((a, b) => b.appeared_students - a.appeared_students);
+    }
+
+    currentVisSubjectList = subjects;
+    renderSubjectBarChart(subjects);
+    renderSubjectGradeChart(subjects);
+    renderSubjectTable(subjects);
+}
+
+function renderSubjectBarChart(subjects) {
+    const canvas = $('vis-subject-bar-chart');
+    if (!canvas) return;
+
+    if (visSubjectBarChart) {
+        visSubjectBarChart.destroy();
+        visSubjectBarChart = null;
+    }
+
+    const displaySubs = subjects.slice(0, 15);
+    const labels = displaySubs.map(s => s.code);
+    const dataVals = displaySubs.map(s => s.pass_percentage);
+    const bgColors = dataVals.map(v => {
+        if (v >= 85) return 'rgba(16, 185, 129, 0.85)';
+        if (v >= 70) return 'rgba(59, 130, 246, 0.85)';
+        if (v >= 50) return 'rgba(245, 158, 11, 0.85)';
+        return 'rgba(239, 68, 68, 0.85)';
+    });
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    visSubjectBarChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Pass Percentage (%)',
+                data: dataVals,
+                backgroundColor: bgColors,
+                borderRadius: 6,
+                borderSkipped: false,
+                barThickness: 18
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const idx = items[0].dataIndex;
+                            const s = displaySubs[idx];
+                            return `${s.code} - ${s.name}`;
+                        },
+                        label: (ctx) => {
+                            const s = displaySubs[ctx.dataIndex];
+                            return [
+                                ` Pass Rate: ${s.pass_percentage}%`,
+                                ` Appeared: ${s.appeared_students} | Passed: ${s.passed_students}`,
+                                ` Arrears: ${s.failed_students} | Credits: ${s.credits}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    min: 0,
+                    max: 100,
+                    ticks: {
+                        callback: v => `${v}%`,
+                        color: isDark ? '#94a3b8' : '#64748b'
+                    },
+                    grid: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }
+                },
+                y: {
+                    ticks: {
+                        color: isDark ? '#e2e8f0' : '#1e293b',
+                        font: { weight: 600 }
+                    },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+function renderSubjectGradeChart(subjects) {
+    const canvas = $('vis-subject-grade-chart');
+    if (!canvas) return;
+
+    if (visSubjectGradeChart) {
+        visSubjectGradeChart.destroy();
+        visSubjectGradeChart = null;
+    }
+
+    const displaySubs = subjects.slice(0, 12);
+    const labels = displaySubs.map(s => s.code);
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    const getGradeCount = (sub, gradeKey) => {
+        const g = sub.grade_distribution || {};
+        if (gradeKey === 'O/S') return (g['O'] || 0) + (g['S'] || 0);
+        if (gradeKey === 'A+/A') return (g['A+'] || 0) + (g['A'] || 0);
+        if (gradeKey === 'B+/B') return (g['B+'] || 0) + (g['B'] || 0);
+        if (gradeKey === 'C') return (g['C'] || 0);
+        if (gradeKey === 'Arrears (F/AB)') return (g['F'] || 0) + (g['AB'] || 0) + (g['ABSENT'] || 0) + (g['E'] || 0) + (g['NC'] || 0);
+        return 0;
+    };
+
+    visSubjectGradeChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'O / S (Distinction)',
+                    data: displaySubs.map(s => getGradeCount(s, 'O/S')),
+                    backgroundColor: '#10b981',
+                    stack: 'grades'
+                },
+                {
+                    label: 'A+ / A (Very Good)',
+                    data: displaySubs.map(s => getGradeCount(s, 'A+/A')),
+                    backgroundColor: '#3b82f6',
+                    stack: 'grades'
+                },
+                {
+                    label: 'B+ / B (Good)',
+                    data: displaySubs.map(s => getGradeCount(s, 'B+/B')),
+                    backgroundColor: '#0ea5e9',
+                    stack: 'grades'
+                },
+                {
+                    label: 'C (Satisfactory)',
+                    data: displaySubs.map(s => getGradeCount(s, 'C')),
+                    backgroundColor: '#f59e0b',
+                    stack: 'grades'
+                },
+                {
+                    label: 'Arrear (F / AB)',
+                    data: displaySubs.map(s => getGradeCount(s, 'Arrears (F/AB)')),
+                    backgroundColor: '#ef4444',
+                    stack: 'grades'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        boxWidth: 12,
+                        color: isDark ? '#cbd5e1' : '#475569',
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    ticks: { color: isDark ? '#e2e8f0' : '#1e293b', font: { weight: 600 } },
+                    grid: { display: false }
+                },
+                y: {
+                    stacked: true,
+                    ticks: { color: isDark ? '#94a3b8' : '#64748b' },
+                    grid: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }
+                }
+            }
+        }
+    });
+}
+
+function renderSubjectTable(subjects) {
+    const tbody = $('vis-sub-tbody');
+    if (!tbody) return;
+
+    if (!subjects || !subjects.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">No course records found for the selected filters.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    subjects.forEach((s, idx) => {
+        let barClass = 'fill-green';
+        if (s.pass_percentage < 50) barClass = 'fill-red';
+        else if (s.pass_percentage < 70) barClass = 'fill-blue';
+
+        const g = s.grade_distribution || {};
+        let pillsHtml = '<div class="grade-pill-group">';
+        if (g['O'] || g['S']) pillsHtml += `<span class="grade-pill grade-pill-o">O/S: ${(g['O']||0)+(g['S']||0)}</span>`;
+        if (g['A+'] || g['A']) pillsHtml += `<span class="grade-pill grade-pill-a">A+/A: ${(g['A+']||0)+(g['A']||0)}</span>`;
+        if (g['B+'] || g['B']) pillsHtml += `<span class="grade-pill grade-pill-b">B+/B: ${(g['B+']||0)+(g['B']||0)}</span>`;
+        if (g['C']) pillsHtml += `<span class="grade-pill grade-pill-c">C: ${g['C']}</span>`;
+        if (s.failed_students > 0) pillsHtml += `<span class="grade-pill grade-pill-f">Arrears: ${s.failed_students}</span>`;
+        pillsHtml += '</div>';
+
+        html += `<tr>
+            <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
+            <td><strong style="color:var(--primary,#2563eb);">${escapeHtml(s.code)}</strong></td>
+            <td>
+                <div style="font-weight:600; color:var(--text-primary);">${escapeHtml(s.name)}</div>
+                <div style="font-size:0.75rem; color:var(--text-muted);">Avg GP: ${s.average_grade_point.toFixed(2)}</div>
+            </td>
+            <td>${escapeHtml(s.department || '—')} / Sem ${escapeHtml(s.semester || '—')}</td>
+            <td style="font-weight:600;">${Number(s.credits).toFixed(1)}</td>
+            <td style="text-align:right; font-weight:600;">${s.appeared_students}</td>
+            <td style="text-align:right; color:var(--emerald,#10b981); font-weight:700;">${s.passed_students}</td>
+            <td style="text-align:right; font-weight:700; color:${s.failed_students > 0 ? 'var(--red,#ef4444)' : 'var(--text-muted)'};">${s.failed_students}</td>
+            <td>
+                <div class="vis-progress-bar-wrap">
+                    <div class="vis-progress-track">
+                        <div class="vis-progress-fill ${barClass}" style="width:${s.pass_percentage}%;"></div>
+                    </div>
+                    <span class="vis-progress-label">${s.pass_percentage.toFixed(1)}%</span>
+                </div>
+            </td>
+            <td>${pillsHtml}</td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function clearSubjectFilters() {
+    currentSubBatchFilter = 'All';
+    const batchSelect = $('vis-sub-filter-batch');
+    if (batchSelect) batchSelect.value = 'All';
+
+    const semSelect = $('vis-sub-filter-sem');
+    if (semSelect) semSelect.value = 'All';
+
+    const deptSelect = $('vis-sub-filter-dept');
+    if (deptSelect) deptSelect.value = 'All';
+
+    const sortSelect = $('vis-sub-filter-sort');
+    if (sortSelect) sortSelect.value = 'pass_asc';
+
+    loadSubjectAnalytics();
+}
+
+function downloadSubjectChart() {
+    if (!visSubjectBarChart) {
+        showToast('Course chart is not ready to download', 'warning');
+        return;
+    }
+    try {
+        const link = document.createElement('a');
+        link.download = `PTU_Course_Pass_Rates_${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = visSubjectBarChart.toBase64Image('image/png', 1.0);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Course chart downloaded as PNG!', 'success');
+    } catch (e) {
+        showToast('Download error: ' + e.message, 'error');
+    }
+}
+
+function exportSubjectAnalyticsExcel() {
+    if (!currentVisSubjectList || !currentVisSubjectList.length) {
+        showToast('No course analytics to export', 'warning');
+        return;
+    }
+    try {
+        if (typeof XLSX === 'undefined') {
+            showToast('Excel exporter not ready', 'error');
+            return;
+        }
+
+        const rows = [
+            ['PONDICHERRY TECHNOLOGICAL UNIVERSITY - COURSE PERFORMANCE REPORT'],
+            ['Generated on:', new Date().toLocaleString('en-IN')],
+            ['Batch Filter:', currentSubBatchFilter],
+            ['Semester Filter:', $('vis-sub-filter-sem')?.value || 'All'],
+            ['Department Filter:', $('vis-sub-filter-dept')?.value || 'All'],
+            [],
+            ['#', 'Course Code', 'Course Title', 'Department', 'Semester', 'Credits', 'Appeared', 'Passed', 'Failed / Arrears', 'Pass %', 'Average GP', 'Grade Distribution']
+        ];
+
+        currentVisSubjectList.forEach((s, idx) => {
+            const gradeStr = Object.entries(s.grade_distribution || {}).map(([g, c]) => `${g}:${c}`).join(', ');
+            rows.push([
+                idx + 1,
+                s.code,
+                s.name,
+                s.department || '—',
+                s.semester || '—',
+                s.credits,
+                s.appeared_students,
+                s.passed_students,
+                s.failed_students,
+                s.pass_percentage,
+                s.average_grade_point,
+                gradeStr
+            ]);
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Course Analytics');
+        XLSX.writeFile(wb, `PTU_Course_Analytics_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        showToast('Course analytics exported to Excel!', 'success');
+    } catch (e) {
+        showToast('Export failed: ' + e.message, 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLACEMENT ELIGIBILITY TAB FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+let currentVisPlacementData = null;
+let currentVisPlacementStudents = [];
+let visPlacementTierChart = null;
+let visPlacementDeptChart = null;
+let currentPlaceBatchFilter = 'All';
+
+async function populatePlacementBatchDropdown() {
+    const sel = $('vis-place-filter-batch');
+    if (!sel) return;
+    try {
+        let batches = [];
+        try {
+            batches = await authFetch('/students/batches');
+        } catch (e) {
+            console.warn('Fallback batch fetch:', e);
+        }
+        if (!batches || !batches.length) {
+            const students = await ensureStudentsCache();
+            const set = new Set();
+            students.forEach(s => { if (s.batch && s.batch.trim()) set.add(s.batch.trim()); });
+            batches = Array.from(set).sort();
+        }
+        let html = '<option value="All">All Batches</option>';
+        (batches || []).forEach(b => {
+            html += `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`;
+        });
+        sel.innerHTML = html;
+        sel.value = currentPlaceBatchFilter || 'All';
+    } catch (e) {
+        console.warn('Could not populate placement batch dropdown:', e);
+    }
+}
+
+function onPlacementBatchChange(val) {
+    currentPlaceBatchFilter = val || 'All';
+    const deptSelect = $('vis-place-filter-dept');
+    if (deptSelect) deptSelect.innerHTML = '<option value="All">All Departments</option>';
+    loadPlacementEligibility();
+}
+
+async function loadPlacementEligibility() {
+    const tbody = $('vis-place-tbody');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">Evaluating campus placement eligibility criteria…</td></tr>';
+    }
+
+    try {
+        const batch = currentPlaceBatchFilter !== 'All' ? currentPlaceBatchFilter : '';
+        const dept = $('vis-place-filter-dept')?.value || 'All';
+
+        let url = '/visualization/placement-eligibility?';
+        if (batch) url += `batch=${encodeURIComponent(batch)}&`;
+        if (dept && dept !== 'All') url += `department=${encodeURIComponent(dept)}&`;
+
+        const data = await authFetch(url);
+        currentVisPlacementData = data;
+        currentVisPlacementStudents = data.students || [];
+
+        // Populate Department filter if needed
+        const deptSelect = $('vis-place-filter-dept');
+        if (deptSelect && data.available_departments && deptSelect.options.length <= 1) {
+            let dHtml = '<option value="All">All Departments</option>';
+            data.available_departments.forEach(d => {
+                const label = VIS_DEPT_NAMES[d] ? `${d} - ${VIS_DEPT_NAMES[d]}` : d;
+                dHtml += `<option value="${escapeHtml(d)}">${escapeHtml(label)}</option>`;
+            });
+            deptSelect.innerHTML = dHtml;
+            deptSelect.value = dept;
+        }
+
+        // 4 KPI Cards
+        const t1El = $('vis-place-kpi-tier1');
+        const t1Sub = $('vis-place-kpi-tier1-pct');
+        const t2El = $('vis-place-kpi-tier2');
+        const t2Sub = $('vis-place-kpi-tier2-pct');
+        const condEl = $('vis-place-kpi-cond');
+        const condSub = $('vis-place-kpi-cond-pct');
+        const inelEl = $('vis-place-kpi-ineligible');
+        const inelSub = $('vis-place-kpi-ineligible-pct');
+
+        if (t1El) t1El.innerText = `${data.tier1_count} (${data.tier1_pct}%)`;
+        if (t1Sub) t1Sub.innerText = `${data.tier1_count} candidates · CGPA ≥ 8.0 & 0 Arrears`;
+
+        if (t2El) t2El.innerText = `${data.tier2_count} (${data.tier2_pct}%)`;
+        if (t2Sub) t2Sub.innerText = `${data.tier2_count} candidates · CGPA ≥ 6.5 & 0 Arrears`;
+
+        if (condEl) condEl.innerText = `${data.conditional_count} (${data.conditional_pct}%)`;
+        if (condSub) condSub.innerText = `${data.conditional_count} candidates · 1–2 Active Backlogs`;
+
+        if (inelEl) inelEl.innerText = `${data.ineligible_count} (${data.ineligible_pct}%)`;
+        if (inelSub) inelSub.innerText = `${data.ineligible_count} candidates · High Backlogs or Low CGPA`;
+
+        renderPlacementTierChart(data);
+        renderPlacementDeptChart(data);
+        filterPlacementTable();
+    } catch (err) {
+        console.error('Placement eligibility error:', err);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="9" class="loading-cell" style="color:var(--red,#ef4444);">Failed to load placement eligibility: ${escapeHtml(err.message || 'Error')}</td></tr>`;
+        }
+        showToast('Error loading placement eligibility: ' + err.message, 'error');
+    }
+}
+
+function renderPlacementTierChart(data) {
+    const canvas = $('vis-placement-tier-chart');
+    if (!canvas) return;
+
+    if (visPlacementTierChart) {
+        visPlacementTierChart.destroy();
+        visPlacementTierChart = null;
+    }
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    visPlacementTierChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: ['Tier 1 Dream (≥8.0)', 'Tier 2 Core (≥6.5)', 'Tier 3 Pass (≥5.5)', 'Conditional (1-2 Backlogs)', 'Ineligible (>2 Backlogs)'],
+            datasets: [{
+                data: [
+                    data.tier1_count,
+                    data.tier2_count,
+                    data.tier3_count,
+                    data.conditional_count,
+                    data.ineligible_count
+                ],
+                backgroundColor: [
+                    '#10b981',
+                    '#3b82f6',
+                    '#64748b',
+                    '#f59e0b',
+                    '#ef4444'
+                ],
+                borderWidth: 2,
+                borderColor: isDark ? '#1e293b' : '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        color: isDark ? '#cbd5e1' : '#475569',
+                        font: { size: 11, weight: 600 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const val = ctx.raw;
+                            const total = data.total_students || 1;
+                            const pct = ((val / total) * 100).toFixed(1);
+                            return ` ${ctx.label}: ${val} students (${pct}%)`;
+                        }
+                    }
+                }
+            },
+            cutout: '68%'
+        }
+    });
+}
+
+function renderPlacementDeptChart(data) {
+    const canvas = $('vis-placement-dept-chart');
+    if (!canvas) return;
+
+    if (visPlacementDeptChart) {
+        visPlacementDeptChart.destroy();
+        visPlacementDeptChart = null;
+    }
+
+    const deptStats = data.department_stats || [];
+    const labels = deptStats.map(d => d.department);
+    const eligiblePcts = deptStats.map(d => d.eligible_percentage);
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    visPlacementDeptChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'All-Clear Placement Eligible (%)',
+                data: eligiblePcts,
+                backgroundColor: '#3b82f6',
+                borderRadius: 6,
+                barThickness: 22
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const d = deptStats[items[0].dataIndex];
+                            return `${d.department} - ${d.department_name}`;
+                        },
+                        label: (ctx) => {
+                            const d = deptStats[ctx.dataIndex];
+                            return [
+                                ` Placement Eligible: ${d.eligible_percentage}%`,
+                                ` Total Students: ${d.total}`,
+                                ` Tier 1: ${d.tier1} | Tier 2: ${d.tier2}`,
+                                ` Conditional: ${d.conditional} | Backlogs: ${d.ineligible}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    ticks: {
+                        callback: v => `${v}%`,
+                        color: isDark ? '#94a3b8' : '#64748b'
+                    },
+                    grid: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }
+                },
+                x: {
+                    ticks: { color: isDark ? '#e2e8f0' : '#1e293b', font: { weight: 600 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+function filterPlacementTable() {
+    if (!currentVisPlacementData || !currentVisPlacementData.students) return;
+
+    const tierFilter = $('vis-place-filter-tier')?.value || 'All';
+    const searchVal = ($('vis-place-search-input')?.value || '').trim().toLowerCase();
+
+    let list = currentVisPlacementData.students;
+
+    if (tierFilter !== 'All') {
+        list = list.filter(s => s.tier === tierFilter);
+    }
+
+    if (searchVal) {
+        list = list.filter(s =>
+            (s.reg_no || '').toLowerCase().includes(searchVal) ||
+            (s.name || '').toLowerCase().includes(searchVal) ||
+            (s.department || '').toLowerCase().includes(searchVal)
+        );
+    }
+
+    renderPlacementTable(list);
+}
+
+function renderPlacementTable(students) {
+    const tbody = $('vis-place-tbody');
+    const countEl = $('vis-place-table-count');
+    if (countEl) countEl.innerText = `Showing ${students.length} candidates sorted by CGPA`;
+    if (!tbody) return;
+
+    if (!students || !students.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">No candidates match the specified criteria.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    students.slice(0, 100).forEach((s, idx) => {
+        let badgeHtml = '';
+        if (s.tier === 'Tier 1') badgeHtml = `<span class="badge-tier badge-tier-1">⭐ Tier 1 Dream</span>`;
+        else if (s.tier === 'Tier 2') badgeHtml = `<span class="badge-tier badge-tier-2">✓ Tier 2 Core</span>`;
+        else if (s.tier === 'Tier 3') badgeHtml = `<span class="badge-tier badge-tier-3">Tier 3 Pass</span>`;
+        else if (s.tier === 'Conditional') badgeHtml = `<span class="badge-tier badge-conditional">⚡ 1–2 Arrears</span>`;
+        else badgeHtml = `<span class="badge-tier badge-ineligible">✗ Ineligible</span>`;
+
+        let standingHtml = s.active_arrears === 0
+            ? '<span class="arrear-badge arrear-0">All Clear</span>'
+            : `<span class="arrear-badge arrear-3">${s.active_arrears} Pending</span>`;
+
+        html += `<tr>
+            <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
+            <td><strong style="color:var(--primary,#2563eb);">${escapeHtml(s.reg_no)}</strong></td>
+            <td style="font-weight:600; color:var(--text-primary);">${escapeHtml(s.name)}</td>
+            <td>${escapeHtml(s.department)}</td>
+            <td>${escapeHtml(s.section || '—')}</td>
+            <td style="text-align:right; font-weight:800; font-size:0.95rem; color:${s.cgpa >= 8.0 ? 'var(--emerald,#10b981)' : s.cgpa >= 6.5 ? 'var(--primary,#2563eb)' : 'var(--text-primary)'};">${s.cgpa.toFixed(2)}</td>
+            <td style="text-align:center;">${standingHtml}</td>
+            <td style="text-align:center;">${badgeHtml}</td>
+            <td style="text-align:center; font-size:0.80rem; font-weight:600; color:${s.active_arrears === 0 ? 'var(--emerald,#10b981)' : 'var(--amber,#f59e0b)'};">
+                ${s.active_arrears === 0 ? 'Eligible' : 'Conditional'}
+            </td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function clearPlacementFilters() {
+    currentPlaceBatchFilter = 'All';
+    const batchSelect = $('vis-place-filter-batch');
+    if (batchSelect) batchSelect.value = 'All';
+
+    const deptSelect = $('vis-place-filter-dept');
+    if (deptSelect) deptSelect.value = 'All';
+
+    const tierSelect = $('vis-place-filter-tier');
+    if (tierSelect) tierSelect.value = 'All';
+
+    const searchInput = $('vis-place-search-input');
+    if (searchInput) searchInput.value = '';
+
+    loadPlacementEligibility();
+}
+
+function downloadPlacementChart() {
+    if (!visPlacementTierChart) {
+        showToast('Placement chart is not ready to download', 'warning');
+        return;
+    }
+    try {
+        const link = document.createElement('a');
+        link.download = `PTU_Placement_Tiers_${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = visPlacementTierChart.toBase64Image('image/png', 1.0);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Placement tier chart downloaded as PNG!', 'success');
+    } catch (e) {
+        showToast('Download error: ' + e.message, 'error');
+    }
+}
+
+function exportPlacementEligibilityExcel() {
+    if (!currentVisPlacementStudents || !currentVisPlacementStudents.length) {
+        showToast('No placement data to export', 'warning');
+        return;
+    }
+    try {
+        if (typeof XLSX === 'undefined') {
+            showToast('Excel exporter not ready', 'error');
+            return;
+        }
+
+        const rows = [
+            ['PONDICHERRY TECHNOLOGICAL UNIVERSITY - CAMPUS PLACEMENT ELIGIBILITY REPORT'],
+            ['Generated on:', new Date().toLocaleString('en-IN')],
+            ['Batch Filter:', currentPlaceBatchFilter],
+            ['Department Filter:', $('vis-place-filter-dept')?.value || 'All'],
+            ['Tier Filter:', $('vis-place-filter-tier')?.value || 'All'],
+            [],
+            ['#', 'Register Number', 'Student Name', 'Department', 'Section', 'Batch', 'CGPA', 'Active Arrears', 'Placement Tier', 'Eligible Status']
+        ];
+
+        currentVisPlacementStudents.forEach((s, idx) => {
+            rows.push([
+                idx + 1,
+                s.reg_no,
+                s.name,
+                s.department,
+                s.section || '—',
+                s.batch,
+                s.cgpa,
+                s.active_arrears,
+                s.tier,
+                s.active_arrears === 0 ? 'Eligible' : (s.active_arrears <= 2 ? 'Conditional' : 'Ineligible')
+            ]);
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Placement Roster');
+        XLSX.writeFile(wb, `PTU_Placement_Eligibility_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        showToast('Placement roster exported to Excel!', 'success');
+    } catch (e) {
+        showToast('Export failed: ' + e.message, 'error');
     }
 }
 
@@ -3961,7 +6765,7 @@ async function handleRcOtpVerify(event) {
 
 async function handleResendOtp() {
     const resendLink = $('rc-otp-resend');
-    if (!rcRegNo || !rcEmail || resendLink?.classList.contains('disabled')) return;
+    if (!rcRegNo || !rcEmail || resendLink?.disabled || resendLink?.classList.contains('disabled')) return;
 
     try {
         const res = await fetch(API_URL + '/report-card/request-otp', {
@@ -3984,6 +6788,7 @@ function startResendCountdown(seconds) {
     stopResendCountdown();
     let remaining = seconds;
     resendLink.classList.add('disabled');
+    resendLink.disabled = true;
     resendLink.innerText = `Resend OTP in ${remaining}s`;
     rcResendTimerId = setInterval(() => {
         remaining -= 1;
@@ -4003,6 +6808,7 @@ function stopResendCountdown() {
     }
     if (resendLink) {
         resendLink.classList.remove('disabled');
+        resendLink.disabled = false;
         resendLink.innerText = 'Resend OTP';
     }
 }
@@ -4277,7 +7083,7 @@ function exportDeveloperReportCardPDF() {
 // ============================================================
 
 // ============================================================
-// TRACK STUDENTS - Export CSV of students who viewed report cards
+// TRACK STUDENTS - Export report-card viewing status as an Excel workbook
 // ============================================================
 async function handleTrackStudentsExport() {
     const btn = $('developer-track-students-btn');
@@ -4299,7 +7105,7 @@ async function handleTrackStudentsExport() {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${authToken}`,
-                'Accept': 'text/csv'
+                'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             }
         });
 
@@ -4312,12 +7118,12 @@ async function handleTrackStudentsExport() {
             throw new Error(errorData.detail || `Export failed: ${response.statusText}`);
         }
 
-        // Get the CSV content
-        const csvBlob = await response.blob();
+        // Get the Excel workbook
+        const workbookBlob = await response.blob();
         
         // Extract filename from Content-Disposition header or use default
         const contentDisposition = response.headers.get('Content-Disposition');
-        let filename = 'tracked_students.csv';
+        let filename = 'tracked_students.xlsx';
         if (contentDisposition) {
             const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
             if (filenameMatch) {
@@ -4326,7 +7132,7 @@ async function handleTrackStudentsExport() {
         }
 
         // Create download link and trigger download
-        const url = window.URL.createObjectURL(csvBlob);
+        const url = window.URL.createObjectURL(workbookBlob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
@@ -4336,9 +7142,9 @@ async function handleTrackStudentsExport() {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
 
-        showToast('CSV exported successfully', 'success');
+        showToast('Excel workbook exported successfully', 'success');
         if (msgEl) {
-            msgEl.textContent = '✓ CSV downloaded successfully';
+            msgEl.textContent = '✓ Excel workbook downloaded successfully';
             msgEl.style.display = 'block';
             msgEl.className = 'testing-rc-msg success';
         }
@@ -4352,6 +7158,70 @@ async function handleTrackStudentsExport() {
         showToast(message, 'error');
     } finally {
         btn?.classList.remove('loading');
+    }
+}
+
+async function handleTrackStudentsReset() {
+    const btn = $('developer-track-students-reset-btn');
+    const msgEl = $('developer-track-students-msg');
+    if (!authToken) {
+        const message = 'Authentication required';
+        showToast(message, 'error');
+        if (msgEl) {
+            msgEl.textContent = '❌ ' + message;
+            msgEl.style.display = 'block';
+            msgEl.className = 'testing-rc-msg error';
+        }
+        return;
+    }
+
+    if (!window.confirm('Reset all tracked report-card views? This permanently removes every current checkmark. Future report-card views will be tracked again.')) {
+        return;
+    }
+
+    if (msgEl) {
+        msgEl.style.display = 'none';
+        msgEl.textContent = '';
+        msgEl.className = 'testing-rc-msg';
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+        const response = await fetch(`${API_URL}/developer/track-students`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                handleLogout();
+                throw new Error('Session expired');
+            }
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `Reset failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const message = `Reset complete. Removed ${data.deleted_count} tracked report-card view${data.deleted_count === 1 ? '' : 's'}.`;
+        showToast(message, 'success');
+        if (msgEl) {
+            msgEl.textContent = '✓ ' + message;
+            msgEl.style.display = 'block';
+            msgEl.className = 'testing-rc-msg success';
+        }
+    } catch (err) {
+        const message = err.message || 'Failed to reset student tracking data';
+        if (msgEl) {
+            msgEl.textContent = '❌ ' + message;
+            msgEl.style.display = 'block';
+            msgEl.className = 'testing-rc-msg error';
+        }
+        showToast(message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 // ============================================================
@@ -4410,12 +7280,14 @@ function renderResourcesTable(resources) {
 
         return `
             <tr>
-              <td>${idx + 1}</td>
-              <td style="font-weight:600; color:var(--text-primary);">${escapeHtml(r.name)}</td>
-              <td><code>${escapeHtml(r.email)}</code></td>
+              <td class="resources-row-number">${String(idx + 1).padStart(2, '0')}</td>
+              <td class="resources-person-cell">
+                <span class="resources-person-name">${escapeHtml(r.name || 'Unnamed resource')}</span>
+              </td>
+              <td class="resources-email-cell"><a href="mailto:${escapeHtml(r.email || '')}">${escapeHtml(r.email || '')}</a></td>
               <td><span class="badge ${typeClass}">${escapeHtml(accType)}</span></td>
               <td>${statusBadge}</td>
-              <td class="developer-only" style="text-align:center;">${actions}</td>
+              <td class="developer-only resources-actions-cell">${actions}</td>
             </tr>
         `;
     }).join('');
@@ -4432,10 +7304,18 @@ function updateResourcesCount(showing, total) {
     if (wrap) {
         wrap.innerText = showing !== total ? ` of ${total}` : '';
     }
+    if ($('resources-metric-total')) $('resources-metric-total').innerText = total;
+    const registered = allResourcesCache.filter(resource => resource.has_account).length;
+    if ($('resources-metric-registered')) $('resources-metric-registered').innerText = registered;
+    if ($('resources-metric-pending')) $('resources-metric-pending').innerText = total - registered;
+    $('resources-count-display')?.classList.toggle('is-filtered', showing !== total);
 }
 
 function filterResourcesSearch() {
-    const q = ($('resources-search-input')?.value || '').trim().toLowerCase();
+    const search = $('resources-search-input');
+    const q = (search?.value || '').trim().toLowerCase();
+    const clearButton = $('resources-search-clear');
+    if (clearButton) clearButton.hidden = !q;
     const type = $('resources-type-filter')?.value || '';
 
     const filtered = allResourcesCache.filter(r => {
@@ -4445,6 +7325,23 @@ function filterResourcesSearch() {
     });
 
     renderResourcesTable(filtered);
+}
+
+function clearResourcesSearch() {
+    const search = $('resources-search-input');
+    if (!search) return;
+    search.value = '';
+    filterResourcesSearch();
+    search.focus();
+}
+
+function clearResourcesFilters() {
+    const search = $('resources-search-input');
+    const type = $('resources-type-filter');
+    if (search) search.value = '';
+    if (type) type.value = '';
+    filterResourcesSearch();
+    search?.focus();
 }
 
 async function populateAccountTypeOptions(isEdit = false, editingResource = null) {
@@ -4606,89 +7503,155 @@ async function deleteResource(id, name) {
     }
 }
 
-// Scroll-anywhere on hover - ultra-smooth momentum scrolling
+// Smooth wheel scrolling for nested application panels
 function initScrollAnywhere() {
-    const scrollSelectors = '.content-grid, .nav-menu, .table-scroll-region, .modal-body, .arrear-modal-body, .arrear-modal-table-container';
-    const activeScrolls = new Map();
-
-    // Industry standard scroll settings: 10 records per scroll, ultra-smooth deceleration
-    const scrollMultiplier = 0.1;
-    const friction = 0.95;
-    const maxVelocity = 15;
-    const minVelocity = 0.15;
+    const scrollResponseMs = 32;
+    const lineDeltaPixels = 16;
+    const scrollSettleThreshold = 1;
+    const activeScrolls = new WeakMap();
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     document.addEventListener('wheel', (e) => {
-        const containers = document.querySelectorAll(scrollSelectors);
-        let targetContainer = null;
+        if (e.ctrlKey || e.metaKey || reducedMotion.matches) return;
+        if (document.body.classList.contains('upload-active')) return;
 
-        for (const c of containers) {
-            if (c.contains(e.target)) {
-                targetContainer = c;
+        const target = e.target instanceof Element ? e.target : e.target?.parentElement;
+        if (!target || target.closest('input, textarea, select, [contenteditable], .filter-select')) return;
+
+        const rawDeltaX = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+        const rawDeltaY = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+        if (!rawDeltaX && !rawDeltaY) return;
+
+        const canScroll = (container, axis, delta) => {
+            if (!delta) return false;
+            const style = getComputedStyle(container);
+            const overflow = axis === 'x' ? style.overflowX : style.overflowY;
+            if (overflow !== 'auto' && overflow !== 'scroll' && overflow !== 'overlay') return false;
+
+            const state = activeScrolls.get(container);
+            const max = axis === 'x'
+                ? container.scrollWidth - container.clientWidth
+                : container.scrollHeight - container.clientHeight;
+            const position = state
+                ? (axis === 'x' ? state.targetX : state.targetY)
+                : (axis === 'x' ? container.scrollLeft : container.scrollTop);
+            return max > 1 && (delta < 0 ? position > 0 : position < max - 1);
+        };
+
+        const scrollingElement = document.scrollingElement || document.documentElement;
+        let targetContainer = null;
+        let selectedDeltaX = 0;
+        let selectedDeltaY = 0;
+        let candidate = target;
+        while (candidate && candidate !== document.body && candidate !== document.documentElement) {
+            const scaleX = e.deltaMode === 1 ? lineDeltaPixels
+                : e.deltaMode === 2 ? candidate.clientWidth : 1;
+            const scaleY = e.deltaMode === 1 ? lineDeltaPixels
+                : e.deltaMode === 2 ? candidate.clientHeight : 1;
+            const deltaX = rawDeltaX * scaleX;
+            const deltaY = rawDeltaY * scaleY;
+            const canScrollX = canScroll(candidate, 'x', deltaX);
+            const canScrollY = canScroll(candidate, 'y', deltaY);
+
+            if (canScrollX || canScrollY) {
+                targetContainer = candidate;
+                selectedDeltaX = canScrollX ? deltaX : 0;
+                selectedDeltaY = canScrollY ? deltaY : 0;
                 break;
+            }
+            candidate = candidate.parentElement;
+        }
+
+        if (!targetContainer) {
+            const scaleX = e.deltaMode === 1 ? lineDeltaPixels
+                : e.deltaMode === 2 ? scrollingElement.clientWidth : 1;
+            const scaleY = e.deltaMode === 1 ? lineDeltaPixels
+                : e.deltaMode === 2 ? scrollingElement.clientHeight : 1;
+            const deltaX = rawDeltaX * scaleX;
+            const deltaY = rawDeltaY * scaleY;
+            const canScrollX = canScroll(scrollingElement, 'x', deltaX);
+            const canScrollY = canScroll(scrollingElement, 'y', deltaY);
+            if (canScrollX || canScrollY) {
+                targetContainer = scrollingElement;
+                selectedDeltaX = canScrollX ? deltaX : 0;
+                selectedDeltaY = canScrollY ? deltaY : 0;
             }
         }
 
         if (!targetContainer) return;
+        e.preventDefault();
 
-        const isInput = e.target.closest('input, textarea, select, [contenteditable], .filter-select');
-        if (isInput) return;
-
-        const canScrollY = targetContainer.scrollHeight > targetContainer.clientHeight + 2;
-        const canScrollX = targetContainer.scrollWidth > targetContainer.clientWidth + 2;
-
-        if (!activeScrolls.has(targetContainer)) {
-            activeScrolls.set(targetContainer, { velY: 0, velX: 0, animId: null });
-        }
-        const scroll = activeScrolls.get(targetContainer);
-
-        const deltaY = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY) * scrollMultiplier, maxVelocity);
-        const deltaX = Math.sign(e.deltaX) * Math.min(Math.abs(e.deltaX || e.deltaY) * scrollMultiplier, maxVelocity);
-
-        if (canScrollY && Math.abs(e.deltaY) > 0) {
-            scroll.velY += deltaY;
-        }
-        if (canScrollX && Math.abs(e.deltaX || e.deltaY) > 0) {
-            scroll.velX += deltaX;
+        let scroll = activeScrolls.get(targetContainer);
+        if (!scroll) {
+            scroll = {
+                targetX: targetContainer.scrollLeft,
+                targetY: targetContainer.scrollTop,
+                frame: 0,
+                lastTime: 0
+            };
+            activeScrolls.set(targetContainer, scroll);
         }
 
-        if (scroll.animId) {
-            cancelAnimationFrame(scroll.animId);
+        const maxX = targetContainer.scrollWidth - targetContainer.clientWidth;
+        const maxY = targetContainer.scrollHeight - targetContainer.clientHeight;
+        scroll.targetX = Math.max(0, Math.min(maxX, scroll.targetX + selectedDeltaX));
+        scroll.targetY = Math.max(0, Math.min(maxY, scroll.targetY + selectedDeltaY));
+        targetContainer.classList.add('is-wheel-scrolling');
+
+        if (!scroll.frame) {
+            const animate = (time) => {
+                const current = activeScrolls.get(targetContainer);
+                if (!current) return;
+                const elapsed = current.lastTime ? Math.min(time - current.lastTime, 32) : 16;
+                current.lastTime = time;
+                const progress = 1 - Math.exp(-elapsed / scrollResponseMs);
+                const remainingX = current.targetX - targetContainer.scrollLeft;
+                const remainingY = current.targetY - targetContainer.scrollTop;
+
+                if (Math.abs(remainingX) > scrollSettleThreshold) targetContainer.scrollLeft += remainingX * progress;
+                else targetContainer.scrollLeft = current.targetX;
+                if (Math.abs(remainingY) > scrollSettleThreshold) targetContainer.scrollTop += remainingY * progress;
+                else targetContainer.scrollTop = current.targetY;
+
+                const stillMoving = Math.abs(current.targetX - targetContainer.scrollLeft) > scrollSettleThreshold
+                    || Math.abs(current.targetY - targetContainer.scrollTop) > scrollSettleThreshold;
+                if (stillMoving) {
+                    current.frame = requestAnimationFrame(animate);
+                } else {
+                    current.frame = 0;
+                    current.lastTime = 0;
+                    targetContainer.classList.remove('is-wheel-scrolling');
+                    activeScrolls.delete(targetContainer);
+                }
+            };
+            scroll.frame = requestAnimationFrame(animate);
         }
-
-        const animate = () => {
-            const s = activeScrolls.get(targetContainer);
-            if (!s) return;
-
-            let stillMoving = false;
-
-            if (canScrollY && Math.abs(s.velY) > minVelocity) {
-                targetContainer.scrollTop += s.velY;
-                s.velY *= friction;
-                stillMoving = true;
-            } else if (canScrollY) {
-                s.velY = 0;
-            }
-
-            if (canScrollX && Math.abs(s.velX) > minVelocity) {
-                targetContainer.scrollLeft += s.velX;
-                s.velX *= friction;
-                stillMoving = true;
-            } else if (canScrollX) {
-                s.velX = 0;
-            }
-
-            if (stillMoving) {
-                s.animId = requestAnimationFrame(animate);
-            } else {
-                s.velY = 0;
-                s.velX = 0;
-                s.animId = null;
-                activeScrolls.delete(targetContainer);
-            }
-        };
-
-        scroll.animId = requestAnimationFrame(animate);
     }, { passive: false });
+}
+
+function initCreditsPortal() {
+    const openButton = $('credits-toggle');
+    const dialog = $('credits-dialog');
+    const closeButton = $('credits-close');
+    if (!openButton || !dialog || !closeButton) return;
+
+    openButton.addEventListener('click', () => {
+        if (dialog.open) return;
+        dialog.showModal();
+        openButton.setAttribute('aria-expanded', 'true');
+    });
+
+    closeButton.addEventListener('click', () => {
+        if (dialog.open) dialog.close();
+    });
+
+    dialog.addEventListener('close', () => {
+        openButton.setAttribute('aria-expanded', 'false');
+    });
+
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+    });
 }
 
 // ─── 17. Lifecycle & Event Binding ────────────────────────────
@@ -4697,6 +7660,8 @@ document.addEventListener('DOMContentLoaded', () => {
     syncThemeCheckbox(); // Sync the animated toggle with current theme
     initParticleCanvas();
     loadPublicStats();
+    initSupportPortal();
+    initCreditsPortal();
     evaluateSessionState();
     initLoginRoleSelector();
     initScrollAnywhere();
@@ -4841,6 +7806,7 @@ async function ensureResultsStudentsCache() {
 async function buildResultsDepartmentTabs(filteredStudents) {
     const container = document.getElementById('results-dept-tabs-container');
     if (!container) return;
+    enablePillTabDragging(container);
 
     const students = filteredStudents || await ensureResultsStudentsCache();
     
@@ -4857,6 +7823,7 @@ async function buildResultsDepartmentTabs(filteredStudents) {
     let html = `<button class="dept-tab ${currentResultsDeptFilter === 'All' ? 'active' : ''}" 
                         data-dept="All" 
                         onclick="selectResultsDeptTab('All')"
+                        aria-pressed="${currentResultsDeptFilter === 'All'}"
                         type="button">
         All <span class="badge-count">${students.length}</span>
     </button>`;
@@ -4865,6 +7832,7 @@ async function buildResultsDepartmentTabs(filteredStudents) {
         html += `<button class="dept-tab ${currentResultsDeptFilter === tab ? 'active' : ''}" 
                         data-dept="${escapeHtml(tab)}" 
                         onclick="selectResultsDeptTab('${escapeHtml(tab)}')"
+                        aria-pressed="${currentResultsDeptFilter === tab}"
                         type="button">
             ${escapeHtml(tab)} <span class="badge-count">${tabCounts[tab]}</span>
         </button>`;
@@ -4885,7 +7853,9 @@ function selectResultsDeptTab(deptSection) {
     if (container) {
         container.querySelectorAll('.dept-tab').forEach(tab => {
             const tabDept = tab.getAttribute('data-dept');
-            tab.classList.toggle('active', tabDept === deptSection);
+            const isActive = tabDept === deptSection;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-pressed', String(isActive));
         });
     }
     
@@ -4969,8 +7939,12 @@ async function loadResultsWithDeptSection() {
         tbody.innerHTML = `<tr><td colspan="10" class="loading-cell" style="color:var(--danger)">Error: ${escapeHtml(err.message)}</td></tr>`;
         const countEl = $('results-showing-count');
         const fCountEl = $('results-f-showing-count');
+        const passRateEl = $('results-pass-rate-number');
+        const passDetailWrap = $('results-pass-detail-wrap');
         if (countEl) countEl.innerText = '0';
         if (fCountEl) fCountEl.innerText = '0';
+        if (passRateEl) passRateEl.innerText = '0.0%';
+        if (passDetailWrap) passDetailWrap.innerText = '(0/0)';
     }
 }
 
@@ -5420,6 +8394,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         _navStaff.call(this);
         const section = document.getElementById('auth-section');
         if (section && !section.classList.contains('hidden')) {
+          revealSection(section, { dy: 12, dur: 300 });
+          const hero = section.querySelector('.mgmt-staff-hero');
+          if (hero) revealSection(hero, { dy: 12, dur: 300 });
           // Full orchestrated entrance: card → header → fields → pills → footer
           requestAnimationFrame(() => initAuthEntrance());
         }
@@ -5925,8 +8902,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Orchestrate structural window elements (Header, Tabs, Actions, Filters, Tables, Cards)
         const windowElements = panel.querySelectorAll(
-          '.panel-header, .dept-tabs, .subjects-actions-row, .filter-row, ' +
-          '.grades-summary-grid, .upload-block, .stat-card, .table-scroll-region'
+          '.panel-header, .upload-hero, .resources-hero, .students-hero, .resources-overview > .resources-metric-card, ' +
+          '#resource-form-container, #resources-table-container, .upload-section-heading, .upload-block > .upload-card, ' +
+          '.dept-tabs, .subjects-actions-row, .filter-row, .grades-summary-grid, .stat-card, .table-scroll-region, ' +
+          '.dashboard-tools-heading, .dashboard-tools-grid > .panel-section'
         );
         if (windowElements.length) {
           anime.remove(windowElements);
@@ -5957,6 +8936,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     'grades-tbody',
     'classreport-tbody',
     'resources-tbody',
+    'vis-tbody',
   ];
 
   function animateTableRows(tbodyIdOrEl) {

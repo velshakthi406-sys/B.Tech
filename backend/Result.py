@@ -1,4 +1,4 @@
-﻿import datetime
+import datetime
 import io
 import re
 import os
@@ -111,6 +111,10 @@ SMTP_CONFIGURED = bool(SMTP_HOST and SMTP_USERNAME and SMTP_PASSWORD)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+
+# Voluntary homepage contributions use a UPI deep link; no payment credentials are stored here.
+SUPPORT_UPI_ID = os.getenv("SUPPORT_UPI_ID", "mala9994709538@oksbi").strip()
+SUPPORT_DISPLAY_NAME = os.getenv("SUPPORT_DISPLAY_NAME", "Mala Vimal").strip()[:70]
 
 GRADE_POINTS = {
     "O": 10, "A+": 9, "A": 8, "B+": 7, "B": 6, "C": 5, "D": 4,
@@ -678,8 +682,108 @@ class ReportCardResponse(BaseModel):
     has_arrears: bool = False
     cgpa: Optional[float] = None
     cgpa_percentage: Optional[float] = None
-    total_credits: float
-    earned_credits: float
+    total_credits: Optional[float] = 0.0
+    earned_credits: Optional[float] = 0.0
+
+# ==========================================
+# DATA VISUALIZATION SCHEMAS (Faculty & Admin)
+# ==========================================
+class SectionPassStats(BaseModel):
+    batch: str
+    department: str
+    section: str
+    section_code: str
+    section_label: str
+    total_students: int
+    appeared_students: int
+    passed_students: int
+    failed_students: int
+    pass_percentage: float
+    enrolled_pass_percentage: float
+
+class VisualizationPassResponse(BaseModel):
+    batch_filter: str
+    semester_filter: str
+    department_filter: str
+    sections: List[SectionPassStats]
+    overall_total_students: int
+    overall_appeared_students: int
+    overall_passed_students: int
+    overall_failed_students: int
+    overall_pass_percentage: float
+    available_batches: List[str]
+    available_semesters: List[str]
+    available_departments: List[str]
+
+class SubjectAnalyticsItem(BaseModel):
+    subject_id: int
+    code: str
+    name: str
+    department: Optional[str] = None
+    semester: Optional[str] = None
+    credits: float = 0.0
+    total_enrolled: int = 0
+    appeared_students: int = 0
+    passed_students: int = 0
+    failed_students: int = 0
+    pass_percentage: float = 0.0
+    average_grade_point: float = 0.0
+    grade_distribution: Dict[str, int] = {}
+
+class SubjectAnalyticsResponse(BaseModel):
+    batch_filter: str
+    semester_filter: str
+    department_filter: str
+    total_subjects: int
+    average_pass_rate: float
+    toughest_subject: Optional[str] = None
+    toughest_pass_rate: Optional[float] = None
+    best_subject: Optional[str] = None
+    best_pass_rate: Optional[float] = None
+    available_batches: List[str]
+    available_semesters: List[str]
+    available_departments: List[str]
+    subjects: List[SubjectAnalyticsItem]
+
+class DeptPlacementStats(BaseModel):
+    department: str
+    department_name: str
+    total: int
+    tier1: int
+    tier2: int
+    tier3: int
+    conditional: int
+    ineligible: int
+    eligible_percentage: float
+
+class StudentPlacementItem(BaseModel):
+    reg_no: str
+    name: str
+    department: str
+    section: Optional[str] = None
+    batch: str
+    cgpa: float
+    active_arrears: int
+    tier: str
+
+class PlacementEligibilityResponse(BaseModel):
+    batch_filter: str
+    department_filter: str
+    total_students: int
+    tier1_count: int
+    tier1_pct: float
+    tier2_count: int
+    tier2_pct: float
+    tier3_count: int
+    tier3_pct: float
+    conditional_count: int
+    conditional_pct: float
+    ineligible_count: int
+    ineligible_pct: float
+    available_batches: List[str]
+    available_departments: List[str]
+    department_stats: List[DeptPlacementStats]
+    students: List[StudentPlacementItem]
 
 # ==========================================
 # AUTH DEPENDENCIES
@@ -940,7 +1044,11 @@ def _dispatch_email(to_email: str, subject: str, text_body: str, html_body: str)
             errors.append(f"SMTP error: {e}")
 
     if not errors:
-        msg = "No email service configured on server. Please set BREVO_API_KEY in Render Environment."
+        msg = (
+            "No email service is configured. Set BREVO_API_KEY, RESEND_API_KEY, "
+            "SENDGRID_API_KEY, or SMTP_HOST/SMTP_USERNAME/SMTP_PASSWORD in Backend/.env "
+            "or the server environment."
+        )
         print(f"[EMAIL-DISPATCH-FAIL] {msg}", flush=True)
         return False, msg
 
@@ -2145,10 +2253,27 @@ def _department_from_sheet(sheet_name: str) -> str:
     sheet_name = re.sub(r'^\d{1,2}\.\d{1,2}\.\d{4}\s*', '', sheet_name)
     return re.sub(r'[-_]\s*[A-Z]$', '', sheet_name, flags=re.I).strip()
 
+def _batch_from_sheet(rows: List[List[Any]]) -> str:
+    batch_pattern = re.compile(r'\b\d{4}\s*-\s*\d{4}\b')
+    for row in rows[:15]:
+        for col_idx, value in enumerate(row):
+            cell_value = _clean_cell(value)
+            if not re.search(r'\bbatch\b', cell_value, re.I):
+                continue
+            match = batch_pattern.search(cell_value)
+            if match:
+                return re.sub(r'\s+', '', match.group())
+            for next_value in row[col_idx + 1:]:
+                match = batch_pattern.search(_clean_cell(next_value))
+                if match:
+                    return re.sub(r'\s+', '', match.group())
+    return ""
+
 _DEPARTMENT_CANON: List[Tuple[str, Tuple[str, ...]]] = [
     ("CE",  (r'\bcivil\b', r'^ce$')),
     ("CHE", (r'\bchem', r'^che$', r'^chi$')),
     ("CSE", (r'computer\s*sci', r'^cse$')),
+    ("AI&DS", (r'artificial\s*intelligence.*data\s*sci', r'^ai\s*&\s*ds$', r'^ai\s*and\s*ds$')),
     ("DS",  (r'data\s*sci', r'^dat\s*sci$', r'^ds$')),
     ("ECE", (r'electronics.*communication', r'^ece$')),
     ("EEE", (r'electrical', r'^eee$')),
@@ -2199,6 +2324,7 @@ def parse_students_excel(file_content: bytes) -> List[Dict[str, Any]]:
         if header_idx is None:
             continue
         header_row = all_rows[header_idx]
+        sheet_batch = _batch_from_sheet(all_rows)
 
         reg_col = name_col = dept_col = programme_col = batch_col = section_col = None
         for col_idx, raw in enumerate(header_row):
@@ -2287,7 +2413,7 @@ def parse_students_excel(file_content: bytes) -> List[Dict[str, Any]]:
             programme = cell(row, programme_col)
             if programme.strip().lower() in ("programme", "specialization"):
                 programme = ""
-            batch = cell(row, batch_col)
+            batch = cell(row, batch_col) or sheet_batch
 
             if section_is_sheet_authoritative:
                 section = fallback_section
@@ -4500,6 +4626,18 @@ def get_grade_summary(
 # ==========================================
 # PUBLIC STATS (Homepage Ticker)
 # ==========================================
+@app.get("/support/config")
+def get_support_config():
+    if not SUPPORT_UPI_ID or not SUPPORT_DISPLAY_NAME:
+        return {"enabled": False}
+    if not re.fullmatch(r"[A-Za-z0-9._-]{2,128}@[A-Za-z][A-Za-z0-9.-]{1,63}", SUPPORT_UPI_ID):
+        raise HTTPException(status_code=503, detail="Support payment UPI ID is invalid.")
+    return {
+        "enabled": True,
+        "upi_id": SUPPORT_UPI_ID,
+        "display_name": SUPPORT_DISPLAY_NAME,
+    }
+
 @app.get("/stats/public")
 def get_public_stats(subjects_db: Session = Depends(get_subjects_db)):
     subjects_count = subjects_db.query(Subject).count()
@@ -4524,6 +4662,487 @@ def get_public_stats(subjects_db: Session = Depends(get_subjects_db)):
         "results": results_count,
         "departments": depts_count
     }
+
+# ==========================================
+# DATA VISUALIZATION (Faculty & Admin Feature)
+# ==========================================
+@app.get("/visualization/pass-percentage", response_model=VisualizationPassResponse)
+def get_visualization_pass_percentage(
+    batch: Optional[str] = None,
+    semester: Optional[str] = None,
+    department: Optional[str] = None,
+    user: User = Depends(role_checker(["Developer", "Admin", "Faculty"]))
+):
+    available_batches = get_all_batch_names()
+    
+    b_filter = (batch or "").strip()
+    sem_filter = (semester or "").strip()
+    dept_filter = (department or "").strip()
+    
+    query_batches = [b_filter] if (b_filter and b_filter.lower() != "all") else available_batches
+    
+    sec_map: Dict[str, dict] = {}
+    overall_total = 0
+    overall_appeared = 0
+    overall_passed = 0
+    overall_failed = 0
+    
+    all_sems = set()
+    all_depts = set()
+    
+    for b_name in query_batches:
+        batch_db = get_batch_session(b_name)
+        try:
+            # Query roster students
+            stu_q = batch_db.query(
+                Student.id, Student.reg_no, Student.name, Student.department, Student.section, Student.batch
+            ).filter(Student.source == "roster")
+            
+            if dept_filter and dept_filter.lower() != "all":
+                stu_q = stu_q.filter(Student.department == dept_filter)
+                
+            students = stu_q.all()
+            if not students:
+                continue
+                
+            # Collect departments in batch
+            for row in batch_db.query(Student.department).filter(Student.source == "roster").distinct().all():
+                if row[0]:
+                    all_depts.add(row[0].strip())
+            # Collect semesters in batch
+            for row in batch_db.query(Result.semester).distinct().all():
+                if row[0]:
+                    all_sems.add(str(row[0]).strip())
+                    
+            stu_ids = [s[0] for s in students]
+            
+            # Fetch results
+            res_q = batch_db.query(
+                Result.student_id, Result.subject_id, Result.semester, Result.grade, Result.grade_point
+            ).filter(Result.student_id.in_(stu_ids))
+            
+            if sem_filter and sem_filter.lower() != "all":
+                res_q = res_q.filter(Result.semester == sem_filter)
+                
+            res_rows = res_q.all()
+            
+            student_subjs: Dict[int, Dict[int, list]] = {}
+            for r in res_rows:
+                student_subjs.setdefault(r.student_id, {}).setdefault(r.subject_id, []).append(r)
+                
+            for stu_id, reg_no, name, stu_dept, stu_section, stu_batch in students:
+                dept_val = (stu_dept or "").strip()
+                sec_val = (stu_section or "").strip()
+                if not dept_val:
+                    continue
+                sec_code = f"{dept_val}-{sec_val}" if sec_val else dept_val
+                sec_label = f"{dept_val} - Section {sec_val}" if sec_val else dept_val
+                
+                group_key = sec_code
+                if group_key not in sec_map:
+                    sec_map[group_key] = {
+                        "batch": b_name if len(query_batches) == 1 else "All Batches",
+                        "department": dept_val,
+                        "section": sec_val,
+                        "section_code": sec_code,
+                        "section_label": sec_label,
+                        "total_students": 0,
+                        "appeared_students": 0,
+                        "passed_students": 0,
+                        "failed_students": 0,
+                    }
+                    
+                sec_entry = sec_map[group_key]
+                sec_entry["total_students"] += 1
+                overall_total += 1
+                
+                subjs = student_subjs.get(stu_id, {})
+                if not subjs:
+                    continue
+                    
+                sec_entry["appeared_students"] += 1
+                overall_appeared += 1
+                
+                has_arrear = False
+                for sub_id, att_list in subjs.items():
+                    passed = any(
+                        att.grade_point > 0 and (att.grade or "").strip().upper() not in ("F", "AB", "ABSENT", "NC", "E", "Z")
+                        for att in att_list
+                    )
+                    if not passed:
+                        has_arrear = True
+                        break
+                        
+                if not has_arrear:
+                    sec_entry["passed_students"] += 1
+                    overall_passed += 1
+                else:
+                    sec_entry["failed_students"] += 1
+                    overall_failed += 1
+        finally:
+            batch_db.close()
+            
+    sections_list = []
+    for key, s in sec_map.items():
+        app_count = s["appeared_students"]
+        tot_count = s["total_students"]
+        pas_count = s["passed_students"]
+        pass_pct = round((pas_count / app_count * 100), 2) if app_count > 0 else 0.0
+        enrolled_pct = round((pas_count / tot_count * 100), 2) if tot_count > 0 else 0.0
+        sections_list.append(SectionPassStats(
+            batch=s["batch"],
+            department=s["department"],
+            section=s["section"],
+            section_code=s["section_code"],
+            section_label=s["section_label"],
+            total_students=tot_count,
+            appeared_students=app_count,
+            passed_students=pas_count,
+            failed_students=s["failed_students"],
+            pass_percentage=pass_pct,
+            enrolled_pass_percentage=enrolled_pct
+        ))
+        
+    sections_list.sort(key=lambda x: x.section_code)
+    overall_pct = round((overall_passed / overall_appeared * 100), 2) if overall_appeared > 0 else 0.0
+    
+    sem_order = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
+    sorted_sems = sorted(list(all_sems), key=lambda x: sem_order.index(x) if x in sem_order else 99)
+    sorted_depts = sorted(list(all_depts))
+    
+    return VisualizationPassResponse(
+        batch_filter=b_filter or "All",
+        semester_filter=sem_filter or "All",
+        department_filter=dept_filter or "All",
+        sections=sections_list,
+        overall_total_students=overall_total,
+        overall_appeared_students=overall_appeared,
+        overall_passed_students=overall_passed,
+        overall_failed_students=overall_failed,
+        overall_pass_percentage=overall_pct,
+        available_batches=available_batches,
+        available_semesters=sorted_sems,
+        available_departments=sorted_depts
+    )
+
+@app.get("/visualization/subject-analytics", response_model=SubjectAnalyticsResponse)
+def get_visualization_subject_analytics(
+    batch: Optional[str] = None,
+    semester: Optional[str] = None,
+    department: Optional[str] = None,
+    user: User = Depends(role_checker(["Developer", "Admin", "Faculty", "TNP", "Exam Wing"]))
+):
+    available_batches = get_all_batch_names()
+    b_filter = (batch or "").strip()
+    sem_filter = (semester or "").strip()
+    dept_filter = (department or "").strip()
+
+    query_batches = [b_filter] if (b_filter and b_filter.lower() != "all") else available_batches
+
+    subjects_db = next(get_subjects_db())
+    subjects_map = {sub.id: sub for sub in subjects_db.query(Subject).all()}
+
+    subj_stats: Dict[int, dict] = {}
+    all_sems = set()
+    all_depts = set()
+
+    for b_name in query_batches:
+        batch_db = get_batch_session(b_name)
+        try:
+            for row in batch_db.query(Student.department).filter(Student.source == "roster").distinct().all():
+                if row[0]:
+                    all_depts.add(row[0].strip())
+            for row in batch_db.query(Result.semester).distinct().all():
+                if row[0]:
+                    all_sems.add(str(row[0]).strip())
+
+            stu_q = batch_db.query(Student.id, Student.department).filter(Student.source == "roster")
+            if dept_filter and dept_filter.lower() != "all":
+                stu_q = stu_q.filter(Student.department == dept_filter)
+            students = stu_q.all()
+            if not students:
+                continue
+
+            stu_ids = [s[0] for s in students]
+
+            res_q = batch_db.query(
+                Result.student_id, Result.subject_id, Result.semester, Result.grade, Result.grade_point
+            ).filter(Result.student_id.in_(stu_ids))
+
+            if sem_filter and sem_filter.lower() != "all":
+                res_q = res_q.filter(Result.semester == sem_filter)
+
+            for r in res_q.all():
+                sub_id = r.subject_id
+                if sub_id not in subj_stats:
+                    subj_stats[sub_id] = {
+                        "appeared": 0,
+                        "passed": 0,
+                        "failed": 0,
+                        "gp_sum": 0.0,
+                        "grades": {},
+                        "enrolled": set()
+                    }
+                entry = subj_stats[sub_id]
+                entry["enrolled"].add(r.student_id)
+                entry["appeared"] += 1
+                g = (r.grade or "").strip().upper()
+                entry["grades"][g] = entry["grades"].get(g, 0) + 1
+                entry["gp_sum"] += (r.grade_point or 0.0)
+                if (r.grade_point or 0.0) > 0 and g not in ("F", "AB", "ABSENT", "NC", "E", "Z"):
+                    entry["passed"] += 1
+                else:
+                    entry["failed"] += 1
+        finally:
+            batch_db.close()
+
+    items: List[SubjectAnalyticsItem] = []
+    for sub_id, stats in subj_stats.items():
+        sub = subjects_map.get(sub_id)
+        code = sub.code if sub else f"ID-{sub_id}"
+        name = sub.name if sub else "Unknown Subject"
+        dept = sub.department if sub else None
+        sem = sub.semester if sub else None
+        credits = sub.credits if sub else 0.0
+
+        appeared = stats["appeared"]
+        passed = stats["passed"]
+        failed = stats["failed"]
+        pass_pct = round((passed / appeared) * 100, 2) if appeared > 0 else 0.0
+        avg_gp = round(stats["gp_sum"] / appeared, 2) if appeared > 0 else 0.0
+
+        items.append(SubjectAnalyticsItem(
+            subject_id=sub_id,
+            code=code,
+            name=name,
+            department=dept,
+            semester=sem,
+            credits=credits,
+            total_enrolled=len(stats["enrolled"]),
+            appeared_students=appeared,
+            passed_students=passed,
+            failed_students=failed,
+            pass_percentage=pass_pct,
+            average_grade_point=avg_gp,
+            grade_distribution=stats["grades"]
+        ))
+
+    items.sort(key=lambda x: x.pass_percentage)
+
+    total_subjs = len(items)
+    avg_pass_rate = round(sum(i.pass_percentage for i in items) / total_subjs, 2) if total_subjs > 0 else 0.0
+    toughest = items[0] if items else None
+    best = items[-1] if items else None
+
+    sem_order = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
+    sorted_sems = sorted(list(all_sems), key=lambda x: sem_order.index(x) if x in sem_order else 99)
+    sorted_depts = sorted(list(all_depts))
+
+    return SubjectAnalyticsResponse(
+        batch_filter=b_filter or "All",
+        semester_filter=sem_filter or "All",
+        department_filter=dept_filter or "All",
+        total_subjects=total_subjs,
+        average_pass_rate=avg_pass_rate,
+        toughest_subject=f"{toughest.code} - {toughest.name}" if toughest else None,
+        toughest_pass_rate=toughest.pass_percentage if toughest else None,
+        best_subject=f"{best.code} - {best.name}" if best else None,
+        best_pass_rate=best.pass_percentage if best else None,
+        available_batches=available_batches,
+        available_semesters=sorted_sems,
+        available_departments=sorted_depts,
+        subjects=items
+    )
+
+@app.get("/visualization/placement-eligibility", response_model=PlacementEligibilityResponse)
+def get_visualization_placement_eligibility(
+    batch: Optional[str] = None,
+    department: Optional[str] = None,
+    user: User = Depends(role_checker(["Developer", "Admin", "Faculty", "TNP", "Exam Wing"]))
+):
+    available_batches = get_all_batch_names()
+    b_filter = (batch or "").strip()
+    dept_filter = (department or "").strip()
+
+    query_batches = [b_filter] if (b_filter and b_filter.lower() != "all") else available_batches
+
+    subjects_db = next(get_subjects_db())
+    subjects_map = {sub.id: sub for sub in subjects_db.query(Subject).all()}
+
+    all_depts = set()
+    students_list: List[StudentPlacementItem] = []
+    dept_agg: Dict[str, dict] = {}
+
+    dept_names_map = {
+        'CE': 'Civil Engineering',
+        'CHE': 'Chemical Engineering',
+        'CSE': 'Computer Science & Engineering',
+        'ECE': 'Electronics & Communication Engineering',
+        'EEE': 'Electrical & Electronics Engineering',
+        'EIE': 'Electronics & Instrumentation Engineering',
+        'IT': 'Information Technology',
+        'ME': 'Mechanical Engineering',
+        'MT': 'Mechatronics Engineering'
+    }
+
+    tier1_count = 0
+    tier2_count = 0
+    tier3_count = 0
+    conditional_count = 0
+    ineligible_count = 0
+
+    for b_name in query_batches:
+        batch_db = get_batch_session(b_name)
+        try:
+            for row in batch_db.query(Student.department).filter(Student.source == "roster").distinct().all():
+                if row[0]:
+                    all_depts.add(row[0].strip())
+
+            stu_q = batch_db.query(
+                Student.id, Student.reg_no, Student.name, Student.department, Student.section, Student.batch
+            ).filter(Student.source == "roster")
+
+            if dept_filter and dept_filter.lower() != "all":
+                stu_q = stu_q.filter(Student.department == dept_filter)
+
+            students = stu_q.all()
+            if not students:
+                continue
+
+            stu_ids = [s[0] for s in students]
+
+            res_q = batch_db.query(
+                Result.student_id, Result.subject_id, Result.grade, Result.grade_point
+            ).filter(Result.student_id.in_(stu_ids))
+
+            from collections import defaultdict
+            stu_results = defaultdict(lambda: defaultdict(list))
+            for r in res_q.all():
+                stu_results[r.student_id][r.subject_id].append(r)
+
+            for stu_id, reg_no, name, dept, sec, stu_batch in students:
+                dept_clean = (dept or "").strip()
+                if not dept_clean:
+                    continue
+
+                if dept_clean not in dept_agg:
+                    dept_agg[dept_clean] = {
+                        "total": 0, "tier1": 0, "tier2": 0, "tier3": 0, "conditional": 0, "ineligible": 0
+                    }
+
+                subjs = stu_results.get(stu_id, {})
+                total_cr = 0.0
+                weighted_pts = 0.0
+                active_arrears = 0
+
+                for sub_id, att_list in subjs.items():
+                    sub = subjects_map.get(sub_id)
+                    cr = sub.credits if sub else 0.0
+                    if cr <= 0:
+                        continue
+                    passed_attempts = [
+                        a for a in att_list
+                        if (a.grade_point or 0) > 0 and (a.grade or "").strip().upper() not in ("F", "AB", "ABSENT", "NC", "E", "Z")
+                    ]
+                    if passed_attempts:
+                        best = max(passed_attempts, key=lambda a: a.grade_point)
+                        total_cr += cr
+                        weighted_pts += (best.grade_point * cr)
+                    else:
+                        latest = att_list[-1]
+                        total_cr += cr
+                        weighted_pts += (latest.grade_point * cr)
+                        active_arrears += 1
+
+                cgpa = round(weighted_pts / total_cr, 2) if total_cr > 0 else 0.0
+
+                if active_arrears == 0:
+                    if cgpa >= 8.0:
+                        tier = "Tier 1"
+                        tier1_count += 1
+                        dept_agg[dept_clean]["tier1"] += 1
+                    elif cgpa >= 6.5:
+                        tier = "Tier 2"
+                        tier2_count += 1
+                        dept_agg[dept_clean]["tier2"] += 1
+                    elif cgpa >= 5.5:
+                        tier = "Tier 3"
+                        tier3_count += 1
+                        dept_agg[dept_clean]["tier3"] += 1
+                    else:
+                        tier = "Ineligible"
+                        ineligible_count += 1
+                        dept_agg[dept_clean]["ineligible"] += 1
+                elif active_arrears <= 2 and cgpa >= 5.5:
+                    tier = "Conditional"
+                    conditional_count += 1
+                    dept_agg[dept_clean]["conditional"] += 1
+                else:
+                    tier = "Ineligible"
+                    ineligible_count += 1
+                    dept_agg[dept_clean]["ineligible"] += 1
+
+                dept_agg[dept_clean]["total"] += 1
+
+                students_list.append(StudentPlacementItem(
+                    reg_no=reg_no,
+                    name=name,
+                    department=dept_clean,
+                    section=sec,
+                    batch=stu_batch or b_name,
+                    cgpa=cgpa,
+                    active_arrears=active_arrears,
+                    tier=tier
+                ))
+        finally:
+            batch_db.close()
+
+    total_students = len(students_list)
+    tier1_pct = round((tier1_count / total_students) * 100, 2) if total_students > 0 else 0.0
+    tier2_pct = round((tier2_count / total_students) * 100, 2) if total_students > 0 else 0.0
+    tier3_pct = round((tier3_count / total_students) * 100, 2) if total_students > 0 else 0.0
+    conditional_pct = round((conditional_count / total_students) * 100, 2) if total_students > 0 else 0.0
+    ineligible_pct = round((ineligible_count / total_students) * 100, 2) if total_students > 0 else 0.0
+
+    dept_stats: List[DeptPlacementStats] = []
+    for d, counts in sorted(dept_agg.items()):
+        tot = counts["total"]
+        eligible_sum = counts["tier1"] + counts["tier2"] + counts["tier3"]
+        el_pct = round((eligible_sum / tot) * 100, 2) if tot > 0 else 0.0
+        dept_stats.append(DeptPlacementStats(
+            department=d,
+            department_name=dept_names_map.get(d, d),
+            total=tot,
+            tier1=counts["tier1"],
+            tier2=counts["tier2"],
+            tier3=counts["tier3"],
+            conditional=counts["conditional"],
+            ineligible=counts["ineligible"],
+            eligible_percentage=el_pct
+        ))
+
+    students_list.sort(key=lambda s: s.cgpa, reverse=True)
+    sorted_depts = sorted(list(all_depts))
+
+    return PlacementEligibilityResponse(
+        batch_filter=b_filter or "All",
+        department_filter=dept_filter or "All",
+        total_students=total_students,
+        tier1_count=tier1_count,
+        tier1_pct=tier1_pct,
+        tier2_count=tier2_count,
+        tier2_pct=tier2_pct,
+        tier3_count=tier3_count,
+        tier3_pct=tier3_pct,
+        conditional_count=conditional_count,
+        conditional_pct=conditional_pct,
+        ineligible_count=ineligible_count,
+        ineligible_pct=ineligible_pct,
+        available_batches=available_batches,
+        available_departments=sorted_depts,
+        department_stats=dept_stats,
+        students=students_list
+    )
 
 # ==========================================
 # REPORT CARD (Public & Testing Direct Generator)
@@ -4746,8 +5365,8 @@ def _build_student_report_card(student: Student, batch_db: Session, subjects_db:
         has_arrears=has_any_arrears,
         cgpa=cgpa,
         cgpa_percentage=cgpa_percentage,
-        total_credits=cgpa_total_credits,
-        earned_credits=cgpa_total_earned,
+        total_credits=round(cgpa_total_credits, 1),
+        earned_credits=round(cgpa_total_earned, 1),
     )
 
 @app.get("/report-card/lookup-email/{reg_no}")
@@ -4977,9 +5596,51 @@ def get_direct_report_card(
     finally:
         batch_db.close()
 
+@app.get("/visualization/student-gpa/{reg_no}", response_model=ReportCardResponse)
+def get_visualization_student_gpa(
+    reg_no: str,
+    subjects_db: Session = Depends(get_subjects_db),
+    user: User = Depends(role_checker(["Developer", "Admin", "Faculty"]))
+):
+    cleaned_reg = (reg_no or "").strip()
+    if not cleaned_reg:
+        raise HTTPException(status_code=400, detail="Register Number is required")
+
+    found_info = find_student_batch(cleaned_reg)
+    if not found_info:
+        raise HTTPException(status_code=404, detail=f"No student found with Register Number '{cleaned_reg}'")
+
+    batch_db = get_batch_session(found_info[1])
+    try:
+        student = batch_db.query(Student).filter(Student.reg_no.ilike(cleaned_reg)).first()
+        if not student:
+            raise HTTPException(status_code=404, detail=f"No student found with Register Number '{cleaned_reg}'")
+        return _build_student_report_card(student, batch_db, subjects_db)
+    finally:
+        batch_db.close()
+
 # ==========================================
 # TRACK STUDENTS - Developer Only
 # ==========================================
+@app.delete("/developer/track-students")
+def reset_tracked_students(
+    system_db: Session = Depends(get_system_db),
+    user: User = Depends(allow_developer)
+):
+    """Clear all saved report-card view records so tracking starts fresh."""
+    try:
+        deleted_count = system_db.query(ReportCardView).delete(synchronize_session=False)
+        system_db.commit()
+        return {
+            "deleted_count": deleted_count,
+            "message": "All report-card viewing checkmarks have been reset."
+        }
+    except Exception as e:
+        system_db.rollback()
+        logger.error(f"Error resetting tracked students: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reset student tracking data")
+
+
 @app.get("/developer/track-students-csv")
 def export_tracked_students_csv(
     system_db: Session = Depends(get_system_db),

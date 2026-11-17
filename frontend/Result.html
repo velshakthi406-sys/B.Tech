@@ -58,6 +58,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" defer></script>
   <script src="xlsx.bundle.js" defer></script>
   <script>if (!window.XLSX) { document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" defer><\/script>'); }</script>
+
+  <script src="chart.umd.min.js" defer></script>
+
+  <script>if (!window.Chart) { document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js" defer><\/script>'); }</script>
 </head>
 
 <body>
@@ -159,6 +163,142 @@
         </div>
       </label>
     </div>
+
+    <div id="credits-widget" class="credits-widget">
+      <button id="credits-toggle" class="credits-nav-button" type="button" aria-haspopup="dialog"
+        aria-controls="credits-dialog" aria-expanded="false" aria-label="Project credits" title="Project credits">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="10" cy="7" r="4" />
+          <path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+        <span>Credits</span>
+      </button>
+      <dialog id="credits-dialog" class="credits-dialog" aria-labelledby="credits-title">
+        <div class="credits-dialog-header">
+          <div class="credits-heading-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="10" cy="7" r="4" />
+              <path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <div class="credits-heading-copy">
+            <span class="credits-eyebrow">THE STUDENT BEHIND THE PORTAL</span>
+            <h2 id="credits-title">Project credits</h2>
+          </div>
+          <button id="credits-close" class="credits-close-button" type="button" aria-label="Close credits">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" aria-hidden="true">
+              <path d="m18 6-12 12M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="credits-dialog-content">
+          <div class="credits-intro">
+            <p>This project is proudly built and maintained by <strong>SHAKTHIVEL MUTHUKUMARAN</strong>.</p>
+            <span>Created to make academic results easier to access for every PTU student.</span>
+          </div>
+          <section class="credits-team" aria-labelledby="credits-team-title">
+            <div class="credits-section-heading">
+              <h3 id="credits-team-title">Meet the Developer</h3>
+              <span>1 contributor</span>
+            </div>
+            <div class="credits-team-list">
+              <article class="credits-person-card">
+                <div class="credits-avatar credits-avatar-lead" aria-hidden="true">MS</div>
+                <div class="credits-person-copy">
+                  <h4>M.SHAKTHIVEL</h4>
+                  <p>Lead developer</p>
+                </div>
+              </article>
+            </div>
+          </section>
+          <footer class="credits-footer">
+            <span>© 2026 PTU Grade Portal</span>
+          </footer>
+        </div>
+      </dialog>
+    </div>
+
+    <div id="support-widget" class="support-widget">
+      <button id="support-toggle" class="support-nav-button" type="button" aria-expanded="false"
+        aria-controls="support-panel" aria-label="Support this project">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" />
+        </svg>
+        <span>Support</span>
+      </button>
+      <section id="support-panel" class="support-panel" aria-labelledby="support-title" role="dialog"
+        aria-modal="false" hidden>
+        <div class="support-panel-heading">
+          <div class="support-heading-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" />
+            </svg>
+          </div>
+          <div class="support-heading-copy">
+            <span class="support-eyebrow">A LITTLE SUPPORT GOES A LONG WAY</span>
+            <h2 id="support-title">Enjoying the portal?</h2>
+          </div>
+          <button id="support-close" class="support-close-button" type="button" aria-label="Close support panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" aria-hidden="true">
+              <path d="m18 6-12 12M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="support-message">
+          <p>If you like this service, support me in keeping it running. Every contribution is optional, and student
+            report cards will always be free.</p>
+        </div>
+        <div class="support-panel-actions">
+          <div class="support-amounts" role="group" aria-label="Choose a contribution amount">
+            <button type="button" class="support-amount-option" data-support-amount="10" aria-pressed="false" disabled>₹10</button>
+            <button type="button" class="support-amount-option is-selected" data-support-amount="25" aria-pressed="true" disabled>₹25</button>
+            <button type="button" class="support-amount-option" data-support-amount="50" aria-pressed="false" disabled>₹50</button>
+          </div>
+          <label class="support-custom-label" for="support-custom-amount">Or choose an amount (₹)</label>
+          <input id="support-custom-amount" class="support-custom-amount" type="number" min="1" max="50000"
+            step="1" inputmode="numeric" value="25" aria-describedby="support-status" disabled />
+          <div class="support-payment-row">
+            <a id="support-pay-link" class="support-pay-button" href="#" aria-disabled="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="5" y="2" width="14" height="20" rx="2" />
+                <path d="M9 6h6M10 18h4" />
+              </svg>
+              <span id="support-pay-label">Set up support payments</span>
+            </a>
+            <button id="support-copy-upi" class="support-copy-button" type="button" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="8" y="8" width="12" height="12" rx="2" />
+                <path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+              </svg>
+              <span>Copy UPI ID</span>
+            </button>
+          </div>
+          <p id="support-upi-display" class="support-upi-display" hidden></p>
+          <p id="support-status" class="support-status" role="status" aria-live="polite">
+            Contributions are not configured yet.
+          </p>
+          <p class="support-disclaimer">Payment opens your UPI app. This portal does not verify payments or issue
+            receipts.</p>
+        </div>
+        <div class="support-qr-card">
+          <img class="support-qr-image" src="support_upi_qr.png"
+            alt="UPI payment QR code for Mala Vimal. Scan with GPay, PhonePe, or another UPI app." />
+          <p class="support-qr-title">Scan &amp; support</p>
+          <p class="support-qr-hint">Mala Vimal · Enter your amount in the UPI app</p>
+          <p class="support-qr-vpa">mala9994709538@oksbi</p>
+        </div>
+      </section>
+    </div>
   </header>
 
   <!-- ═══════════════════════════════════════════
@@ -209,8 +349,8 @@
           display: inline-flex;
           align-items: center;
           gap: 0;
-          margin-bottom: 28px;
-          border-radius: 6px;
+          margin-bottom: 18px;
+          border-radius: 999px;
           overflow: hidden;
           backdrop-filter: blur(18px) saturate(160%);
           -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -237,8 +377,8 @@
         .ptu-nameplate-body {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 10px 18px 10px 14px;
+          gap: 12px;
+          padding: 9px 16px 9px 14px;
         }
 
         /* Shield icon */
@@ -260,9 +400,9 @@
         /* University name */
         .ptu-nameplate-label {
           font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-          font-size: 0.72rem;
+          font-size: 0.68rem;
           font-weight: 700;
-          letter-spacing: 0.14em;
+          letter-spacing: 0.11em;
           text-transform: uppercase;
           color: rgba(248, 250, 252, 0.92);
           white-space: nowrap;
@@ -272,16 +412,31 @@
         /* Est. tag */
         .ptu-nameplate-est {
           font-family: 'Inter', sans-serif;
-          font-size: 0.58rem;
-          font-weight: 500;
-          letter-spacing: 0.10em;
+          font-size: 0.72rem;
+          font-weight: 800;
+          letter-spacing: 0.07em;
           text-transform: uppercase;
-          color: rgba(220, 38, 38, 0.85);
-          border: 1px solid rgba(220, 38, 38, 0.35);
-          border-radius: 3px;
-          padding: 1px 5px;
+          color: #ff6b6b;
+          border: 2px solid rgba(248, 113, 113, 0.82);
+          background: rgba(239, 68, 68, 0.14);
+          border-radius: 4px;
+          padding: 3px 7px;
           line-height: 1.5;
           flex-shrink: 0;
+          box-shadow: 0 0 10px rgba(239, 68, 68, 0.18);
+        }
+
+        .ptu-nameplate-est b {
+          font-weight: 900;
+          -webkit-text-stroke: 0.3px currentColor;
+          text-shadow: 0 0 0.45px currentColor;
+        }
+
+        [data-theme="light"] .ptu-nameplate-est {
+          color: #93c5fd;
+          border-color: rgba(147, 197, 253, 0.92);
+          background: rgba(37, 99, 235, 0.24);
+          box-shadow: 0 0 12px rgba(37, 99, 235, 0.26);
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -302,6 +457,18 @@
         </div>
       </div>
 
+      <aside class="home-nep-promo" aria-label="For NEP students">
+        <div class="home-nep-promo-mark" aria-hidden="true">
+          <span>NEP</span>
+          <small>2024</small>
+        </div>
+        <div class="home-nep-promo-copy">
+          <span class="home-nep-promo-eyebrow">For NEP Students</span>
+          <p class="home-nep-promo-title">Your academic journey, all in one place.</p>
+          <p class="home-nep-promo-description">Report cards, SGPA &amp; CGPA made easy to revisit.</p>
+        </div>
+      </aside>
+
       <!-- Title -->
       <h1 class="home-title hero-title">
         Academic Grade<br />
@@ -314,20 +481,18 @@
         Unified grade processing, CGPA computation, and student self-service — all in one modern, accessible platform.
       </p>
 
-      <!-- Notice Marquee -->
-      <div class="notice-marquee marquee" role="status" aria-label="Important notice">
-        <div class="notice-marquee-track marquee-track">
-          <span class="notice-marquee-item marquee-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send
-            it to velshakthi406@gmail.com</span>
-          <span class="notice-marquee-item marquee-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px;">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>Kindly share the result PDF for which your grades are incorrect, so it can be corrected promptly. Send
-            it to velshakthi406@gmail.com</span>
-        </div>
+      <div class="home-announcement" role="note" aria-label="Grade correction contact">
+        <span class="home-announcement-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3 2.8 19a1.2 1.2 0 0 0 1 1.8h16.4a1.2 1.2 0 0 0 1-1.8L12 3Z" />
+            <path d="M12 9v4m0 3h.01" />
+          </svg>
+        </span>
+        <span class="home-announcement-copy">
+          <strong>Need a grade correction?</strong>
+          <span>Send the result PDF to <a href="mailto:velshakthi406@gmail.com">velshakthi406@gmail.com</a>.</span>
+        </span>
       </div>
 
       <!-- Portal Entry Cards -->
@@ -362,7 +527,7 @@
             </svg>
           </div>
           <div class="portal-card-title portal-title">Management Portal</div>
-          <div class="portal-card-desc portal-desc">Manage students, upload results, and developerister grades
+          <div class="portal-card-desc portal-desc">Manage students, upload results, and maintain grades
             seamlessly.</div>
           <div class="portal-card-arrow portal-arrow">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -403,6 +568,61 @@
        SECTION 2: AUTH — Staff Login
   ════════════════════════════════════════════ -->
   <section id="auth-section" class="auth-wrapper hidden" aria-label="Staff authentication">
+
+    <!-- Ambient Glassmorphism Canvas -->
+    <div class="rc-ambient-canvas" aria-hidden="true">
+      <div class="rc-ambient-orb rc-orb-crimson"></div>
+      <div class="rc-ambient-orb rc-orb-indigo"></div>
+      <div class="rc-ambient-orb rc-orb-cyan"></div>
+    </div>
+
+    <!-- ── Management Portal Hero ── -->
+    <div class="mgmt-staff-hero" aria-labelledby="mgmt-staff-title">
+      <div class="mgmt-staff-hero-copy">
+        <div class="mgmt-staff-kicker">
+          <span></span>MANAGEMENT PORTAL
+        </div>
+        <h1 id="mgmt-staff-title">Grade Control.<br /><span>Secure Access.</span></h1>
+        <p>Upload results, manage student records, and oversee academic data — all in one secure, role-based platform.</p>
+        <div class="mgmt-staff-highlights" aria-label="Portal features">
+          <span>Role-based access</span>
+          <span>Grade management</span>
+          <span>OTP-secured setup</span>
+        </div>
+        <div class="mgmt-staff-security">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>Credential & OTP-verified staff authentication</span>
+        </div>
+      </div>
+      <div class="mgmt-staff-art" aria-hidden="true">
+        <div class="mgmt-art-orbit mgmt-art-orbit-one"></div>
+        <div class="mgmt-art-orbit mgmt-art-orbit-two"></div>
+        <div class="mgmt-dashboard-preview">
+          <div class="mgmt-dash-preview-top">
+            <span class="mgmt-dash-mark">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+              </svg>
+            </span>
+            <span class="mgmt-dash-status">ADMIN PANEL</span>
+          </div>
+          <span class="mgmt-dash-caption">GRADE MANAGEMENT</span>
+          <span class="mgmt-dash-rule mgmt-dash-rule-long"></span>
+          <span class="mgmt-dash-rule mgmt-dash-rule-medium"></span>
+          <div class="mgmt-dash-preview-stats">
+            <span><b>Upload</b><i></i></span>
+            <span><b>Review</b><i></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Auth Card ── -->
     <div class="auth-card">
       <div class="auth-card-header">
         <h2 id="auth-title">Staff <span class="accent">Sign In</span></h2>
@@ -494,12 +714,12 @@
             </button>
           </div>
         </form>
-        <div class="auth-footer" style="margin-top:10px;">
+        <div class="auth-footer" style="margin-top:4px;">
           <span onclick="startRegisterFlow()">Register new account</span>
           &nbsp;·&nbsp;
           <span onclick="startForgotPasswordFlow()">Forgot password?</span>
         </div>
-        <div class="auth-footer" style="margin-top:6px;">
+        <div class="auth-footer" style="margin-top:2px;">
           <span onclick="closeStaffPortalFromHome()">← Back to Homepage</span>
         </div>
       </div><!-- /#auth-step-login -->
@@ -681,11 +901,54 @@
       <div class="rc-ambient-orb rc-orb-cyan"></div>
     </div>
 
+    <div class="rc-student-hero" aria-labelledby="rc-student-title">
+      <div class="rc-student-hero-copy">
+        <h1 id="rc-student-title">Every semester.<br /><span>One clear record.</span></h1>
+        <p>Revisit your semester results, SGPA and CGPA in one secure, easy-to-read report card.</p>
+        <div class="rc-student-highlights" aria-label="Report card features">
+          <span>Semester results</span>
+          <span>SGPA &amp; CGPA</span>
+          <span>Print or save as PDF</span>
+        </div>
+        <div class="rc-student-security">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span>Secure access with email OTP verification</span>
+        </div>
+      </div>
+      <div class="rc-student-art" aria-hidden="true">
+        <div class="rc-art-orbit rc-art-orbit-one"></div>
+        <div class="rc-art-orbit rc-art-orbit-two"></div>
+        <div class="rc-record-preview">
+          <div class="rc-record-preview-top">
+            <span class="rc-record-mark">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5z" />
+                <path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20M8 7h8M8 10h6" />
+              </svg>
+            </span>
+            <span class="rc-record-status">OTP PROTECTED</span>
+          </div>
+          <span class="rc-record-caption">ACADEMIC SNAPSHOT</span>
+          <span class="rc-record-rule rc-record-rule-long"></span>
+          <span class="rc-record-rule rc-record-rule-medium"></span>
+          <div class="rc-record-preview-stats">
+            <span><b>SGPA</b><i></i></span>
+            <span><b>CGPA</b><i></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Step 1: Lookup -->
     <div class="auth-card report-card-lookup-card" id="rc-step-lookup">
       <div class="auth-card-header">
-        <h2>Student Report Card</h2>
-        <p>Enter your register number and email to receive your one-time passcode</p>
+        <h2>Student <span class="accent">Report Card</span></h2>
+        <p class="rc-lookup-hint">Enter your register number and email to receive your OTP</p>
       </div>
 
       <!-- Step indicator -->
@@ -710,13 +973,12 @@
           <div style="position:relative;">
             <span class="input-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect width="18" height="18" x="3" y="3" rx="2" />
-                <path d="M7 7h.01" />
-                <path d="M17 7h.01" />
-                <path d="M7 17h.01" />
-                <path d="M17 17h.01" />
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <circle cx="8" cy="10" r="2" />
+                <path d="M5.5 16c.5-1.3 1.3-2 2.5-2s2 .7 2.5 2" />
+                <path d="M13 9h5M13 13h5" />
               </svg></span>
-            <input type="text" id="rc-reg-no" class="has-icon" required maxlength="10"
+            <input type="text" id="rc-reg-no" class="has-icon" required maxlength="10" inputmode="numeric"
               placeholder="Enter 10-digit Reg No (e.g. 2401112050)" autocomplete="off" />
           </div>
         </div>
@@ -744,7 +1006,7 @@
       </form>
 
       <div class="auth-footer" style="margin-top:16px;">
-        <span onclick="closeReportCard()">← Back to Homepage</span>
+        <button type="button" class="auth-footer-action" onclick="closeReportCard()">← Back to Homepage</button>
       </div>
     </div>
 
@@ -806,10 +1068,10 @@
       </form>
 
       <div class="auth-footer" style="margin-top:12px;">
-        <span id="rc-otp-resend" onclick="handleResendOtp()">Resend OTP</span>
+        <button type="button" id="rc-otp-resend" class="auth-footer-action" onclick="handleResendOtp()">Resend OTP</button>
       </div>
       <div class="auth-footer">
-        <span onclick="showRcLookupStep()">← Change Register No / Email</span>
+        <button type="button" class="auth-footer-action" onclick="showRcLookupStep()">← Change Register No / Email</button>
       </div>
     </div>
 
@@ -871,7 +1133,7 @@
         </button>
         <div class="brand-text">
           <span class="brand-name">Grade Hub</span>
-          <span class="brand-sub">PTU · Academic Portal</span>
+          <span class="brand-sub">Academic Portal</span>
         </div>
       </div>
 
@@ -960,6 +1222,28 @@
           </span>
           <span class="label">Class Report</span>
         </button>
+
+        <button class="nav-item nav-visualization" onclick="switchView('visualization')" aria-label="Data Visualization">
+
+          <span class="nav-item-icon">
+
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+              <line x1="18" y1="20" x2="18" y2="10" />
+
+              <line x1="12" y1="20" x2="12" y2="4" />
+
+              <line x1="6" y1="20" x2="6" y2="14" />
+
+              <line x1="2" y1="20" x2="22" y2="20" />
+
+            </svg>
+
+          </span>
+
+          <span class="label">Data Visualization</span>
+
+        </button>
       </nav>
 
       <!-- User Profile -->
@@ -1027,19 +1311,31 @@
         <!-- ║  VIEW: DASHBOARD              ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-dashboard" class="panel hidden" role="region" aria-label="System overview">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
+          <section class="management-hero dashboard-hero" aria-labelledby="dashboard-heading">
+            <div class="management-hero-copy dashboard-hero-copy">
+              <span class="management-hero-eyebrow dashboard-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
                 </svg>
+                Academic operations
               </span>
-              System Overview
-            </h3>
-          </div>
+              <h1 id="dashboard-heading">Institution overview</h1>
+              <p>Monitor students, courses, published results, and departments from one place.</p>
+            </div>
+            <div class="management-hero-art dashboard-hero-visual" aria-hidden="true">
+              <svg viewBox="0 0 120 96" fill="none">
+                <rect x="12" y="12" width="96" height="72" rx="12" stroke="currentColor" />
+                <path d="M27 67V52M45 67V40M63 67V48M81 67V29" stroke="currentColor" stroke-width="7" stroke-linecap="round" />
+                <path d="m25 39 19-9 17 7 22-18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="83" cy="19" r="4" fill="currentColor" />
+              </svg>
+            </div>
+            <div class="dashboard-hero-orbit dashboard-hero-orbit-one" aria-hidden="true"></div>
+            <div class="dashboard-hero-orbit dashboard-hero-orbit-two" aria-hidden="true"></div>
+          </section>
 
           <!-- KPI Stats -->
           <div class="stats-row" id="dashboard-stats">
@@ -1110,6 +1406,15 @@
 
 
 
+          <section class="dashboard-tools" id="dashboard-tools" aria-labelledby="dashboard-tools-heading" hidden>
+            <header class="dashboard-tools-heading">
+              <div>
+                <span class="dashboard-tools-eyebrow">Role-based utilities</span>
+                <h2 id="dashboard-tools-heading">Tools &amp; maintenance</h2>
+                <p>Manage batch data, report cards, staff records, and view tracking.</p>
+              </div>
+            </header>
+            <div class="dashboard-tools-grid">
           <!-- ============================================================
                BATCH LIFECYCLE & PURGE GRADUATED BATCH DATA
                ============================================================ -->
@@ -1243,7 +1548,7 @@
                   </svg></span>
                 <div>
                   <h4 class="testing-rc-title">Track Students</h4>
-                  <p class="testing-rc-desc">Export CSV of all unique students who have viewed their report cards (Reg No, Name, Department).</p>
+                  <p class="testing-rc-desc">Export report-card viewing status or reset all tracked checkmarks. New views will be tracked again.</p>
                 </div>
               </div>
               <span class="badge-testing">Developer Only</span>
@@ -1251,11 +1556,17 @@
             <div class="testing-rc-form">
               <button type="button" id="developer-track-students-btn" onclick="handleTrackStudentsExport()" class="btn-primary testing-rc-btn">
                 <span class="btn-spinner"></span>
-                <span class="btn-label">Export CSV</span>
+                <span class="btn-label">Export .xlsx</span>
+              </button>
+              <button type="button" id="developer-track-students-reset-btn" onclick="handleTrackStudentsReset()" class="btn-primary testing-rc-btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-label">Reset checkmarks</span>
               </button>
             </div>
             <div id="developer-track-students-msg" class="testing-rc-msg" style="display:none;"></div>
           </div>
+            </div>
+          </section>
 
         </div>
 
@@ -1263,35 +1574,57 @@
         <!-- ║  VIEW: UPLOAD DATA            ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-upload" class="panel hidden" role="region" aria-label="Upload data">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon" style="background:var(--teal-glass);color:var(--teal);">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
+          <div class="management-hero management-hero--texture upload-hero">
+            <div class="management-hero-copy upload-hero-copy">
+              <span class="management-hero-eyebrow upload-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 16V4" />
+                  <path d="m7 9 5-5 5 5" />
+                  <path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
                 </svg>
+                ACADEMIC DATA OPERATIONS
               </span>
-              Upload Data
-            </h3>
-            <span class="text-muted" style="font-size:0.82rem;">Bulk-import records or add a new result set</span>
+              <h1>Upload Data</h1>
+              <p>Import student records, subject catalogs, and semester results through guided workflows.</p>
+            </div>
+            <div class="management-hero-art upload-hero-art" aria-hidden="true">
+              <span class="upload-hero-orbit upload-hero-orbit-one"></span>
+              <span class="upload-hero-orbit upload-hero-orbit-two"></span>
+              <svg viewBox="0 0 120 120" fill="none">
+                <path d="M35 79h-7a17 17 0 1 1 3.2-33.7A29 29 0 0 1 86 43a20 20 0 0 1 5 39.4H83" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+                <path d="M60 91V57m0 0L47 70m13-13 13 13" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="60" cy="91" r="4" fill="currentColor" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="upload-section-heading">
+            <div>
+              <span class="upload-section-eyebrow">IMPORT WORKFLOWS</span>
+              <h2>Choose what to upload</h2>
+            </div>
           </div>
 
           <div class="upload-block">
             <!-- Upload Students -->
-            <div class="upload-card" data-upload-card>
-              <div class="upload-card-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
+            <div class="upload-card upload-card-students" data-upload-card>
+              <div class="upload-card-heading">
+                <div class="upload-card-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </div>
+                <div class="upload-card-title">
+                  <span class="upload-card-kicker">STUDENT RECORDS</span>
+                  <h4>Upload Students</h4>
+                </div>
               </div>
-              <h4>Upload Students</h4>
               <p class="upload-card-hint">Excel workbook (.xlsx / .xls) with student roll details</p>
               <form id="upload-students-form" onsubmit="handleUploadStudents(event)" enctype="multipart/form-data">
-                <label class="file-dropzone" for="students-file-input" tabindex="0">
+                <label class="file-dropzone" for="students-file-input">
                   <input type="file" id="students-file-input" name="file" accept=".xlsx,.xls" required />
                   <div class="file-dropzone-body">
                     <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
@@ -1311,17 +1644,22 @@
             </div>
 
             <!-- Upload Subjects -->
-            <div class="upload-card" data-upload-card>
-              <div class="upload-card-icon">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
+            <div class="upload-card upload-card-subjects" data-upload-card>
+              <div class="upload-card-heading">
+                <div class="upload-card-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                </div>
+                <div class="upload-card-title">
+                  <span class="upload-card-kicker">SUBJECT CATALOG</span>
+                  <h4>Upload Subjects</h4>
+                </div>
               </div>
-              <h4>Upload Subjects</h4>
               <p class="upload-card-hint">PDF containing the university subject master list</p>
               <form id="upload-subjects-form" onsubmit="handleUploadSubjects(event)" enctype="multipart/form-data">
-                <label class="file-dropzone" for="subjects-file-input" tabindex="0">
+                <label class="file-dropzone" for="subjects-file-input">
                   <input type="file" id="subjects-file-input" name="file" accept=".pdf" required />
                   <div class="file-dropzone-body">
                     <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
@@ -1350,6 +1688,7 @@
                       <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                     </svg>
                   </div>
+                  <span class="upload-card-kicker">SEMESTER RESULTS</span>
                   <h4>Upload Results</h4>
                   <p class="upload-card-hint">The PDF results sheet, tagged with semester &amp; batch so records file
                     themselves into the right place automatically.</p>
@@ -1382,7 +1721,7 @@
                       </select>
                     </div>
                   </div>
-                  <label class="file-dropzone" for="results-file-input" tabindex="0">
+                  <label class="file-dropzone" for="results-file-input">
                     <input type="file" id="results-file-input" name="file" accept=".pdf" required />
                     <div class="file-dropzone-body">
                       <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
@@ -1414,6 +1753,7 @@
                       <line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
                   </div>
+                  <span class="upload-card-kicker">GRADE CORRECTIONS</span>
                   <h4>Upload Re-Evaluation</h4>
                   <p class="upload-card-hint">The PDF re-evaluation results sheet. Only corrects results that already
                     exist — an improved grade clears the arrear status.</p>
@@ -1446,7 +1786,7 @@
                       </select>
                     </div>
                   </div>
-                  <label class="file-dropzone" for="reeval-file-input" tabindex="0">
+                  <label class="file-dropzone" for="reeval-file-input">
                     <input type="file" id="reeval-file-input" name="file" accept=".pdf" required />
                     <div class="file-dropzone-body">
                       <svg class="file-dropzone-svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
@@ -1474,58 +1814,77 @@
         <!-- ║  VIEW: RESULTS                ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-results" class="panel hidden" role="region" aria-label="Student results">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon" style="background:var(--violet-glass);color:var(--violet);">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <section class="management-hero management-hero--texture directory-hero results-hero" aria-labelledby="results-heading">
+            <div class="management-hero-copy results-hero-copy">
+              <span class="management-hero-eyebrow results-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
+                  <path d="M14 2v6h6M8 13h8M8 17h5" stroke-linecap="round" />
+                </svg>
+                ACADEMIC RECORDS
+              </span>
+              <h1 id="results-heading">Results Explorer</h1>
+              <p>Review published grades, track pass outcomes, and quickly narrow records by cohort, department, or subject.</p>
+            </div>
+            <div class="management-hero-art directory-hero-art results-hero-art" aria-hidden="true">
+              <svg viewBox="0 0 144 116" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="24" y="13" width="96" height="88" rx="16" />
+                <path d="M44 37h55M44 51h31M44 68h14l9-10 10 16 11-13 12 7" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M43 83h58" stroke-linecap="round" opacity=".65" />
+              </svg>
+            </div>
+            <span class="directory-hero-orbit" aria-hidden="true"></span>
+            <span class="directory-hero-orbit directory-hero-orbit-two" aria-hidden="true"></span>
+          </section>
+
+          <section class="resources-overview results-overview" aria-label="Results overview">
+            <article class="resources-metric-card results-metric-card" id="results-count-display">
+              <span class="resources-metric-icon results-metric-icon results-metric-icon-total" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6M8 13h8M8 17h5" stroke-linecap="round" />
                 </svg>
               </span>
-              Student Results
-            </h3>
-            <div style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <div class="counter-indicator-pill" id="results-count-display">
-                <span class="counter-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                </span>
-                <span class="counter-text">
-                  <strong id="results-showing-count" class="counter-number">0</strong>
-                  <span id="results-total-count-wrap" class="counter-total-wrap"></span>
-                  <span class="counter-label">Results</span>
-                </span>
-              </div>
-              <button class="counter-indicator-pill indicator-f-grades filter-toggle-btn" id="results-f-filter-btn"
-                type="button" onclick="toggleFGradesFilter()" aria-pressed="false"
-                aria-label="Filter results to show F grades only" title="Show only F grades">
-                <span class="counter-icon" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                  </svg>
-                </span>
-                <span class="counter-text">
-                  <strong id="results-f-showing-count" class="counter-number">0</strong>
-                  <span class="counter-label">F Grades</span>
-                </span>
-                <span class="filter-state-badge" id="f-filter-badge" aria-live="polite"></span>
-              </button>
+              <span class="resources-metric-label">Matching records</span>
+              <strong id="results-showing-count" class="resources-metric-value">0</strong>
+              <span class="resources-metric-note"><span id="results-total-count-wrap"></span> Results matching current filters</span>
+            </article>
+            <article class="resources-metric-card results-metric-card" id="results-pass-rate-pill">
+              <span class="resources-metric-icon results-metric-icon results-metric-icon-pass" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <path d="m9 11 3 3L22 4" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="resources-metric-label">Pass rate</span>
+              <strong id="results-pass-rate-number" class="resources-metric-value">0.0%</strong>
+              <span class="resources-metric-note" id="results-pass-detail-wrap">(0/0) Passing grades</span>
+            </article>
+            <button class="resources-metric-card results-metric-card results-f-metric-card filter-toggle-btn"
+              id="results-f-filter-btn" type="button" onclick="toggleFGradesFilter()" aria-pressed="false"
+              aria-label="Filter results to show F grades only" title="Show only F grades">
+              <span class="resources-metric-icon results-metric-icon results-metric-icon-f" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9 8h6M9 12h4M9 12v5" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="resources-metric-label">F grades</span>
+              <strong id="results-f-showing-count" class="resources-metric-value">0</strong>
+              <span class="resources-metric-note">Click to filter records<span class="filter-state-badge" id="f-filter-badge" aria-live="polite"></span></span>
+            </button>
+          </section>
+
+          <section class="results-filter-panel" role="group" aria-label="Filter results">
+            <div class="dept-tabs results-filter-row">
+              <span class="results-filter-label">Batch</span>
+              <div class="dept-tabs-scroll" id="results-batch-tabs-container" role="group" aria-label="Filter results by batch"></div>
             </div>
-          </div>
-
-          <!-- Batch Pills with Count Badges -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="results-batch-tabs-container"></div>
-          </div>
-
-          <!-- Department+Section Pills (EXACT match to Students/SGPA/CGPA/Class Report style) -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="results-dept-tabs-container"></div>
-          </div>
+            <div class="dept-tabs results-filter-row">
+              <span class="results-filter-label">Section</span>
+              <div class="dept-tabs-scroll" id="results-dept-tabs-container" role="group" aria-label="Filter results by department and section"></div>
+            </div>
+          </section>
 
           <!-- Filters (semester, subject code, reg no, reset) -->
           <div class="sgpa-filters-container" role="search" aria-label="Filter results">
@@ -1636,6 +1995,15 @@
             </form>
           </div>
 
+          <section class="results-table-card" aria-label="Result records">
+            <div class="results-table-heading">
+              <div>
+                <h2>Result records</h2>
+                <p>Published grades and academic details for the selected filters.</p>
+              </div>
+              <span class="results-table-hint">Scroll horizontally to view all columns</span>
+            </div>
+
           <!-- Table -->
           <div id="results-table-container" class="table-scroll-region">
             <table class="data-table" id="results-table">
@@ -1690,51 +2058,76 @@
               Export Excel
             </button>
           </div>
+          </section>
         </div>
 
         <!-- ╔═══════════════════════════════╗ -->
         <!-- ║  VIEW: STUDENTS               ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-students" class="panel hidden" role="region" aria-label="Student management">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon" style="background:var(--teal-glass);color:var(--teal);">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <section class="management-hero management-hero--texture directory-hero students-hero" aria-labelledby="students-heading">
+            <div class="management-hero-copy students-hero-copy">
+              <span class="management-hero-eyebrow students-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
+                STUDENT RECORDS
               </span>
-              Student Management
-            </h3>
-          </div>
+              <h1 id="students-heading">Student Management</h1>
+              <p>Organize student records by cohort and section, then find or update a profile in seconds.</p>
+            </div>
+            <button class="directory-hero-action students-add-button" type="button" onclick="showAddStudentForm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>Add student</span>
+            </button>
+            <div class="management-hero-art directory-hero-art students-hero-art" aria-hidden="true">
+              <svg viewBox="0 0 144 116" fill="none">
+                <rect x="22" y="15" width="100" height="86" rx="18" stroke="currentColor" stroke-width="2" />
+                <circle cx="55" cy="48" r="13" stroke="currentColor" stroke-width="2.5" />
+                <path d="M34 83c3-12 11-18 21-18s18 6 21 18M84 42h22M84 55h22M84 68h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx="111" cy="88" r="15" fill="var(--management-accent-dark, #302969)" stroke="currentColor" stroke-width="2" />
+                <path d="M111 80v16M103 88h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <span class="directory-hero-orbit" aria-hidden="true"></span>
+            <span class="directory-hero-orbit directory-hero-orbit-two" aria-hidden="true"></span>
+          </section>
 
-          <!-- Batch tabs -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="batch-tabs-container"></div>
-          </div>
-          <!-- Section tabs -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="section-tabs-container"></div>
+          <div class="students-filter-panel" role="group" aria-label="Filter students">
+            <div class="dept-tabs students-filter-row">
+              <span class="students-filter-label">Batch</span>
+              <div class="dept-tabs-scroll" id="batch-tabs-container" role="group" aria-label="Filter by batch"></div>
+            </div>
+            <div class="dept-tabs students-filter-row">
+              <span class="students-filter-label">Section</span>
+              <div class="dept-tabs-scroll" id="section-tabs-container" role="group" aria-label="Filter by section"></div>
+            </div>
           </div>
 
           <div class="tab-content-area">
-            <div class="subjects-actions-row">
-              <button class="btn-small btn-small-accent" onclick="showAddStudentForm()">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Add Student
-              </button>
-              <div class="table-search">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-                <input type="text" id="students-search-input" placeholder="Search by name, reg no, department…"
-                  oninput="filterStudentsSearch(this.value)" />
+            <div class="subjects-actions-row students-directory-toolbar">
+              <div class="students-search-group">
+                <label class="students-search-label" for="students-search-input">Search students</label>
+                <div class="table-search directory-search">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input class="directory-search-input" type="text" id="students-search-input" aria-label="Search students by name, registration number, department, batch, or section" placeholder="Name, reg no., dept, batch, or section…"
+                    oninput="filterStudentsSearch(this.value)" />
+                  <button class="students-search-clear directory-search-clear" id="students-search-clear" type="button" aria-label="Clear student search"
+                    title="Clear search" onclick="clearStudentSearch()" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <path d="m18 6-12 12M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div class="counter-indicator-pill" id="students-count-display">
+              <div class="counter-indicator-pill" id="students-count-display" role="status" aria-live="polite" aria-atomic="true">
                 <span class="counter-icon">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -1774,7 +2167,7 @@
               </form>
             </div>
 
-            <div id="students-table-container" class="table-scroll-region">
+            <div id="students-table-container" class="table-scroll-region" role="region" aria-label="Student records table. Scroll horizontally to view all columns." tabindex="0">
               <table class="data-table" id="students-table">
                 <thead>
                   <tr>
@@ -1802,42 +2195,98 @@
         <!-- ╔═══════════════════════════════╗ -->
         <!-- ║  VIEW: SUBJECTS               ║ -->
         <!-- ╚═══════════════════════════════╝ -->
-        <div id="view-subjects" class="panel hidden" role="region" aria-label="Subject master">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon" style="background:var(--violet-glass);color:var(--violet);">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <div id="view-subjects" class="panel hidden" role="region" aria-label="Subjects">
+          <section class="management-hero management-hero--texture directory-hero subjects-hero" aria-labelledby="subjects-heading">
+            <div class="management-hero-copy subjects-hero-copy">
+              <span class="management-hero-eyebrow subjects-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
+                <span>ACADEMIC CATALOG</span>
               </span>
-              Subject Master
-            </h3>
-          </div>
+              <h1 id="subjects-heading">Subject Master</h1>
+              <p>Browse subject codes, credits, semesters, and departments in one searchable catalog.</p>
+            </div>
+            <div class="management-hero-art directory-hero-art subjects-hero-art" aria-hidden="true">
+              <svg viewBox="0 0 144 116" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="22" y="15" width="100" height="86" rx="18" />
+                <path d="M48 40h48M48 55h48M48 70h34" stroke-linecap="round" />
+                <path d="M40 28v60M104 28v60" opacity=".55" />
+              </svg>
+            </div>
+            <button type="button" class="directory-hero-action subjects-add-button" onclick="showAddSubjectForm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>Add Subject</span>
+            </button>
+            <span class="directory-hero-orbit" aria-hidden="true"></span>
+            <span class="directory-hero-orbit directory-hero-orbit-two" aria-hidden="true"></span>
+          </section>
 
-          <!-- Dept tabs -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="dept-tabs-container"></div>
+          <section class="resources-overview subjects-overview" aria-label="Subject catalog summary">
+            <article class="resources-metric-card subjects-metric-card">
+              <div class="resources-metric-icon subjects-metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+              </div>
+              <span class="resources-metric-label">Catalog subjects</span>
+              <strong class="resources-metric-value" id="subjects-total-value">0</strong>
+              <span class="resources-metric-note">Across all departments</span>
+            </article>
+            <article class="resources-metric-card subjects-metric-card">
+              <div class="resources-metric-icon subjects-metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" />
+                </svg>
+              </div>
+              <span class="resources-metric-label">Departments</span>
+              <strong class="resources-metric-value" id="subjects-department-value">0</strong>
+              <span class="resources-metric-note">With catalog subjects</span>
+            </article>
+            <article class="resources-metric-card subjects-metric-card">
+              <div class="resources-metric-icon subjects-metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="17" rx="2" />
+                  <path d="M16 2v4M8 2v4M3 10h18M8 14h3M8 17h6" stroke-linecap="round" />
+                </svg>
+              </div>
+              <span class="resources-metric-label">Semesters</span>
+              <strong class="resources-metric-value" id="subjects-semester-value">0</strong>
+              <span class="resources-metric-note">Represented in the catalog</span>
+            </article>
+          </section>
+
+          <div class="subjects-filter-panel">
+            <span class="subjects-filter-label">DEPARTMENT</span>
+            <div class="dept-tabs subjects-dept-tabs">
+              <div class="dept-tabs-scroll" id="dept-tabs-container" role="group" aria-label="Filter subjects by department"></div>
+            </div>
           </div>
 
           <div class="tab-content-area">
-            <div class="subjects-actions-row">
-              <button class="btn-small btn-small-accent" onclick="showAddSubjectForm()">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Add Subject
-              </button>
-              <div class="table-search">
+            <div class="subjects-actions-row subjects-directory-toolbar">
+              <div class="subjects-search-group">
+                <label class="subjects-search-label" for="subjects-search-input">Search subjects</label>
+                <div class="table-search directory-search subjects-directory-search">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="11" cy="11" r="8" />
                   <path d="m21 21-4.35-4.35" />
                 </svg>
-                <input type="text" id="subjects-search-input" placeholder="Search by code, name, department…"
-                  oninput="filterSubjectsSearch(this.value)" />
+                  <input class="directory-search-input" type="text" id="subjects-search-input" aria-label="Search subjects by code, name, department, or semester" placeholder="Code, name, department, or semester…"
+                    oninput="filterSubjectsSearch(this.value)" />
+                  <button class="directory-search-clear" id="subjects-search-clear" type="button" aria-label="Clear subject search"
+                    title="Clear search" onclick="clearSubjectsSearch()" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <path d="m18 6-12 12M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div class="counter-indicator-pill" id="subjects-count-display">
+              <div class="counter-indicator-pill subjects-count-pill" id="subjects-count-display" aria-live="polite">
                 <span class="counter-icon">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -1853,7 +2302,7 @@
             </div>
 
             <!-- Add/Edit Subject form -->
-            <div id="subject-form-container" class="inline-form-panel" style="display:none;">
+            <div id="subject-form-container" class="inline-form-panel subjects-form-panel" style="display:none;">
               <form id="subject-form" onsubmit="handleSubjectSubmit(event)">
                 <div class="inline-form-row">
                   <input type="text" id="subject-code" placeholder="Code (e.g. MAUC101)" required />
@@ -1869,8 +2318,8 @@
               </form>
             </div>
 
-            <div id="subjects-table-container" class="table-scroll-region">
-              <table class="data-table" id="subjects-table">
+            <div id="subjects-table-container" class="table-scroll-region subjects-table-card">
+              <table class="data-table subjects-table" id="subjects-table">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -1896,32 +2345,83 @@
         <!-- ║  VIEW: SGPA / CGPA            ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-grades" class="panel hidden" role="region" aria-label="SGPA and CGPA summary">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon" style="background:var(--indigo-glass);color:var(--indigo);">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          <section class="management-hero management-hero--texture directory-hero grades-hero" aria-labelledby="grades-heading">
+            <div class="management-hero-copy grades-hero-copy">
+              <span class="management-hero-eyebrow grades-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M3 3v18h18" />
+                  <path d="m19 9-5 5-4-4-4 4" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                ACADEMIC PERFORMANCE
+              </span>
+              <h1 id="grades-heading">SGPA / CGPA Summary</h1>
+              <p>Compare semester performance with cumulative standing, and review credit completion and active arrears.</p>
+            </div>
+            <button type="button" class="directory-hero-action grades-export-button" onclick="exportGradesToExcel()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6M8 13h8M8 17h5" stroke-linecap="round" />
+              </svg>
+              <span>Export Excel</span>
+            </button>
+            <div class="management-hero-art directory-hero-art grades-hero-art" aria-hidden="true">
+              <svg viewBox="0 0 144 116" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="22" y="14" width="100" height="88" rx="17" />
+                <path d="M42 79h12V62H42zM66 79h12V48H66zM90 79h12V35H90z" />
+                <path d="M40 89h64M44 40l16-10 15 7 19-16" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <span class="directory-hero-orbit" aria-hidden="true"></span>
+            <span class="directory-hero-orbit directory-hero-orbit-two" aria-hidden="true"></span>
+          </section>
+
+          <section class="resources-overview grades-overview" aria-label="Grade summary">
+            <article class="resources-metric-card grades-metric-card">
+              <span class="resources-metric-icon grades-metric-icon grades-metric-icon-students" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </span>
-              SGPA / CGPA Summary
-            </h3>
-            <button class="btn-export" onclick="exportGradesToExcel()" style="font-size:0.80rem; padding:7px 14px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              Export Excel
-            </button>
-          </div>
+              <span class="resources-metric-label">Students in view</span>
+              <strong class="resources-metric-value" id="grades-summary-students">0</strong>
+              <span class="resources-metric-note">Matching current filters</span>
+            </article>
+            <article class="resources-metric-card grades-metric-card">
+              <span class="resources-metric-icon grades-metric-icon grades-metric-icon-average" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 15.5 10.5 13l2 2 4-5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="resources-metric-label" id="grades-summary-average-label">Average CGPA</span>
+              <strong class="resources-metric-value" id="grades-summary-average">—</strong>
+              <span class="resources-metric-note" id="grades-summary-average-note">Overall academic standing</span>
+            </article>
+            <article class="resources-metric-card grades-metric-card">
+              <span class="resources-metric-icon grades-metric-icon grades-metric-icon-arrears" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M10.3 3.9 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+                  <path d="M12 9v4M12 17h.01" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="resources-metric-label">Active arrears</span>
+              <strong class="resources-metric-value" id="grades-summary-arrears">0</strong>
+              <span class="resources-metric-note" id="grades-summary-arrears-note">Across students in view</span>
+            </article>
+          </section>
 
-          <!-- Batch Pills -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="grade-batch-tabs-container"></div>
-          </div>
-          <!-- Department Pills -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="grade-dept-tabs-container"></div>
-          </div>
+          <section class="grades-filter-panel" role="group" aria-label="Filter grade summaries">
+            <div class="dept-tabs grades-filter-row">
+              <span class="grades-filter-label">Batch</span>
+              <div class="dept-tabs-scroll" id="grade-batch-tabs-container" role="group" aria-label="Filter grade summaries by batch"></div>
+            </div>
+            <div class="dept-tabs grades-filter-row">
+              <span class="grades-filter-label">Section</span>
+              <div class="dept-tabs-scroll" id="grade-dept-tabs-container" role="group" aria-label="Filter grade summaries by department and section"></div>
+            </div>
+          </section>
 
           <!-- Filters -->
           <div class="sgpa-filters-container compact-filters" role="search" aria-label="Filter grades">
@@ -2045,107 +2545,175 @@
             </div>
           </div>
 
-          <!-- Grades Table -->
-          <div id="grades-table-container" class="table-scroll-region">
-            <table class="data-table" id="grades-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Reg No</th>
-                  <th>Name</th>
-                  <th>Department</th>
-                  <th>Semester</th>
-                  <th>SGPA</th>
-                  <th>CGPA</th>
-                  <th>Total Cr.</th>
-                  <th>Earned Cr.</th>
-                  <th>Arrears</th>
-                </tr>
-              </thead>
-              <tbody id="grades-tbody">
-                <tr>
-                  <td colspan="10" class="loading-cell">Loading…</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <section class="grades-table-card" aria-label="Student grade summary">
+            <div class="grades-table-heading">
+              <div>
+                <h2>Student grade summary</h2>
+                <p>SGPA, CGPA, earned credits, and active arrears for each student.</p>
+              </div>
+              <span class="grades-table-hint">Select an arrear row for subject details</span>
+            </div>
+            <div id="grades-table-container" class="table-scroll-region">
+              <table class="data-table" id="grades-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Reg No</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Semester</th>
+                    <th>SGPA</th>
+                    <th>CGPA</th>
+                    <th>Total Cr.</th>
+                    <th>Earned Cr.</th>
+                    <th>Arrears</th>
+                  </tr>
+                </thead>
+                <tbody id="grades-tbody">
+                  <tr>
+                    <td colspan="10" class="loading-cell">Loading…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
 
         <!-- ╔═══════════════════════════════╗ -->
         <!-- ║  VIEW: CLASS REPORT           ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-classreport" class="panel hidden" role="region" aria-label="Class Report">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon"
-                style="background:var(--teal-glass,rgba(20,184,166,.15));color:var(--teal,#14b8a6);">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <section class="management-hero management-hero--texture directory-hero classreport-hero" aria-labelledby="classreport-heading">
+            <div class="management-hero-copy classreport-hero-copy">
+              <span class="management-hero-eyebrow classreport-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <line x1="3" y1="9" x2="21" y2="9" />
-                  <line x1="3" y1="15" x2="21" y2="15" />
-                  <line x1="9" y1="9" x2="9" y2="21" />
+                  <path d="M3 9h18M3 15h18M9 9v12" />
+                </svg>
+                CLASS PERFORMANCE
+              </span>
+              <h1 id="classreport-heading">Class Report</h1>
+              <p>Review class-wide grades, credit progress, and pass rates across batches and sections.</p>
+            </div>
+            <button type="button" class="directory-hero-action classreport-export-button" onclick="exportClassReportToExcel()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6M8 13h8M8 17h5" stroke-linecap="round" />
+              </svg>
+              <span>Export Excel</span>
+            </button>
+            <div class="management-hero-art directory-hero-art classreport-hero-art" aria-hidden="true">
+              <svg viewBox="0 0 144 116" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="22" y="14" width="100" height="88" rx="17" />
+                <path d="M42 79h12V62H42zM66 79h12V48H66zM90 79h12V35H90z" />
+                <path d="M40 89h64M44 40l16-10 15 7 19-16" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <span class="directory-hero-orbit" aria-hidden="true"></span>
+            <span class="directory-hero-orbit directory-hero-orbit-two" aria-hidden="true"></span>
+          </section>
+
+          <section class="resources-overview classreport-overview" aria-label="Class report overview">
+            <article class="resources-metric-card classreport-metric-card">
+              <span class="resources-metric-icon classreport-metric-icon classreport-metric-icon-students" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </span>
-              Class Report
-            </h3>
-            <button class="btn-export" onclick="exportClassReportToExcel()"
-              style="font-size:0.80rem; padding:7px 14px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              Export Excel
-            </button>
-          </div>
+              <span class="resources-metric-label">Students in view</span>
+              <strong class="resources-metric-value" id="cr-showing-count">0</strong>
+              <span class="resources-metric-note">Matching current filters</span>
+            </article>
+            <article class="resources-metric-card classreport-metric-card">
+              <span class="resources-metric-icon classreport-metric-icon classreport-metric-icon-average" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 15.5 10.5 13l2 2 4-5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="resources-metric-label" id="cr-summary-average-label">Average CGPA</span>
+              <strong class="resources-metric-value" id="cr-summary-average">—</strong>
+              <span class="resources-metric-note" id="cr-summary-average-note">Overall academic standing</span>
+            </article>
+            <article class="resources-metric-card classreport-metric-card" id="cr-pass-rate-pill" title="Pass percentage for selected filters">
+              <span class="resources-metric-icon classreport-metric-icon classreport-metric-icon-pass" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </span>
+              <span class="resources-metric-label">Pass rate</span>
+              <strong class="resources-metric-value" id="cr-pass-rate-number">0.0%</strong>
+              <span class="resources-metric-note"><span id="cr-pass-detail-wrap">(0/0)</span> students with no active arrears</span>
+            </article>
+          </section>
 
-          <!-- Batch Pills -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="cr-batch-tabs-container"></div>
-          </div>
-          <!-- Department Pills -->
-          <div class="dept-tabs">
-            <div class="dept-tabs-scroll" id="cr-dept-tabs-container"></div>
-          </div>
+          <section class="classreport-filter-panel" role="group" aria-label="Filter class report by batch and section">
+            <div class="dept-tabs classreport-filter-row">
+              <span class="classreport-filter-label">Batch</span>
+              <div class="dept-tabs-scroll" id="cr-batch-tabs-container" role="group" aria-label="Filter class report by batch"></div>
+            </div>
+            <div class="dept-tabs classreport-filter-row">
+              <span class="classreport-filter-label">Section</span>
+              <div class="dept-tabs-scroll" id="cr-dept-tabs-container" role="group" aria-label="Filter class report by section"></div>
+            </div>
+          </section>
 
-          <!-- Filters -->
-          <div class="sgpa-filters-container" role="search" aria-label="Filter class report">
-            <div class="filter-bar">
-              <!-- Reg No Filter -->
-              <div class="filter-item filter-regno">
-                <label for="cr-filter-regno">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          <div class="sgpa-filters-container compact-filters" role="search" aria-label="Filter class report">
+            <div class="filter-bar-compact">
+              <!-- Semester Filter (SGPA) -->
+              <div class="filter-item-compact filter-sem">
+                <label for="cr-filter-sem">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
-                  Search by Reg No
+                  Semester
                 </label>
-                <input type="text" class="filter-select" id="cr-filter-regno" placeholder="e.g. 2401112050"
-                  oninput="filterClassReport()" />
+                <select class="filter-select-compact" id="cr-filter-sem" onchange="loadClassReport()">
+                  <option value="">CGPA (Overall)</option>
+                  <option value="I">Sem I</option>
+                  <option value="II">Sem II</option>
+                  <option value="III">Sem III</option>
+                  <option value="IV">Sem IV</option>
+                  <option value="V">Sem V</option>
+                  <option value="VI">Sem VI</option>
+                  <option value="VII">Sem VII</option>
+                  <option value="VIII">Sem VIII</option>
+                </select>
               </div>
 
-              <!-- Student Name Filter -->
-              <div class="filter-item filter-name">
-                <label for="cr-filter-name">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
+              <!-- Sort by CGPA -->
+              <div class="filter-item-compact filter-sort-cgpa">
+                <label for="cr-filter-sort">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="20" x2="12" y2="10" />
+                    <line x1="18" y1="20" x2="18" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="16" />
                   </svg>
-                  Search by Name
+                  Sort by CGPA
                 </label>
-                <input type="text" class="filter-select" id="cr-filter-name" placeholder="e.g. Shakthivel"
-                  oninput="filterClassReport()" />
+                <select class="filter-select-compact" id="cr-filter-sort" onchange="loadClassReport()">
+                  <option value="none">None</option>
+                  <option value="desc">Descending (↓)</option>
+                  <option value="asc">Ascending (↑)</option>
+                </select>
               </div>
 
               <!-- Sort by Credits -->
-              <div class="filter-item filter-sort-credits">
+              <div class="filter-item-compact filter-sort-credits">
                 <label for="cr-filter-credits-sort">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10" />
                     <polyline points="12 6 12 12 16 14" />
                   </svg>
                   Sort by Credits
                 </label>
-                <select class="filter-select" id="cr-filter-credits-sort" onchange="loadClassReport()">
+                <select class="filter-select-compact" id="cr-filter-credits-sort" onchange="loadClassReport()">
                   <option value="none">None</option>
                   <option value="desc">Descending (↓)</option>
                   <option value="asc">Ascending (↑)</option>
@@ -2153,9 +2721,9 @@
               </div>
 
               <!-- Arrear Status Multi-select -->
-              <div class="filter-item filter-arrear">
+              <div class="filter-item-compact filter-arrear">
                 <label for="cr-filter-arrears-btn">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="15" y1="9" x2="9" y2="15" />
                     <line x1="9" y1="9" x2="15" y2="15" />
@@ -2163,7 +2731,7 @@
                   Arrear Status
                 </label>
                 <div class="multi-select" id="cr-filter-arrears-wrap">
-                  <button type="button" class="multi-select-btn filter-select" id="cr-filter-arrears-btn"
+                  <button type="button" class="multi-select-btn filter-select-compact" id="cr-filter-arrears-btn"
                     onclick="toggleCrArrearDropdown(event)" aria-haspopup="true" aria-expanded="false" aria-label="Filter by arrear status">
                     <span id="cr-filter-arrears-label">ALL</span>
                   </button>
@@ -2199,7 +2767,7 @@
               </div>
 
               <!-- Enhanced Reset Button -->
-              <div class="filter-item filter-action-group">
+              <div class="filter-item-compact filter-action-group">
                 <label class="filter-action-label" aria-hidden="true">&nbsp;</label>
                 <button class="btn-reset-enhanced" type="button" onclick="clearClassReportFilters()"
                   title="Clear all active filters" aria-label="Reset all filters">
@@ -2214,47 +2782,1058 @@
             </div>
           </div>
 
-          <!-- Class Report Table -->
-          <div id="classreport-table-container" class="table-scroll-region">
-            <table class="data-table" id="classreport-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Reg No</th>
-                  <th>Name</th>
-                  <th>Department</th>
-                  <th>Total Credits</th>
-                  <th>Earned Credits</th>
-                  <th>Arrear Status</th>
-                </tr>
-              </thead>
-              <tbody id="classreport-tbody">
-                <tr>
-                  <td colspan="7" class="loading-cell">Loading…</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <section class="classreport-table-card" aria-label="Class report student grades">
+            <div class="classreport-table-heading">
+              <div>
+                <h2>Student grade summary</h2>
+                <p>Compare SGPA, CGPA, earned credits, and active arrears for each student.</p>
+              </div>
+              <span class="classreport-table-hint">Select an arrear row for subject details</span>
+            </div>
+            <div id="classreport-table-container" class="table-scroll-region">
+              <table class="data-table" id="classreport-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Reg No</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Semester</th>
+                    <th>SGPA</th>
+                    <th>CGPA</th>
+                    <th>Total Cr.</th>
+                    <th>Earned Cr.</th>
+                    <th>Arrears</th>
+                  </tr>
+                </thead>
+                <tbody id="classreport-tbody">
+                  <tr>
+                    <td colspan="10" class="loading-cell">Loading…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
+
+
+
+        <!-- ╔══════════════════════════════════════════════╗ -->
+        <!-- ║  VIEW: DATA VISUALIZATION (FACULTY/ADMIN)      ║ -->
+        <!-- ╚══════════════════════════════════════════════╝ -->
+        <div id="view-visualization" class="panel hidden" role="region" aria-label="Data Visualization">
+          <div class="panel-header">
+            <h3>
+              <span class="panel-header-icon"
+                style="background:var(--primary-glass,rgba(59,130,246,0.15));color:var(--primary,#2563eb);">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="18" y1="20" x2="18" y2="10" />
+                  <line x1="12" y1="20" x2="12" y2="4" />
+                  <line x1="6" y1="20" x2="6" y2="14" />
+                  <line x1="2" y1="20" x2="22" y2="20" />
+                </svg>
+              </span>
+              Data Visualization
+            </h3>
+            <div style="display:flex; gap:10px; align-items:center;" id="vis-header-actions">
+              <button class="btn-export" onclick="exportVisualizationExcel()" id="vis-export-btn"
+                style="font-size:0.80rem; padding:7px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                Export Excel
+              </button>
+              <button class="btn-primary" onclick="downloadVisualizationChart()" id="vis-download-btn"
+                style="font-size:0.80rem; padding:7px 14px; display:inline-flex; align-items:center; gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Download Chart
+              </button>
+            </div>
+          </div>
+
+          <!-- Visualization Sub-Tabs -->
+          <div class="vis-tabs-bar" role="tablist" aria-label="Visualization tabs">
+            <button class="vis-tab active" id="vis-tab-pass" role="tab" aria-selected="true"
+              aria-controls="vis-pane-pass" onclick="switchVisTab('pass')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+                <line x1="2" y1="20" x2="22" y2="20" />
+              </svg>
+              Pass Percentage
+            </button>
+            <button class="vis-tab" id="vis-tab-gpa" role="tab" aria-selected="false"
+              aria-controls="vis-pane-gpa" onclick="switchVisTab('gpa')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+              GPA Trend
+            </button>
+            <button class="vis-tab" id="vis-tab-subject" role="tab" aria-selected="false"
+              aria-controls="vis-pane-subject" onclick="switchVisTab('subject')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              Subject Analytics
+            </button>
+            <button class="vis-tab" id="vis-tab-placement" role="tab" aria-selected="false"
+              aria-controls="vis-pane-placement" onclick="switchVisTab('placement')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="3"/>
+              </svg>
+              Placement Eligibility
+            </button>
+          </div>
+
+          <!-- ═══ PANE: PASS PERCENTAGE ═══ -->
+          <div id="vis-pane-pass" class="vis-tab-pane" role="tabpanel" aria-labelledby="vis-tab-pass">
+
+          <!-- Filters Row -->
+          <div class="sgpa-filters-container" role="search" aria-label="Filter data visualization">
+            <div class="filter-bar">
+              <!-- Batch Filter Dropdown -->
+              <div class="filter-item filter-batch">
+                <label for="vis-filter-batch">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  Batch
+                </label>
+                <select class="filter-select" id="vis-filter-batch" onchange="onVisBatchChange(this.value)">
+                  <option value="All">All Batches</option>
+                </select>
+              </div>
+
+              <!-- Semester Filter Dropdown -->
+              <div class="filter-item filter-sem">
+                <label for="vis-filter-sem">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  Semester
+                </label>
+                <select class="filter-select" id="vis-filter-sem" onchange="loadVisualizationData()">
+                  <option value="All">All Semesters</option>
+                </select>
+              </div>
+
+              <!-- Department Filter Dropdown -->
+              <div class="filter-item filter-dept">
+                <label for="vis-filter-dept">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                  Department
+                </label>
+                <select class="filter-select" id="vis-filter-dept" onchange="loadVisualizationData()">
+                  <option value="All">All Departments</option>
+                </select>
+              </div>
+
+              <!-- Sort Order -->
+              <div class="filter-item filter-sort">
+                <label for="vis-filter-sort">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <polyline points="19 12 12 19 5 12" />
+                  </svg>
+                  Sort Sections
+                </label>
+                <select class="filter-select" id="vis-filter-sort" onchange="applyVisualizationSort()">
+                  <option value="name_asc">Section Name (A → Z)</option>
+                  <option value="pct_desc" selected>Pass % (High → Low)</option>
+                  <option value="pct_asc">Pass % (Low → High)</option>
+                </select>
+              </div>
+
+              <!-- Reset Button -->
+              <div class="filter-item-reset">
+                <button type="button" class="btn-reset-enhanced" onclick="clearVisualizationFilters()"
+                  title="Reset all filters">
+                  <svg class="reset-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                  <span>Reset</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary KPI Cards -->
+          <div class="stats-row" id="vis-stats-row" style="margin-bottom: 24px;">
+            <div class="stat-card teal">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Average Pass Rate</div>
+                  <div class="stat-value" id="vis-kpi-avg">0.0%</div>
+                </div>
+                <div class="stat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                </div>
+              </div>
+              <div class="stat-trend" id="vis-kpi-avg-sub">Across all sections</div>
+            </div>
+
+            <div class="stat-card green" style="background:var(--emerald-glass,rgba(16,185,129,.08));border-color:rgba(16,185,129,.2);">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Top Section</div>
+                  <div class="stat-value" id="vis-kpi-top" style="color:var(--emerald,#10b981);">—</div>
+                </div>
+                <div class="stat-icon" style="color:var(--emerald,#10b981);background:rgba(16,185,129,.15);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
+                </div>
+              </div>
+              <div class="stat-trend" id="vis-kpi-top-sub">Highest pass percentage</div>
+            </div>
+
+            <div class="stat-card red">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Lowest Section</div>
+                  <div class="stat-value" id="vis-kpi-low" style="color:var(--red,#ef4444);">—</div>
+                </div>
+                <div class="stat-icon" style="color:var(--red,#ef4444);background:rgba(239,68,68,.15);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+              </div>
+              <div class="stat-trend" id="vis-kpi-low-sub">Attention required</div>
+            </div>
+
+            <div class="stat-card violet">
+              <div class="stat-top">
+                <div>
+                  <div class="stat-label">Total Evaluated</div>
+                  <div class="stat-value" id="vis-kpi-total">0</div>
+                </div>
+                <div class="stat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                  </svg>
+                </div>
+              </div>
+              <div class="stat-trend" id="vis-kpi-total-sub">0 Passed · 0 Uncleared</div>
+            </div>
+          </div>
+
+          <!-- Main Bar Chart Card -->
+          <div class="vis-chart-card">
+            <div class="vis-chart-header">
+              <div class="vis-chart-title-wrap">
+                <h4 style="margin:0;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                    <line x1="2" y1="20" x2="22" y2="20" />
+                  </svg>
+                  Pass Percentage of Each Section (%)
+                </h4>
+                <span class="vis-chart-subtitle" id="vis-chart-subtitle">Section comparison across selected batch and filters</span>
+              </div>
+              <div class="vis-chart-benchmarks">
+                <span class="benchmark-pill benchmark-green"><span class="dot"></span> ≥ 75% High</span>
+                <span class="benchmark-pill benchmark-blue"><span class="dot"></span> 50% – 74% Moderate</span>
+                <span class="benchmark-pill benchmark-red"><span class="dot"></span> &lt; 50% Low</span>
+              </div>
+            </div>
+            <div class="vis-chart-canvas-wrapper" style="position:relative; width:100%; min-height:380px; max-height:480px; padding:16px 8px 12px 8px;">
+              <canvas id="vis-pass-chart"></canvas>
+              <div id="vis-chart-fallback" class="vis-chart-fallback hidden"></div>
+            </div>
+          </div>
+
+          <!-- Detailed Breakdown Table -->
+          <div class="vis-table-card" style="margin-top:24px;">
+            <div class="vis-table-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <h4 style="margin:0;font-size:1rem;font-weight:700;">Section Performance Breakdown</h4>
+              <span id="vis-table-count" style="font-size:0.82rem; color:var(--text-muted,#64748b);">Showing 0 sections</span>
+            </div>
+            <div id="vis-table-container" class="table-scroll-region">
+              <table class="data-table" id="vis-table">
+                <thead>
+                  <tr>
+                    <th style="width:50px; text-align:center;">#</th>
+                    <th>Section</th>
+                    <th>Department</th>
+                    <th style="text-align:center;">Enrolled</th>
+                    <th style="text-align:center;">Appeared</th>
+                    <th style="text-align:center;">Passed</th>
+                    <th style="text-align:center;">Uncleared</th>
+                    <th style="width:240px;">Pass Percentage</th>
+                  </tr>
+                </thead>
+                <tbody id="vis-tbody">
+                  <tr><td colspan="8" class="loading-cell">Loading section statistics…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          </div><!-- end vis-pane-pass -->
+
+          <!-- ═══ PANE: GPA TREND ═══ -->
+          <div id="vis-pane-gpa" class="vis-tab-pane hidden" role="tabpanel" aria-labelledby="vis-tab-gpa">
+
+            <!-- GPA Search Card -->
+            <div class="vis-gpa-search-card">
+              <div class="vis-gpa-search-inner">
+                <div class="vis-gpa-icon-wrap" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                  </svg>
+                </div>
+                <div class="vis-gpa-search-group">
+                  <label for="vis-gpa-regno-input" class="vis-gpa-search-label">
+                    Enter Register Number
+                  </label>
+                  <div class="vis-gpa-input-row">
+                    <div class="vis-gpa-input-wrapper">
+                      <svg class="vis-gpa-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      <input type="text" id="vis-gpa-regno-input" class="vis-gpa-input"
+                        placeholder="Enter Student Register Number (e.g. 2401104002)"
+                        autocomplete="off" autocorrect="off" spellcheck="false"
+                        maxlength="15"
+                        onkeydown="if(event.key==='Enter') loadGPAChart()"
+                        oninput="onGpaRegnoInput(this.value)" />
+                      <button type="button" class="vis-gpa-input-clear" id="vis-gpa-clear-btn" style="display:none;"
+                        onclick="clearGpaInput()" title="Clear register number" aria-label="Clear register number">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                    <button type="button" class="btn-primary vis-gpa-search-btn" onclick="loadGPAChart()" id="vis-gpa-search-btn">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      <span>Show Trajectory</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- GPA Loading Skeleton -->
+            <div id="vis-gpa-loading" class="vis-gpa-loading-skeleton hidden">
+              <div class="vis-skeleton-header">
+                <div class="vis-skeleton-circle"></div>
+                <div class="vis-skeleton-lines">
+                  <div class="vis-skeleton-line short"></div>
+                  <div class="vis-skeleton-line medium"></div>
+                </div>
+              </div>
+              <div class="vis-skeleton-kpis">
+                <div class="vis-skeleton-kpi"></div>
+                <div class="vis-skeleton-kpi"></div>
+                <div class="vis-skeleton-kpi"></div>
+                <div class="vis-skeleton-kpi"></div>
+              </div>
+              <div class="vis-skeleton-chart"></div>
+            </div>
+
+            <!-- GPA Error Alert -->
+            <div id="vis-gpa-error" class="vis-gpa-error-alert hidden">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div class="vis-error-text">
+                <strong id="vis-gpa-error-title">Student Not Found</strong>
+                <span id="vis-gpa-error-msg">Please check the registration number and try again.</span>
+              </div>
+            </div>
+
+            <!-- GPA Student Info + Chart (Results Content) -->
+            <div id="vis-gpa-content" class="hidden">
+              <!-- Student Profile Card -->
+              <div class="vis-gpa-student-card" id="vis-gpa-student-info">
+                <div class="vis-gpa-student-avatar" id="vis-gpa-avatar">?</div>
+                <div class="vis-gpa-student-details">
+                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span class="vis-gpa-student-name" id="vis-gpa-student-name">—</span>
+                    <span class="vis-gpa-dept-badge" id="vis-gpa-dept-badge">—</span>
+                  </div>
+                  <div class="vis-gpa-student-meta" id="vis-gpa-student-meta">—</div>
+                </div>
+                <div class="vis-gpa-actions">
+                  <button type="button" class="btn-export" onclick="exportGpaExcel()" style="font-size:0.78rem; padding:6px 12px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    Export Trajectory
+                  </button>
+                  <button type="button" class="btn-secondary" onclick="downloadGpaChart()" style="font-size:0.78rem; padding:6px 12px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Save Chart
+                  </button>
+                </div>
+              </div>
+
+              <!-- 4 Executive KPI Cards -->
+              <div class="stats-row" style="margin-top:16px; margin-bottom:20px;">
+                <!-- CGPA KPI -->
+                <div class="stat-card violet">
+                  <div class="stat-top">
+                    <div>
+                      <div class="stat-label">Cumulative GPA (CGPA)</div>
+                      <div class="stat-value" id="vis-gpa-kpi-cgpa">0.00</div>
+                    </div>
+                    <div class="stat-icon" style="background:rgba(99,102,241,0.15); color:var(--indigo,#6366f1);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                        <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="stat-trend" id="vis-gpa-kpi-class">Academic Standing: —</div>
+                </div>
+
+                <!-- Total Credits KPI -->
+                <div class="stat-card teal">
+                  <div class="stat-top">
+                    <div>
+                      <div class="stat-label">Credits Completed</div>
+                      <div class="stat-value" id="vis-gpa-kpi-credits">0.0 / 0.0</div>
+                    </div>
+                    <div class="stat-icon" style="background:rgba(20,184,166,0.15); color:var(--teal,#14b8a6);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="stat-trend" id="vis-gpa-kpi-credit-pct">100% Completion Rate</div>
+                </div>
+
+                <!-- Arrear Status KPI -->
+                <div class="stat-card green" id="vis-gpa-arrear-card">
+                  <div class="stat-top">
+                    <div>
+                      <div class="stat-label">Arrear Status</div>
+                      <div class="stat-value" id="vis-gpa-kpi-arrears">0 Active</div>
+                    </div>
+                    <div class="stat-icon" id="vis-gpa-arrear-icon" style="background:rgba(16,185,129,0.15); color:var(--emerald,#10b981);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="stat-trend" id="vis-gpa-kpi-arrear-sub">All registered subjects cleared</div>
+                </div>
+
+                <!-- Latest Semester Velocity KPI -->
+                <div class="stat-card blue">
+                  <div class="stat-top">
+                    <div>
+                      <div class="stat-label">Latest Semester SGPA</div>
+                      <div class="stat-value" id="vis-gpa-kpi-latest">0.00</div>
+                    </div>
+                    <div class="stat-icon" style="background:rgba(59,130,246,0.15); color:var(--primary,#2563eb);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                        <polyline points="17 6 23 6 23 12" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div class="stat-trend" id="vis-gpa-kpi-delta">—</div>
+                </div>
+              </div>
+
+              <!-- SGPA Line Chart Card -->
+              <div class="vis-chart-card">
+                <div class="vis-chart-header">
+                  <div class="vis-chart-title-wrap">
+                    <h4 style="margin:0;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                      </svg>
+                      Semester-wise SGPA Progression
+                    </h4>
+                    <span class="vis-chart-subtitle" id="vis-gpa-chart-subtitle">Y Axis: SGPA (0.00 – 10.00) · X Axis: Semester</span>
+                  </div>
+                  <div class="vis-chart-benchmarks">
+                    <span class="benchmark-pill benchmark-green"><span class="dot"></span> ≥ 8.5 Excellent</span>
+                    <span class="benchmark-pill benchmark-blue"><span class="dot"></span> 7.0–8.4 Good</span>
+                    <span class="benchmark-pill benchmark-amber"><span class="dot"></span> 6.0–6.9 Average</span>
+                    <span class="benchmark-pill benchmark-red"><span class="dot"></span> &lt; 6.0 Needs Focus</span>
+                    <span class="benchmark-pill benchmark-dashed" id="vis-gpa-cgpa-pill"><span class="dash"></span> CGPA Reference</span>
+                  </div>
+                </div>
+                <div class="vis-chart-canvas-wrapper" style="position:relative; width:100%; min-height:380px; max-height:460px; padding:16px 8px 12px 8px;">
+                  <canvas id="vis-gpa-chart"></canvas>
+                </div>
+              </div>
+
+              <!-- Semester-wise SGPA Breakdown Table -->
+              <div class="vis-table-card" style="margin-top:24px;">
+                <div class="vis-table-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                  <div>
+                    <h4 style="margin:0;font-size:1rem;font-weight:700;">Semester Progression Breakdown</h4>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">Chronological grade and credit summary</span>
+                  </div>
+                  <span id="vis-gpa-table-count" style="font-size:0.82rem; color:var(--text-muted,#64748b);">4 Semesters</span>
+                </div>
+                <div class="table-scroll-region">
+                  <table class="data-table" id="vis-gpa-table">
+                    <thead>
+                      <tr>
+                        <th style="width:50px; text-align:center;">#</th>
+                        <th>Semester</th>
+                        <th style="text-align:center;">SGPA</th>
+                        <th style="text-align:center;">Registered Credits</th>
+                        <th style="text-align:center;">Earned Credits</th>
+                        <th style="text-align:center;">Subjects Evaluated</th>
+                        <th style="text-align:center;">Arrears in Sem</th>
+                        <th>Performance Standing</th>
+                      </tr>
+                    </thead>
+                    <tbody id="vis-gpa-tbody">
+                      <tr><td colspan="8" class="loading-cell">Loading trajectory…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- GPA Empty State -->
+            <div id="vis-gpa-empty" class="vis-gpa-empty-state">
+              <div class="vis-gpa-empty-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+              </div>
+              <div class="vis-gpa-empty-title">Enter a Register Number</div>
+              <div class="vis-gpa-empty-desc">
+                Type a student registration number in the field above and click <strong>Show Trajectory</strong> to view their semester-by-semester SGPA progression line chart.
+              </div>
+            </div>
+
+          </div><!-- end vis-pane-gpa -->
+
+          <!-- ═══ PANE: SUBJECT ANALYTICS ═══ -->
+          <div id="vis-pane-subject" class="vis-tab-pane hidden" role="tabpanel" aria-labelledby="vis-tab-subject">
+
+            <!-- Filters Row -->
+            <div class="sgpa-filters-container" role="search" aria-label="Filter subject analytics">
+              <div class="filter-bar">
+                <!-- Batch Filter Dropdown -->
+                <div class="filter-item filter-batch">
+                  <label for="vis-sub-filter-batch">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    Batch
+                  </label>
+                  <select class="filter-select" id="vis-sub-filter-batch" onchange="onSubjectBatchChange(this.value)">
+                    <option value="All">All Batches</option>
+                  </select>
+                </div>
+
+                <!-- Semester Filter Dropdown -->
+                <div class="filter-item filter-sem">
+                  <label for="vis-sub-filter-sem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    Semester
+                  </label>
+                  <select class="filter-select" id="vis-sub-filter-sem" onchange="loadSubjectAnalytics()">
+                    <option value="All">All Semesters</option>
+                  </select>
+                </div>
+
+                <!-- Department Filter Dropdown -->
+                <div class="filter-item filter-dept">
+                  <label for="vis-sub-filter-dept">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </svg>
+                    Department
+                  </label>
+                  <select class="filter-select" id="vis-sub-filter-dept" onchange="loadSubjectAnalytics()">
+                    <option value="All">All Departments</option>
+                  </select>
+                </div>
+
+                <!-- Sort Order -->
+                <div class="filter-item filter-sort">
+                  <label for="vis-sub-filter-sort">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <polyline points="19 12 12 19 5 12" />
+                    </svg>
+                    Sort By
+                  </label>
+                  <select class="filter-select" id="vis-sub-filter-sort" onchange="applySubjectSort()">
+                    <option value="pass_asc" selected>Pass % (Lowest First - Bottlenecks)</option>
+                    <option value="pass_desc">Pass % (Highest First)</option>
+                    <option value="code_asc">Course Code (A → Z)</option>
+                    <option value="enrolled_desc">Enrolled Students (High → Low)</option>
+                  </select>
+                </div>
+
+                <!-- Reset Button -->
+                <div class="filter-item-reset">
+                  <button type="button" class="btn-reset-enhanced" onclick="clearSubjectFilters()" title="Reset all filters">
+                    <svg class="reset-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                    </svg>
+                    <span>Reset</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Summary KPI Cards -->
+            <div class="stats-row" id="vis-sub-stats-row" style="margin-bottom: 24px;">
+              <div class="stat-card blue">
+                <div class="stat-icon-wrap" style="background:rgba(59,130,246,0.15);color:var(--primary,#2563eb);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-sub-kpi-total">—</div>
+                  <div class="stat-label">Total Courses Evaluated</div>
+                  <div class="stat-subtext" id="vis-sub-kpi-total-sub">Across curriculum</div>
+                </div>
+              </div>
+
+              <div class="stat-card teal">
+                <div class="stat-icon-wrap" style="background:rgba(13,148,136,0.15);color:var(--teal,#0d9488);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-sub-kpi-avg">—%</div>
+                  <div class="stat-label">Average Course Pass Rate</div>
+                  <div class="stat-subtext" id="vis-sub-kpi-avg-sub">Mean passing benchmark</div>
+                </div>
+              </div>
+
+              <div class="stat-card red">
+                <div class="stat-icon-wrap" style="background:rgba(239,68,68,0.15);color:var(--red,#ef4444);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-sub-kpi-toughest" style="font-size:1.15rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:210px;">—</div>
+                  <div class="stat-label">Toughest Course (Lowest Pass)</div>
+                  <div class="stat-subtext" id="vis-sub-kpi-toughest-sub" style="color:var(--red,#ef4444);font-weight:700;">Needs Remedial Attention</div>
+                </div>
+              </div>
+
+              <div class="stat-card green">
+                <div class="stat-icon-wrap" style="background:rgba(16,185,129,0.15);color:var(--emerald,#10b981);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="8" r="7"/>
+                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-sub-kpi-best" style="font-size:1.15rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:210px;">—</div>
+                  <div class="stat-label">Highest Performing Course</div>
+                  <div class="stat-subtext" id="vis-sub-kpi-best-sub" style="color:var(--emerald,#10b981);font-weight:700;">Exemplary Clearance</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subject Charts Grid (Horizontal Ranked Bars + Grade Breakdown Stacked) -->
+            <div class="vis-two-col-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 20px; margin-bottom: 24px;">
+              <!-- Chart 1: Pass Rate Ranking -->
+              <div class="vis-chart-card">
+                <div class="vis-chart-header">
+                  <div class="vis-chart-title-wrap">
+                    <h4 style="margin:0; font-size:1.05rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#6366f1;"></span>
+                      Course Clearance Performance Ranking
+                    </h4>
+                    <span class="vis-chart-subtitle">Ranked by Pass % · Identifies high-risk bottleneck subjects</span>
+                  </div>
+                </div>
+                <div style="position:relative; min-height:360px; max-height:480px; width:100%; overflow-y:auto; padding-top:10px;">
+                  <canvas id="vis-subject-bar-chart" height="380"></canvas>
+                </div>
+              </div>
+
+              <!-- Chart 2: Grade Breakdown Stacked Distribution -->
+              <div class="vis-chart-card">
+                <div class="vis-chart-header">
+                  <div class="vis-chart-title-wrap">
+                    <h4 style="margin:0; font-size:1.05rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
+                      Grade Composition & Arrear Distribution
+                    </h4>
+                    <span class="vis-chart-subtitle">Stacked tally of grades (O, A+, A, B+, B, C, F/Arrear)</span>
+                  </div>
+                </div>
+                <div style="position:relative; min-height:360px; max-height:480px; width:100%; overflow-y:auto; padding-top:10px;">
+                  <canvas id="vis-subject-grade-chart" height="380"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Detailed Subject Performance Table -->
+            <div class="vis-table-card">
+              <div class="vis-chart-header" style="margin-bottom:16px;">
+                <div class="vis-chart-title-wrap">
+                  <h4 style="margin:0; font-size:1.05rem; font-weight:700; color:var(--text-primary);">Detailed Course Performance & Grade Distribution</h4>
+                  <span class="vis-chart-subtitle">Comprehensive breakdown per course with credits and passing ratios</span>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="vis-sub-table">
+                  <thead>
+                    <tr>
+                      <th style="width:45px;">#</th>
+                      <th style="width:110px;">Code</th>
+                      <th>Course Title</th>
+                      <th style="width:90px;">Dept / Sem</th>
+                      <th style="width:70px;">Credits</th>
+                      <th style="width:85px; text-align:right;">Appeared</th>
+                      <th style="width:85px; text-align:right;">Passed</th>
+                      <th style="width:85px; text-align:right;">Arrears</th>
+                      <th style="width:170px;">Pass Percentage</th>
+                      <th style="min-width:180px;">Grade Breakdown</th>
+                    </tr>
+                  </thead>
+                  <tbody id="vis-sub-tbody">
+                    <tr><td colspan="10" class="loading-cell">Loading course analytics…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div><!-- end vis-pane-subject -->
+
+          <!-- ═══ PANE: PLACEMENT ELIGIBILITY ═══ -->
+          <div id="vis-pane-placement" class="vis-tab-pane hidden" role="tabpanel" aria-labelledby="vis-tab-placement">
+
+            <!-- Filters Row -->
+            <div class="sgpa-filters-container" role="search" aria-label="Filter placement eligibility">
+              <div class="filter-bar">
+                <!-- Batch Filter Dropdown -->
+                <div class="filter-item filter-batch">
+                  <label for="vis-place-filter-batch">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    Batch
+                  </label>
+                  <select class="filter-select" id="vis-place-filter-batch" onchange="onPlacementBatchChange(this.value)">
+                    <option value="All">All Batches</option>
+                  </select>
+                </div>
+
+                <!-- Department Filter Dropdown -->
+                <div class="filter-item filter-dept">
+                  <label for="vis-place-filter-dept">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </svg>
+                    Department
+                  </label>
+                  <select class="filter-select" id="vis-place-filter-dept" onchange="loadPlacementEligibility()">
+                    <option value="All">All Departments</option>
+                  </select>
+                </div>
+
+                <!-- Tier Filter Dropdown -->
+                <div class="filter-item filter-sort">
+                  <label for="vis-place-filter-tier">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <polygon points="12 8 8 12 12 16 16 12 12 8" />
+                    </svg>
+                    Placement Tier
+                  </label>
+                  <select class="filter-select" id="vis-place-filter-tier" onchange="filterPlacementTable()">
+                    <option value="All">All Students</option>
+                    <option value="Tier 1">⭐ Tier 1 Dream (CGPA ≥ 8.0, 0 Arrears)</option>
+                    <option value="Tier 2">✓ Tier 2 Core (CGPA ≥ 6.5, 0 Arrears)</option>
+                    <option value="Tier 3">Tier 3 Pass (CGPA ≥ 5.5, 0 Arrears)</option>
+                    <option value="Conditional">⚡ Conditional (1-2 Arrears)</option>
+                    <option value="Ineligible">✗ Ineligible (>2 Arrears / Low GPA)</option>
+                  </select>
+                </div>
+
+                <!-- Search Input -->
+                <div class="filter-item" style="flex: 1.4; min-width: 220px;">
+                  <label for="vis-place-search-input">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    Search Candidates
+                  </label>
+                  <input type="text" id="vis-place-search-input" class="filter-select" style="padding-left:12px;"
+                    placeholder="Search name or reg no…" oninput="filterPlacementTable()">
+                </div>
+
+                <!-- Reset Button -->
+                <div class="filter-item-reset">
+                  <button type="button" class="btn-reset-enhanced" onclick="clearPlacementFilters()" title="Reset all filters">
+                    <svg class="reset-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                    </svg>
+                    <span>Reset</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4 Executive KPI Cards -->
+            <div class="stats-row" id="vis-place-stats-row" style="margin-bottom: 24px;">
+              <div class="stat-card green">
+                <div class="stat-icon-wrap" style="background:rgba(16,185,129,0.15);color:var(--emerald,#10b981);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-place-kpi-tier1">—</div>
+                  <div class="stat-label">Tier 1 Super Dream & Dream</div>
+                  <div class="stat-subtext" id="vis-place-kpi-tier1-pct" style="color:var(--emerald,#10b981);font-weight:700;">CGPA ≥ 8.0 · 0 Arrears</div>
+                </div>
+              </div>
+
+              <div class="stat-card blue">
+                <div class="stat-icon-wrap" style="background:rgba(59,130,246,0.15);color:var(--primary,#2563eb);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-place-kpi-tier2">—</div>
+                  <div class="stat-label">Tier 2 Core & Day-1 Drives</div>
+                  <div class="stat-subtext" id="vis-place-kpi-tier2-pct" style="color:var(--primary,#2563eb);font-weight:700;">CGPA ≥ 6.5 · 0 Arrears</div>
+                </div>
+              </div>
+
+              <div class="stat-card amber">
+                <div class="stat-icon-wrap" style="background:rgba(245,158,11,0.15);color:var(--amber,#f59e0b);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-place-kpi-cond">—</div>
+                  <div class="stat-label">Conditional Clearance</div>
+                  <div class="stat-subtext" id="vis-place-kpi-cond-pct" style="color:var(--amber,#f59e0b);font-weight:700;">1–2 Backlogs (Clearable)</div>
+                </div>
+              </div>
+
+              <div class="stat-card red">
+                <div class="stat-icon-wrap" style="background:rgba(239,68,68,0.15);color:var(--red,#ef4444);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
+                <div class="stat-content">
+                  <div class="stat-value" id="vis-place-kpi-ineligible">—</div>
+                  <div class="stat-label">Backlog / Ineligible</div>
+                  <div class="stat-subtext" id="vis-place-kpi-ineligible-pct" style="color:var(--red,#ef4444);font-weight:700;">&gt; 2 Arrears or CGPA &lt; 5.5</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Placement Charts Grid (Tier Doughnut + Department Bar Comparison) -->
+            <div class="vis-two-col-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 20px; margin-bottom: 24px;">
+              <!-- Chart 1: Tier Distribution Doughnut -->
+              <div class="vis-chart-card">
+                <div class="vis-chart-header">
+                  <div class="vis-chart-title-wrap">
+                    <h4 style="margin:0; font-size:1.05rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
+                      Campus Placement Eligibility Tiers
+                    </h4>
+                    <span class="vis-chart-subtitle">Breakdown of job-ready students vs backlog risks</span>
+                  </div>
+                </div>
+                <div style="position:relative; min-height:340px; display:flex; align-items:center; justify-content:center; padding:10px;">
+                  <canvas id="vis-placement-tier-chart" height="300" style="max-height:320px;"></canvas>
+                </div>
+              </div>
+
+              <!-- Chart 2: Department-wise Placement Readiness Bar Chart -->
+              <div class="vis-chart-card">
+                <div class="vis-chart-header">
+                  <div class="vis-chart-title-wrap">
+                    <h4 style="margin:0; font-size:1.05rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#3b82f6;"></span>
+                      Department Placement Readiness Rate (%)
+                    </h4>
+                    <span class="vis-chart-subtitle">Percentage of clear all-pass candidates across engineering branches</span>
+                  </div>
+                </div>
+                <div style="position:relative; min-height:340px; padding-top:10px;">
+                  <canvas id="vis-placement-dept-chart" height="300" style="max-height:320px;"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Candidate Roster Table -->
+            <div class="vis-table-card">
+              <div class="vis-chart-header" style="margin-bottom:16px;">
+                <div class="vis-chart-title-wrap">
+                  <h4 style="margin:0; font-size:1.05rem; font-weight:700; color:var(--text-primary);">Student Placement Drive Eligibility Roster</h4>
+                  <span class="vis-chart-subtitle" id="vis-place-table-count">Showing qualified candidates sorted by CGPA</span>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="vis-place-table">
+                  <thead>
+                    <tr>
+                      <th style="width:45px;">#</th>
+                      <th style="width:125px;">Reg No</th>
+                      <th>Student Name</th>
+                      <th style="width:100px;">Department</th>
+                      <th style="width:75px;">Section</th>
+                      <th style="width:85px; text-align:right;">CGPA</th>
+                      <th style="width:105px; text-align:center;">Active Arrears</th>
+                      <th style="width:150px; text-align:center;">Placement Tier</th>
+                      <th style="width:130px; text-align:center;">Standing</th>
+                    </tr>
+                  </thead>
+                  <tbody id="vis-place-tbody">
+                    <tr><td colspan="9" class="loading-cell">Loading placement roster…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div><!-- end vis-pane-placement -->
+
+        </div>
+
+
 
         <!-- ╔═══════════════════════════════╗ -->
         <!-- ║  VIEW: RESOURCES              ║ -->
         <!-- ╚═══════════════════════════════╝ -->
         <div id="view-resources" class="panel" role="region" aria-label="Resources management">
-          <div class="panel-header">
-            <h3>
-              <span class="panel-header-icon" style="background:var(--red-glass);color:var(--red);">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <section class="management-hero management-hero--texture directory-hero resources-hero" aria-labelledby="resources-heading">
+            <div class="management-hero-copy resources-hero-copy">
+              <span class="management-hero-eyebrow resources-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                People &amp; access
+              </span>
+              <h1 id="resources-heading">Resource directory</h1>
+              <p>Manage the people and account access connected to your portal.</p>
+            </div>
+            <button class="directory-hero-action resources-add-button" type="button" onclick="showAddResourceForm()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>Add resource</span>
+            </button>
+            <div class="management-hero-art directory-hero-art resources-hero-art" aria-hidden="true">
+              <svg viewBox="0 0 144 116" fill="none">
+                <rect x="22" y="15" width="100" height="86" rx="18" stroke="currentColor" stroke-width="2" />
+                <circle cx="55" cy="48" r="13" stroke="currentColor" stroke-width="2.5" />
+                <path d="M34 83c3-12 11-18 21-18s18 6 21 18M84 42h22M84 55h22M84 68h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx="111" cy="88" r="15" fill="var(--management-accent-dark, #302969)" stroke="currentColor" stroke-width="2" />
+                <path d="M111 80v16M103 88h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div class="directory-hero-orbit" aria-hidden="true"></div>
+            <div class="directory-hero-orbit directory-hero-orbit-two" aria-hidden="true"></div>
+          </section>
+
+          <section class="resources-overview" aria-label="Directory overview">
+            <article class="resources-metric-card">
+              <span class="resources-metric-icon resources-metric-icon-total" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </span>
-              Resources Management
-            </h3>
-          </div>
-
+              <span class="resources-metric-label">Directory entries</span>
+              <strong class="resources-metric-value" id="resources-metric-total">0</strong>
+              <span class="resources-metric-note">People with portal access</span>
+            </article>
+            <article class="resources-metric-card">
+              <span class="resources-metric-icon resources-metric-icon-active" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="m5 12 4 4L19 6" />
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+              </span>
+              <span class="resources-metric-label">Registered</span>
+              <strong class="resources-metric-value" id="resources-metric-registered">0</strong>
+              <span class="resources-metric-note">Account signup complete</span>
+            </article>
+            <article class="resources-metric-card">
+              <span class="resources-metric-icon resources-metric-icon-pending" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+              </span>
+              <span class="resources-metric-label">Awaiting signup</span>
+              <strong class="resources-metric-value" id="resources-metric-pending">0</strong>
+              <span class="resources-metric-note">Pre-registered accounts</span>
+            </article>
+          </section>
           <div class="tab-content-area">
             <div class="subjects-actions-row">
               <button class="btn-small btn-small-accent" onclick="showAddResourceForm()">
@@ -2264,13 +3843,22 @@
                 </svg>
                 Add Resource
               </button>
-              <div class="table-search" style="flex:1; max-width:320px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-                <input type="text" id="resources-search-input" placeholder="Search by name or email…"
-                  oninput="filterResourcesSearch()" />
+              <div class="resources-search-group">
+                <label class="resources-search-label" for="resources-search-input">Search resources</label>
+                <div class="table-search directory-search">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input class="directory-search-input" type="text" id="resources-search-input" aria-label="Search resources by name or email"
+                    placeholder="Name or email address…" oninput="filterResourcesSearch()" />
+                  <button class="resources-search-clear directory-search-clear" id="resources-search-clear" type="button"
+                    aria-label="Clear resource search" title="Clear search" onclick="clearResourcesSearch()" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <path d="m18 6-12 12M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div class="form-group" style="margin:0; min-width:180px;">
                 <select class="compact-select" id="resources-type-filter" onchange="filterResourcesSearch()">
@@ -2294,6 +3882,9 @@
                   <span class="counter-label">Resources</span>
                 </span>
               </div>
+              <button type="button" class="resources-clear-button" onclick="clearResourcesFilters()">
+                Clear filters
+              </button>
             </div>
 
             <!-- Add/Edit Resource Form -->
@@ -2332,15 +3923,15 @@
 
             <!-- Resources Table -->
             <div id="resources-table-container" class="table-scroll-region">
-              <table class="data-table" id="resources-table">
+              <table class="data-table resources-table" id="resources-table">
                 <thead>
                   <tr>
-                    <th style="width:50px;">#</th>
-                    <th>Name</th>
+                    <th class="resources-number-col">#</th>
+                    <th>Person</th>
                     <th>Email Address</th>
                     <th>Account Type</th>
-                    <th>Portal Status</th>
-                    <th class="developer-only" style="width:120px; text-align:center;">Actions</th>
+                    <th>Account status</th>
+                    <th class="developer-only resources-actions-col">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="resources-tbody">

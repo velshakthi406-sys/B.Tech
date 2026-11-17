@@ -46,15 +46,6 @@
    TABLET LANDSCAPE (1024px - 768px)
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 1024px) and (min-width: 769px) {
-  /* Sidebar optimization for tablets */
-  .sidebar {
-    width: 220px;
-  }
-
-  .main-content {
-    margin-left: 220px;
-  }
-
   /* Compact stats cards */
   .stats-row {
     gap: 12px;
@@ -334,6 +325,27 @@
   .home-desc,
   .hero-desc {
     font-size: 0.9rem;
+  }
+
+  .home-nep-promo {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px;
+    border-radius: 17px;
+  }
+
+  .home-nep-promo-mark {
+    min-height: 48px;
+    border-radius: 12px;
+  }
+
+  .home-nep-promo-title {
+    font-size: 0.96rem;
+  }
+
+  .home-nep-promo-description {
+    font-size: 0.74rem;
   }
 
   .portal-card-title,
@@ -784,5 +796,260 @@
   select:focus-visible {
     outline: 3px solid var(--indigo);
     outline-offset: 2px;
+  }
+}
+
+/* Homepage landing refresh */
+@media (max-width: 768px) {
+  #home-section {
+    padding: 0 !important;
+    background-attachment: scroll !important;
+  }
+
+  .home-hero {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    padding: 126px 20px 38px;
+  }
+
+  #home-section .home-nep-promo {
+    width: 100%;
+    max-width: 400px;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+    padding: 13px 15px;
+    border-radius: 18px;
+  }
+
+  #home-section .home-title {
+    margin: 8px 0 14px;
+    font-size: clamp(2.15rem, 8vw, 3.8rem);
+    line-height: 1.06;
+  }
+
+  #home-section .home-desc {
+    width: 100%;
+    max-width: 400px;
+    box-sizing: border-box;
+    margin-bottom: 18px;
+    padding: 12px 15px;
+    font-size: 0.94rem;
+  }
+
+  .home-announcement {
+    width: 100%;
+    max-width: 400px;
+    box-sizing: border-box;
+    margin-bottom: 22px;
+    padding: 11px 12px;
+  }
+
+  .home-hero .portal-cards,
+  .home-hero .portal-grid {
+    width: 100%;
+    max-width: 400px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    margin: 0 auto;
+  }
+
+  .home-hero .home-stats {
+    width: 100%;
+    max-width: 400px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 0;
+    padding: 16px 8px;
+    border-radius: 20px;
+  }
+
+  #home-section .home-stat {
+    padding: 2px 8px;
+  }
+
+  #home-section .home-stat + .home-stat {
+    border-left: 0;
+  }
+
+  #home-section .home-stat:nth-child(even) {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  [data-theme="light"] #home-section .home-stat:nth-child(even) {
+    border-left-color: rgba(30, 64, 175, 0.18);
+  }
+
+  #home-section .home-stat-num {
+    font-size: 1.55rem;
+  }
+
+  #home-section .home-footer {
+    margin-top: 20px;
+    font-size: 0.72rem;
+  }
+
+  [data-theme="light"] .public-nav-links {
+    border-color: rgba(37, 99, 235, 0.18);
+    background: rgba(224, 242, 254, 0.97);
+    box-shadow: 0 12px 32px rgba(15, 35, 73, 0.2);
+  }
+
+  [data-theme="light"] .public-nav-links .public-nav-btn {
+    color: #334155;
+  }
+
+  [data-theme="light"] .public-nav-links .public-nav-btn:hover,
+  [data-theme="light"] .public-nav-links .public-nav-btn.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-hero {
+    padding: 118px 16px 32px;
+  }
+
+  #home-section .ptu-nameplate {
+    max-width: 100%;
+    transform: none !important;
+  }
+
+  #home-section .ptu-nameplate-body {
+    gap: 7px !important;
+    padding: 8px 10px 8px 9px !important;
+  }
+
+  #home-section .ptu-nameplate-label {
+    font-size: 0.53rem !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  #home-section .ptu-nameplate-est {
+    font-size: 0.58rem !important;
+    padding: 2px 5px !important;
+  }
+
+  #home-section .ptu-nameplate-sep {
+    height: 16px;
+  }
+
+  #home-section .home-title {
+    font-size: clamp(2rem, 9.5vw, 2.7rem);
+  }
+
+  .home-announcement {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .home-announcement-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .home-announcement-copy {
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  .home-hero .home-stats {
+    padding-inline: 5px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .home-hero {
+    padding-top: 100px;
+  }
+}
+
+@media (max-width: 600px) {
+  #report-card-section #rc-step-lookup .auth-card-header .rc-lookup-hint {
+    white-space: normal;
+  }
+
+  #report-card-section .rc-student-hero h1 {
+    max-width: 15ch;
+    font-size: clamp(2rem, 9vw, 2.8rem);
+    line-height: 1.08;
+  }
+
+  #report-card-section .report-card-lookup-card {
+    padding: 24px 18px;
+  }
+}
+
+@media (max-width: 380px) {
+  #report-card-section .step-label {
+    font-size: 0.62rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #report-card-section .report-card-lookup-card,
+  #report-card-section .rc-record-preview {
+    animation: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  #dashboard-section .main-content {
+    padding: 0 !important;
+  }
+
+  #dashboard-section .top-header {
+    min-height: 58px;
+    padding: 7px 14px;
+    padding-left: calc(14px + env(safe-area-inset-left, 0px));
+    padding-right: calc(14px + env(safe-area-inset-right, 0px));
+  }
+
+  #dashboard-section .content-grid {
+    padding: 16px 14px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  #dashboard-section #view-dashboard #dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  #dashboard-section #view-dashboard .stat-card {
+    min-height: 126px;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  #dashboard-section .content-grid {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  #dashboard-section #view-dashboard .dashboard-hero {
+    min-height: 152px;
+    padding: 20px;
+  }
+
+  #dashboard-section #view-dashboard .dashboard-hero-copy {
+    max-width: 100%;
+  }
+
+  #dashboard-section #view-dashboard .dashboard-hero-visual {
+    display: none;
+  }
+
+  #dashboard-section #view-dashboard #dashboard-stats {
+    gap: 10px;
+  }
+
+  #dashboard-section #view-dashboard .stat-card {
+    min-height: 120px;
+    padding: 14px;
+    border-radius: 15px;
+  }
+
+  #dashboard-section #view-dashboard .stat-value {
+    font-size: clamp(1.6rem, 7vw, 2rem);
   }
 }
