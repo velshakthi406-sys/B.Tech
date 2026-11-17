@@ -1366,6 +1366,10 @@ h1,h2,h3,h4,h5,h6 {
   gap: 8px;
 }
 
+.support-payment-row > [hidden] {
+  display: none;
+}
+
 .support-payment-row svg {
   flex: 0 0 17px;
   width: 17px;
@@ -1415,6 +1419,10 @@ h1,h2,h3,h4,h5,h6 {
   object-fit: contain;
   border-radius: 10px;
   background: #FFFFFF;
+}
+
+.support-qr-image[hidden] {
+  display: none;
 }
 
 .support-qr-card .support-qr-title {

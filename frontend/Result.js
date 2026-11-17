@@ -451,14 +451,18 @@ async function initSupportPortal() {
     const closeButton = $('support-close');
     const panel = $('support-panel');
     const payLink = $('support-pay-link');
+    const gpayLink = $('support-gpay-link');
     const payLabel = $('support-pay-label');
     const copyButton = $('support-copy-upi');
     const upiDisplay = $('support-upi-display');
+    const qrImage = $('support-qr-image');
+    const qrHint = $('support-qr-hint');
     const status = $('support-status');
     const amountInput = $('support-custom-amount');
     const amountButtons = Array.from(document.querySelectorAll('[data-support-amount]'));
-    if (!widget || !toggleButton || !panel || !closeButton || !payLink || !payLabel || !copyButton || !upiDisplay || !status || !amountInput) return;
+    if (!widget || !toggleButton || !panel || !closeButton || !payLink || !gpayLink || !payLabel || !copyButton || !upiDisplay || !qrImage || !qrHint || !status || !amountInput) return;
     const userAgent = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(userAgent);
     const canLaunchUpiApp = navigator.userAgentData?.mobile === true
         || /Android|iPhone|iPad|iPod|IEMobile|Windows Phone/i.test(userAgent)
         || (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1);
@@ -487,15 +491,21 @@ async function initSupportPortal() {
     });
 
     let supportConfig;
+    let usingFallbackConfig = false;
     try {
         const response = await fetch(`${API_URL}/support/config`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || 'Support payments are unavailable.');
         supportConfig = data;
     } catch (error) {
-        status.textContent = 'The UPI button is unavailable. You can still scan the QR and enter an amount.';
-        payLabel.textContent = 'UPI button unavailable';
-        return;
+        const fallbackUpiId = $('support-qr-vpa')?.textContent.trim();
+        const fallbackDisplayName = $('support-qr-name')?.textContent.trim();
+        if (!fallbackUpiId || !fallbackDisplayName) {
+            status.textContent = 'Payment settings could not be loaded. Scan the QR code to contribute.';
+            return;
+        }
+        supportConfig = { enabled: true, upi_id: fallbackUpiId, display_name: fallbackDisplayName };
+        usingFallbackConfig = true;
     }
 
     if (!supportConfig.enabled) {
@@ -514,10 +524,18 @@ async function initSupportPortal() {
 
     upiDisplay.hidden = false;
     upiDisplay.textContent = `UPI ID: ${upiId}`;
+    $('support-qr-name').textContent = displayName;
+    $('support-qr-vpa').textContent = upiId;
+    const qrMatchesPaymentDetails = qrImage.dataset.supportUpiId === upiId;
+    qrImage.hidden = !qrMatchesPaymentDetails;
+    qrHint.textContent = qrMatchesPaymentDetails
+        ? 'Scan with any UPI app and enter your amount.'
+        : 'QR unavailable for these UPI details. Use a payment button or copy the UPI ID.';
     copyButton.disabled = false;
     amountButtons.forEach((button) => { button.disabled = false; });
     amountInput.disabled = false;
     payLabel.textContent = 'Continue with UPI';
+    gpayLink.hidden = !isAndroid;
 
     const updatePaymentLink = () => {
         const amount = Number(amountInput.value);
@@ -525,6 +543,8 @@ async function initSupportPortal() {
         if (!validAmount) {
             payLink.href = '#';
             payLink.setAttribute('aria-disabled', 'true');
+            gpayLink.href = '#';
+            gpayLink.setAttribute('aria-disabled', 'true');
             status.textContent = 'Choose an amount from ₹1 to ₹50,000.';
             return;
         }
@@ -532,7 +552,9 @@ async function initSupportPortal() {
         if (!canLaunchUpiApp) {
             payLink.href = '#';
             payLink.setAttribute('aria-disabled', 'true');
-            payLabel.textContent = 'Use QR or copy UPI ID';
+            gpayLink.href = '#';
+            gpayLink.setAttribute('aria-disabled', 'true');
+            payLabel.textContent = 'Open a UPI app';
             status.textContent = 'This browser cannot open UPI apps. Scan the QR with your phone or copy the UPI ID.';
             return;
         }
@@ -546,8 +568,14 @@ async function initSupportPortal() {
         });
         payLink.href = `upi://pay?${params.toString()}`;
         payLink.setAttribute('aria-disabled', 'false');
+        if (isAndroid) {
+            gpayLink.href = `intent://pay?${params.toString()}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+            gpayLink.setAttribute('aria-disabled', 'false');
+        }
         payLabel.textContent = 'Continue with UPI';
-        status.textContent = 'Your contribution is optional. Portal access remains free.';
+        status.textContent = usingFallbackConfig
+            ? 'Payment settings are offline; using the UPI details shown here. Your contribution is optional.'
+            : 'Your contribution is optional. Portal access remains free.';
     };
 
     amountButtons.forEach((button) => {
@@ -573,6 +601,10 @@ async function initSupportPortal() {
 
     payLink.addEventListener('click', (event) => {
         if (payLink.getAttribute('aria-disabled') === 'true') event.preventDefault();
+    });
+
+    gpayLink.addEventListener('click', (event) => {
+        if (gpayLink.getAttribute('aria-disabled') === 'true') event.preventDefault();
     });
 
     copyButton.addEventListener('click', async () => {

@@ -266,13 +266,21 @@
           <input id="support-custom-amount" class="support-custom-amount" type="number" min="1" max="50000"
             step="1" inputmode="numeric" value="25" aria-describedby="support-status" disabled />
           <div class="support-payment-row">
+            <a id="support-gpay-link" class="support-pay-button support-gpay-button" href="#" aria-disabled="true" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 3h7v7M21 3l-9 9" />
+                <path d="M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" />
+              </svg>
+              <span>Open Google Pay</span>
+            </a>
             <a id="support-pay-link" class="support-pay-button" href="#" aria-disabled="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <rect x="5" y="2" width="14" height="20" rx="2" />
                 <path d="M9 6h6M10 18h4" />
               </svg>
-              <span id="support-pay-label">Set up support payments</span>
+              <span id="support-pay-label">Choose a UPI app</span>
             </a>
             <button id="support-copy-upi" class="support-copy-button" type="button" disabled>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -291,11 +299,12 @@
             receipts.</p>
         </div>
         <div class="support-qr-card">
-          <img class="support-qr-image" src="support_upi_qr.png"
-            alt="UPI payment QR code for Mala Vimal. Scan with GPay, PhonePe, or another UPI app." />
-          <p class="support-qr-title">Scan &amp; support</p>
-          <p class="support-qr-hint">Mala Vimal · Enter your amount in the UPI app</p>
-          <p class="support-qr-vpa">mala9994709538@oksbi</p>
+          <img id="support-qr-image" class="support-qr-image" src="support_upi_qr.png"
+            data-support-upi-id="mala9994709538@oksbi"
+            alt="UPI payment QR code. Scan with Google Pay, PhonePe, or another UPI app." />
+          <p id="support-qr-name" class="support-qr-title">Mala Vimal</p>
+          <p id="support-qr-hint" class="support-qr-hint">Scan with any UPI app and enter your amount.</p>
+          <p id="support-qr-vpa" class="support-qr-vpa">mala9994709538@oksbi</p>
         </div>
       </section>
     </div>
